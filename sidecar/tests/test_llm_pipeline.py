@@ -122,6 +122,84 @@ class TestPromptEngine:
         assert "clinical level" in prompt
         assert "medical terminology" in prompt
 
+    def test_user_prompt_contains_clinical_context(self):
+        engine = PromptEngine()
+        report = _make_parsed_report()
+        prompt = engine.build_user_prompt(
+            report,
+            MOCK_REFERENCE_RANGES,
+            MOCK_GLOSSARY,
+            "scrubbed text",
+            clinical_context="Chest pain and dyspnea",
+        )
+        assert "Clinical Context" in prompt
+        assert "Chest pain and dyspnea" in prompt
+        assert "Prioritize findings" in prompt
+
+    def test_user_prompt_without_clinical_context(self):
+        engine = PromptEngine()
+        report = _make_parsed_report()
+        prompt = engine.build_user_prompt(
+            report,
+            MOCK_REFERENCE_RANGES,
+            MOCK_GLOSSARY,
+            "scrubbed text",
+            clinical_context=None,
+        )
+        assert "Clinical Context" not in prompt
+
+    def test_user_prompt_contains_template_instructions(self):
+        engine = PromptEngine()
+        report = _make_parsed_report()
+        prompt = engine.build_user_prompt(
+            report,
+            MOCK_REFERENCE_RANGES,
+            MOCK_GLOSSARY,
+            "scrubbed text",
+            template_instructions="Start with a brief overview.",
+        )
+        assert "Structure Instructions" in prompt
+        assert "Start with a brief overview." in prompt
+
+    def test_user_prompt_contains_closing_text(self):
+        engine = PromptEngine()
+        report = _make_parsed_report()
+        prompt = engine.build_user_prompt(
+            report,
+            MOCK_REFERENCE_RANGES,
+            MOCK_GLOSSARY,
+            "scrubbed text",
+            closing_text="Discuss with your doctor.",
+        )
+        assert "Closing Text" in prompt
+        assert "Discuss with your doctor." in prompt
+
+    def test_user_prompt_without_template_params(self):
+        engine = PromptEngine()
+        report = _make_parsed_report()
+        prompt = engine.build_user_prompt(
+            report,
+            MOCK_REFERENCE_RANGES,
+            MOCK_GLOSSARY,
+            "scrubbed text",
+        )
+        assert "Structure Instructions" not in prompt
+        assert "Closing Text" not in prompt
+
+    def test_system_prompt_contains_tone(self):
+        engine = PromptEngine()
+        context = {**MOCK_PROMPT_CONTEXT, "tone": "Warm and reassuring"}
+        prompt = engine.build_system_prompt(LiteracyLevel.GRADE_6, context)
+        assert "Warm and reassuring" in prompt
+        assert "## Tone" in prompt
+
+    def test_system_prompt_omits_tone_when_empty(self):
+        engine = PromptEngine()
+        prompt = engine.build_system_prompt(
+            LiteracyLevel.GRADE_6, MOCK_PROMPT_CONTEXT
+        )
+        assert "## Tone" not in prompt
+
 
 class TestResponseParser:
     def test_valid_response_parses(self):

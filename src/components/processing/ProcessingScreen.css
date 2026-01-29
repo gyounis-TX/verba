@@ -108,9 +108,26 @@
   border-radius: var(--radius-md);
 }
 
+.error-title {
+  font-weight: 600;
+  color: #991b1b;
+  margin-bottom: var(--space-xs);
+}
+
 .error-message {
   color: #dc2626;
+  margin-bottom: var(--space-xs);
+}
+
+.error-suggestion {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
   margin-bottom: var(--space-md);
+}
+
+.error-actions {
+  display: flex;
+  gap: var(--space-sm);
 }
 
 .retry-btn {

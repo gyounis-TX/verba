@@ -1,7 +1,7 @@
 import os
 import tempfile
 
-from fastapi import APIRouter, Body, File, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, Body, File, HTTPException, Query, Request, Response, UploadFile
 
 from api.analysis_models import DetectTypeResponse, ParsedReport, ParseRequest
 from api.explain_models import (
@@ -10,8 +10,23 @@ from api.explain_models import (
     ExplainResponse,
     SettingsUpdate,
 )
+from api.template_models import (
+    TemplateCreateRequest,
+    TemplateListResponse,
+    TemplateResponse,
+    TemplateUpdateRequest,
+)
+from api.history_models import (
+    ConsentStatusResponse,
+    HistoryCreateRequest,
+    HistoryDeleteResponse,
+    HistoryDetailResponse,
+    HistoryListItem,
+    HistoryListResponse,
+)
 from api.models import DetectionResult, ExtractionResult
 from api import settings_store
+from storage.database import get_db
 from extraction import ExtractionPipeline
 from extraction.detector import PDFDetector
 from llm.client import LLMClient, LLMProvider
@@ -237,15 +252,35 @@ async def explain_report(request: ExplainRequest = Body(...)):
     # 6. Build prompts
     literacy_level = LiteracyLevel(request.literacy_level.value)
     prompt_engine = PromptEngine()
+    prompt_context = handler.get_prompt_context()
+    if settings.specialty and "specialty" not in prompt_context:
+        prompt_context["specialty"] = settings.specialty
     system_prompt = prompt_engine.build_system_prompt(
         literacy_level=literacy_level,
-        prompt_context=handler.get_prompt_context(),
+        prompt_context=prompt_context,
     )
+    # 6b. Load template if specified
+    template_tone = None
+    template_instructions = None
+    template_closing = None
+    if request.template_id is not None:
+        db = get_db()
+        tpl = db.get_template(request.template_id)
+        if tpl:
+            template_tone = tpl.get("tone")
+            template_instructions = tpl.get("structure_instructions")
+            template_closing = tpl.get("closing_text")
+            if template_tone:
+                prompt_context["tone"] = template_tone
+
     user_prompt = prompt_engine.build_user_prompt(
         parsed_report=parsed_report,
         reference_ranges=handler.get_reference_ranges(),
         glossary=handler.get_glossary(),
         scrubbed_text=scrub_result.scrubbed_text,
+        clinical_context=request.clinical_context,
+        template_instructions=template_instructions,
+        closing_text=template_closing,
     )
 
     # 7. Call LLM with retry
@@ -295,7 +330,7 @@ async def explain_report(request: ExplainRequest = Body(...)):
 
     return ExplainResponse(
         explanation=explanation,
-        parsed_report=parsed_report.model_dump(),
+        parsed_report=parsed_report,
         validation_warnings=[issue.message for issue in issues],
         phi_categories_found=scrub_result.phi_found,
         model_used=llm_response.model,
@@ -347,8 +382,10 @@ async def export_pdf(request: Request):
 
 def _mask_api_key(key: str | None) -> str | None:
     """Mask an API key for display, keeping first 8 and last 4 chars."""
-    if not key or len(key) < 16:
+    if not key:
         return key
+    if len(key) < 16:
+        return "***"
     return key[:8] + "..." + key[-4:]
 
 
@@ -368,3 +405,126 @@ async def update_settings(update: SettingsUpdate = Body(...)):
     updated.claude_api_key = _mask_api_key(updated.claude_api_key)
     updated.openai_api_key = _mask_api_key(updated.openai_api_key)
     return updated
+
+
+# --- Template Endpoints ---
+
+
+@router.get("/templates", response_model=TemplateListResponse)
+async def list_templates():
+    """Return all templates."""
+    db = get_db()
+    items, total = db.list_templates()
+    return TemplateListResponse(
+        items=[TemplateResponse(**item) for item in items],
+        total=total,
+    )
+
+
+@router.post("/templates", response_model=TemplateResponse, status_code=201)
+async def create_template(request: TemplateCreateRequest = Body(...)):
+    """Create a new template."""
+    db = get_db()
+    record = db.create_template(
+        name=request.name,
+        test_type=request.test_type,
+        tone=request.tone,
+        structure_instructions=request.structure_instructions,
+        closing_text=request.closing_text,
+    )
+    return TemplateResponse(**record)
+
+
+@router.patch("/templates/{template_id}", response_model=TemplateResponse)
+async def update_template(template_id: int, request: TemplateUpdateRequest = Body(...)):
+    """Update an existing template."""
+    db = get_db()
+    update_data = request.model_dump(exclude_unset=True)
+    record = db.update_template(template_id, **update_data)
+    if not record:
+        raise HTTPException(status_code=404, detail="Template not found.")
+    return TemplateResponse(**record)
+
+
+@router.delete("/templates/{template_id}")
+async def delete_template(template_id: int):
+    """Delete a template."""
+    db = get_db()
+    deleted = db.delete_template(template_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Template not found.")
+    return {"deleted": True, "id": template_id}
+
+
+# --- History Endpoints ---
+
+
+@router.get("/history", response_model=HistoryListResponse)
+async def list_history(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    search: str | None = Query(None),
+):
+    """Return paginated history list, newest first."""
+    db = get_db()
+    items, total = db.list_history(offset=offset, limit=limit, search=search)
+    return HistoryListResponse(
+        items=[HistoryListItem(**item) for item in items],
+        total=total,
+        offset=offset,
+        limit=limit,
+    )
+
+
+@router.get("/history/{history_id}", response_model=HistoryDetailResponse)
+async def get_history_detail(history_id: int):
+    """Return single history record with full_response."""
+    db = get_db()
+    record = db.get_history(history_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="History record not found.")
+    return HistoryDetailResponse(**record)
+
+
+@router.post("/history", response_model=HistoryDetailResponse, status_code=201)
+async def create_history(request: HistoryCreateRequest = Body(...)):
+    """Save a new analysis history record."""
+    db = get_db()
+    new_id = db.save_history(
+        test_type=request.test_type,
+        test_type_display=request.test_type_display,
+        summary=request.summary,
+        full_response=request.full_response,
+        filename=request.filename,
+    )
+    record = db.get_history(new_id)
+    return HistoryDetailResponse(**record)  # type: ignore[arg-type]
+
+
+@router.delete("/history/{history_id}", response_model=HistoryDeleteResponse)
+async def delete_history(history_id: int):
+    """Hard-delete a history record."""
+    db = get_db()
+    deleted = db.delete_history(history_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="History record not found.")
+    return HistoryDeleteResponse(deleted=True, id=history_id)
+
+
+# --- Consent Endpoints ---
+
+
+@router.get("/consent", response_model=ConsentStatusResponse)
+async def get_consent():
+    """Check whether the user has given privacy consent."""
+    db = get_db()
+    value = db.get_setting("privacy_consent_given")
+    return ConsentStatusResponse(consent_given=value == "true")
+
+
+@router.post("/consent", response_model=ConsentStatusResponse)
+async def grant_consent():
+    """Record that the user has given privacy consent."""
+    db = get_db()
+    db.set_setting("privacy_consent_given", "true")
+    return ConsentStatusResponse(consent_given=True)

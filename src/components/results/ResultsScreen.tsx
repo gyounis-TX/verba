@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type {
   ExplainResponse,
+  ExtractionResult,
   MeasurementExplanation,
   FindingExplanation,
   ParsedMeasurement,
+  LiteracyLevel,
 } from "../../types/sidecar";
 import { sidecarApi } from "../../services/sidecarApi";
+import { useToast } from "../shared/Toast";
 import { GlossaryTooltip } from "./GlossaryTooltip";
 import "./ResultsScreen.css";
 
@@ -42,26 +45,176 @@ const FINDING_SEVERITY_ICONS: Record<string, string> = {
   informational: "\u24D8",
 };
 
+const LITERACY_OPTIONS: { value: LiteracyLevel; label: string }[] = [
+  { value: "grade_4", label: "Grade 4" },
+  { value: "grade_6", label: "Grade 6" },
+  { value: "grade_8", label: "Grade 8" },
+  { value: "clinical", label: "Clinical" },
+];
+
+function buildCopyText(
+  summary: string,
+  findings: { finding: string; explanation: string }[],
+  questions: string[],
+  disclaimer: string,
+): string {
+  const parts: string[] = [];
+  parts.push("SUMMARY");
+  parts.push(summary);
+  if (findings.length > 0) {
+    parts.push("");
+    parts.push("KEY FINDINGS");
+    for (const f of findings) {
+      parts.push(`- ${f.finding}: ${f.explanation}`);
+    }
+  }
+  if (questions.length > 0) {
+    parts.push("");
+    parts.push("QUESTIONS TO ASK YOUR DOCTOR");
+    for (const q of questions) {
+      parts.push(`- ${q}`);
+    }
+  }
+  parts.push("");
+  parts.push(disclaimer);
+  return parts.join("\n");
+}
+
 export function ResultsScreen() {
   const location = useLocation();
   const navigate = useNavigate();
-  const explainResponse = (
-    location.state as { explainResponse?: ExplainResponse }
-  )?.explainResponse;
+  const locationState = location.state as {
+    explainResponse?: ExplainResponse;
+    fromHistory?: boolean;
+    extractionResult?: ExtractionResult;
+    clinicalContext?: string;
+    templateId?: number;
+  } | null;
 
+  const initialResponse = locationState?.explainResponse ?? null;
+  const fromHistory = locationState?.fromHistory ?? false;
+  const extractionResult = locationState?.extractionResult ?? null;
+  const clinicalContext = locationState?.clinicalContext;
+  const templateId = locationState?.templateId;
+
+  const { showToast } = useToast();
+  const [currentResponse, setCurrentResponse] =
+    useState<ExplainResponse | null>(initialResponse);
   const [glossary, setGlossary] = useState<Record<string, string>>({});
   const [isExporting, setIsExporting] = useState(false);
 
+  // Refinement state
+  const [selectedLiteracy, setSelectedLiteracy] =
+    useState<LiteracyLevel>("grade_6");
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  // Edit state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedSummary, setEditedSummary] = useState("");
+  const [editedFindings, setEditedFindings] = useState<
+    { finding: string; explanation: string }[]
+  >([]);
+  const [editedQuestions, setEditedQuestions] = useState<string[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Sync edit state when response changes
   useEffect(() => {
-    if (!explainResponse) return;
-    const testType = explainResponse.parsed_report.test_type;
+    if (!currentResponse) return;
+    const expl = currentResponse.explanation;
+    setEditedSummary(expl.overall_summary);
+    setEditedFindings(
+      expl.key_findings.map((f) => ({
+        finding: f.finding,
+        explanation: f.explanation,
+      })),
+    );
+    setEditedQuestions([...expl.questions_for_doctor]);
+    setIsDirty(false);
+    setIsEditing(false);
+  }, [currentResponse]);
+
+  useEffect(() => {
+    if (!currentResponse) return;
+    const testType = currentResponse.parsed_report.test_type;
     sidecarApi
       .getGlossary(testType)
       .then((res) => setGlossary(res.glossary))
-      .catch(() => {});
-  }, [explainResponse]);
+      .catch(() => {
+        showToast("error", "Could not load glossary for tooltips.");
+      });
+  }, [currentResponse, showToast]);
 
-  if (!explainResponse) {
+  const canRefine = !fromHistory && extractionResult != null;
+
+  const handleRegenerate = useCallback(async () => {
+    if (!extractionResult) return;
+    setIsRegenerating(true);
+    try {
+      const response = await sidecarApi.explainReport({
+        extraction_result: extractionResult,
+        test_type: currentResponse?.parsed_report.test_type,
+        literacy_level: selectedLiteracy,
+        clinical_context: clinicalContext,
+        template_id: templateId,
+      });
+      setCurrentResponse(response);
+      showToast("success", "Explanation regenerated.");
+    } catch {
+      showToast("error", "Failed to regenerate explanation.");
+    } finally {
+      setIsRegenerating(false);
+    }
+  }, [extractionResult, currentResponse, selectedLiteracy, clinicalContext, templateId, showToast]);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!currentResponse) return;
+    setIsExporting(true);
+    try {
+      const blob = await sidecarApi.exportPdf(currentResponse);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "verba-report.pdf";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("success", "PDF exported successfully.");
+    } catch {
+      showToast("error", "Failed to export PDF.");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [currentResponse, showToast]);
+
+  const handleCopy = useCallback(async () => {
+    if (!currentResponse) return;
+    const expl = currentResponse.explanation;
+    const summary = isDirty ? editedSummary : expl.overall_summary;
+    const findings = isDirty ? editedFindings : expl.key_findings;
+    const questions = isDirty ? editedQuestions : expl.questions_for_doctor;
+    const text = buildCopyText(summary, findings, questions, expl.disclaimer);
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("success", "Copied to clipboard.");
+      // Future: capture learning event
+    } catch {
+      showToast("error", "Failed to copy to clipboard.");
+    }
+  }, [
+    currentResponse,
+    isDirty,
+    editedSummary,
+    editedFindings,
+    editedQuestions,
+    showToast,
+  ]);
+
+  const markDirty = () => {
+    if (!isDirty) setIsDirty(true);
+  };
+
+  if (!currentResponse) {
     return (
       <div className="results-screen">
         <h2 className="results-title">No Results</h2>
@@ -79,7 +232,18 @@ export function ResultsScreen() {
     );
   }
 
-  const { explanation, parsed_report } = explainResponse;
+  const { explanation, parsed_report } = currentResponse;
+  const displaySummary = isDirty ? editedSummary : explanation.overall_summary;
+  const displayFindings = isDirty
+    ? editedFindings.map((f, i) => ({
+        ...(explanation.key_findings[i] ?? { severity: "informational" }),
+        finding: f.finding,
+        explanation: f.explanation,
+      }))
+    : explanation.key_findings;
+  const displayQuestions = isDirty
+    ? editedQuestions
+    : explanation.questions_for_doctor;
 
   const measurementMap = new Map<string, ParsedMeasurement>();
   if (parsed_report.measurements) {
@@ -88,25 +252,6 @@ export function ResultsScreen() {
     }
   }
 
-  const handleExportPdf = async () => {
-    setIsExporting(true);
-    try {
-      const blob = await sidecarApi.exportPdf(explainResponse);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "verba-report.pdf";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch {
-      // PDF export failed silently
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   return (
     <div className="results-screen">
       <header className="results-header">
@@ -114,6 +259,9 @@ export function ResultsScreen() {
         <span className="results-test-type">
           {parsed_report.test_type_display}
         </span>
+        {fromHistory && (
+          <span className="results-from-history">Viewed from history</span>
+        )}
       </header>
 
       {/* Export Toolbar */}
@@ -128,31 +276,79 @@ export function ResultsScreen() {
         <button className="export-btn" onClick={() => window.print()}>
           Print
         </button>
+        <button className="export-btn" onClick={handleCopy}>
+          Copy Explanation
+        </button>
       </div>
+
+      {/* Refine Toolbar */}
+      {canRefine && (
+        <div className="refine-toolbar">
+          <label className="refine-label">
+            Literacy:
+            <select
+              className="refine-select"
+              value={selectedLiteracy}
+              onChange={(e) =>
+                setSelectedLiteracy(e.target.value as LiteracyLevel)
+              }
+            >
+              {LITERACY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="refine-btn"
+            onClick={handleRegenerate}
+            disabled={isRegenerating}
+          >
+            {isRegenerating ? "Regenerating\u2026" : "Regenerate"}
+          </button>
+          <button
+            className={`edit-toggle-btn ${isEditing ? "edit-toggle-btn--active" : ""}`}
+            onClick={() => setIsEditing(!isEditing)}
+          >
+            {isEditing ? "Stop Editing" : "Edit Text"}
+          </button>
+          {isDirty && <span className="edit-indicator">Edited</span>}
+        </div>
+      )}
 
       {/* Overall Summary */}
       <section className="results-section">
         <h3 className="section-heading">Summary</h3>
-        <p className="summary-text">
-          <GlossaryTooltip
-            text={explanation.overall_summary}
-            glossary={glossary}
+        {isEditing ? (
+          <textarea
+            className="summary-textarea"
+            value={editedSummary}
+            onChange={(e) => {
+              setEditedSummary(e.target.value);
+              markDirty();
+            }}
+            rows={6}
           />
-        </p>
+        ) : (
+          <p className="summary-text">
+            <GlossaryTooltip text={displaySummary} glossary={glossary} />
+          </p>
+        )}
       </section>
 
       {/* Key Findings */}
-      {explanation.key_findings.length > 0 && (
+      {displayFindings.length > 0 && (
         <details open className="results-section results-collapsible">
           <summary className="section-heading">
             Key Findings
             <span className="section-count">
-              {explanation.key_findings.length}
+              {displayFindings.length}
             </span>
           </summary>
           <div className="section-body">
             <div className="findings-list">
-              {explanation.key_findings.map(
+              {displayFindings.map(
                 (f: FindingExplanation, i: number) => (
                   <div key={i} className="finding-card">
                     <div className="finding-header">
@@ -168,18 +364,53 @@ export function ResultsScreen() {
                         {FINDING_SEVERITY_ICONS[f.severity] || "\u2014"}
                       </span>
                       <span className="finding-title">
-                        <GlossaryTooltip
-                          text={f.finding}
-                          glossary={glossary}
-                        />
+                        {isEditing ? (
+                          <input
+                            className="finding-edit-input"
+                            value={editedFindings[i]?.finding ?? f.finding}
+                            onChange={(e) => {
+                              const updated = [...editedFindings];
+                              updated[i] = {
+                                ...updated[i],
+                                finding: e.target.value,
+                              };
+                              setEditedFindings(updated);
+                              markDirty();
+                            }}
+                          />
+                        ) : (
+                          <GlossaryTooltip
+                            text={f.finding}
+                            glossary={glossary}
+                          />
+                        )}
                       </span>
                     </div>
-                    <p className="finding-explanation">
-                      <GlossaryTooltip
-                        text={f.explanation}
-                        glossary={glossary}
+                    {isEditing ? (
+                      <textarea
+                        className="finding-edit-textarea"
+                        value={
+                          editedFindings[i]?.explanation ?? f.explanation
+                        }
+                        onChange={(e) => {
+                          const updated = [...editedFindings];
+                          updated[i] = {
+                            ...updated[i],
+                            explanation: e.target.value,
+                          };
+                          setEditedFindings(updated);
+                          markDirty();
+                        }}
+                        rows={3}
                       />
-                    </p>
+                    ) : (
+                      <p className="finding-explanation">
+                        <GlossaryTooltip
+                          text={f.explanation}
+                          glossary={glossary}
+                        />
+                      </p>
+                    )}
                   </div>
                 ),
               )}
@@ -262,23 +493,34 @@ export function ResultsScreen() {
       )}
 
       {/* Questions for Doctor */}
-      {explanation.questions_for_doctor.length > 0 && (
+      {displayQuestions.length > 0 && (
         <details open className="results-section results-collapsible">
           <summary className="section-heading">
             Questions to Ask Your Doctor
             <span className="section-count">
-              {explanation.questions_for_doctor.length}
+              {displayQuestions.length}
             </span>
           </summary>
           <div className="section-body">
             <ul className="questions-list">
-              {explanation.questions_for_doctor.map(
-                (q: string, i: number) => (
-                  <li key={i} className="question-item">
-                    {q}
-                  </li>
-                ),
-              )}
+              {displayQuestions.map((q: string, i: number) => (
+                <li key={i} className="question-item">
+                  {isEditing ? (
+                    <input
+                      className="question-edit-input"
+                      value={editedQuestions[i] ?? q}
+                      onChange={(e) => {
+                        const updated = [...editedQuestions];
+                        updated[i] = e.target.value;
+                        setEditedQuestions(updated);
+                        markDirty();
+                      }}
+                    />
+                  ) : (
+                    q
+                  )}
+                </li>
+              ))}
             </ul>
           </div>
         </details>
@@ -292,18 +534,18 @@ export function ResultsScreen() {
       {/* Metadata */}
       <footer className="results-footer">
         <span className="results-meta">
-          Model: {explainResponse.model_used} | Tokens:{" "}
-          {explainResponse.input_tokens} in /{" "}
-          {explainResponse.output_tokens} out
+          Model: {currentResponse.model_used} | Tokens:{" "}
+          {currentResponse.input_tokens} in /{" "}
+          {currentResponse.output_tokens} out
         </span>
-        {explainResponse.validation_warnings.length > 0 && (
+        {currentResponse.validation_warnings.length > 0 && (
           <details className="validation-warnings">
             <summary>
               Validation Warnings (
-              {explainResponse.validation_warnings.length})
+              {currentResponse.validation_warnings.length})
             </summary>
             <ul>
-              {explainResponse.validation_warnings.map((w, i) => (
+              {currentResponse.validation_warnings.map((w, i) => (
                 <li key={i}>{w}</li>
               ))}
             </ul>
@@ -313,7 +555,12 @@ export function ResultsScreen() {
 
       <button
         className="results-back-btn"
-        onClick={() => navigate("/")}
+        onClick={() => {
+          if (isDirty && !window.confirm("You have unsaved edits. Leave anyway?")) {
+            return;
+          }
+          navigate("/");
+        }}
       >
         Analyze Another Report
       </button>

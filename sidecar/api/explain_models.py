@@ -7,7 +7,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from api.analysis_models import SeverityStatus
+from api.analysis_models import ParsedReport, SeverityStatus
 
 
 class LLMProviderEnum(str, Enum):
@@ -33,6 +33,8 @@ class ExplainRequest(BaseModel):
     literacy_level: LiteracyLevelEnum = LiteracyLevelEnum.GRADE_6
     provider: LLMProviderEnum = LLMProviderEnum.CLAUDE
     api_key: Optional[str] = None
+    clinical_context: Optional[str] = None
+    template_id: Optional[int] = None
 
 
 # --- Response sub-models ---
@@ -67,7 +69,7 @@ class ExplainResponse(BaseModel):
     """Full response from POST /analyze/explain."""
 
     explanation: ExplanationResult
-    parsed_report: dict
+    parsed_report: ParsedReport
     validation_warnings: list[str] = Field(default_factory=list)
     phi_categories_found: list[str] = Field(default_factory=list)
     model_used: str = ""
@@ -87,6 +89,8 @@ class AppSettings(BaseModel):
     claude_model: Optional[str] = None
     openai_model: Optional[str] = None
     literacy_level: LiteracyLevelEnum = LiteracyLevelEnum.GRADE_6
+    specialty: Optional[str] = None
+    practice_name: Optional[str] = None
 
 
 class SettingsUpdate(BaseModel):
@@ -98,3 +102,5 @@ class SettingsUpdate(BaseModel):
     claude_model: Optional[str] = None
     openai_model: Optional[str] = None
     literacy_level: Optional[LiteracyLevelEnum] = None
+    specialty: Optional[str] = None
+    practice_name: Optional[str] = None

@@ -25,3 +25,32 @@
 .sidecar-error {
   color: #dc2626;
 }
+
+.setup-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  background-color: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: #92400e;
+}
+
+.setup-banner-btn {
+  padding: var(--space-xs) var(--space-md);
+  background-color: #f59e0b;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.setup-banner-btn:hover {
+  background-color: #d97706;
+}

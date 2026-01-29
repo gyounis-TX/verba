@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { sidecarApi } from "../../services/sidecarApi";
-import type { ExtractionResult } from "../../types/sidecar";
+import { useToast } from "../shared/Toast";
+import type { ExtractionResult, Template } from "../../types/sidecar";
 import "./ImportScreen.css";
 
 type ImportMode = "pdf" | "text";
@@ -9,6 +10,7 @@ type ImportStatus = "idle" | "extracting" | "success" | "error";
 
 export function ImportScreen() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [mode, setMode] = useState<ImportMode>("pdf");
@@ -18,6 +20,20 @@ export function ImportScreen() {
   const [result, setResult] = useState<ExtractionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [clinicalContext, setClinicalContext] = useState("");
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<
+    number | undefined
+  >(undefined);
+
+  useEffect(() => {
+    sidecarApi
+      .listTemplates()
+      .then((res) => setTemplates(res.items))
+      .catch(() => {
+        showToast("error", "Failed to load templates.");
+      });
+  }, [showToast]);
 
   const resetState = useCallback(() => {
     setStatus("idle");
@@ -119,16 +135,24 @@ export function ImportScreen() {
       setResult(extractionResult);
       setStatus("success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Extraction failed.");
+      const msg = err instanceof Error ? err.message : "Extraction failed.";
+      setError(msg);
       setStatus("error");
+      showToast("error", msg);
     }
-  }, [mode, selectedFile, pastedText]);
+  }, [mode, selectedFile, pastedText, showToast]);
 
   const handleProceed = useCallback(() => {
     if (result) {
-      navigate("/processing", { state: { extractionResult: result } });
+      navigate("/processing", {
+        state: {
+          extractionResult: result,
+          clinicalContext: clinicalContext.trim() || undefined,
+          templateId: selectedTemplateId,
+        },
+      });
     }
-  }, [navigate, result]);
+  }, [navigate, result, clinicalContext, selectedTemplateId]);
 
   const canExtract =
     status !== "extracting" &&
@@ -288,6 +312,44 @@ export function ImportScreen() {
               {result.full_text.length > 2000 && "\n\n... (truncated)"}
             </pre>
           </div>
+
+          <div className="clinical-context-group">
+            <label className="clinical-context-label">
+              Clinical Reason for Test (Optional)
+            </label>
+            <textarea
+              className="clinical-context-input"
+              placeholder="e.g. Chest pain, shortness of breath, follow-up for diabetes..."
+              value={clinicalContext}
+              onChange={(e) => setClinicalContext(e.target.value)}
+              rows={3}
+            />
+          </div>
+
+          {templates.length > 0 && (
+            <div className="clinical-context-group">
+              <label className="clinical-context-label">
+                Template (Optional)
+              </label>
+              <select
+                className="clinical-context-input"
+                value={selectedTemplateId ?? ""}
+                onChange={(e) =>
+                  setSelectedTemplateId(
+                    e.target.value ? Number(e.target.value) : undefined,
+                  )
+                }
+              >
+                <option value="">No template</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                    {t.test_type ? ` (${t.test_type})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <button className="proceed-btn" onClick={handleProceed}>
             Continue to Processing

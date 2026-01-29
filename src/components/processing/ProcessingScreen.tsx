@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { sidecarApi } from "../../services/sidecarApi";
+import { useToast } from "../shared/Toast";
 import type { ExtractionResult, ExplainResponse } from "../../types/sidecar";
 import "./ProcessingScreen.css";
 
@@ -30,20 +31,89 @@ const STEPS: StepInfo[] = [
   },
 ];
 
+interface CategorizedError {
+  category: string;
+  title: string;
+  message: string;
+  suggestion: string;
+}
+
+function categorizeError(errorMessage: string): CategorizedError {
+  const lower = errorMessage.toLowerCase();
+
+  if (lower.includes("api key") || lower.includes("no api key") || lower.includes("authentication")) {
+    return {
+      category: "auth",
+      title: "API Key Required",
+      message: errorMessage,
+      suggestion: "Please add your API key in Settings.",
+    };
+  }
+
+  if (lower.includes("rate limit") || lower.includes("quota") || lower.includes("429")) {
+    return {
+      category: "quota",
+      title: "Rate Limit Reached",
+      message: errorMessage,
+      suggestion: "Please wait a moment and try again.",
+    };
+  }
+
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    return {
+      category: "timeout",
+      title: "Request Timed Out",
+      message: errorMessage,
+      suggestion: "The AI service is slow. Please try again.",
+    };
+  }
+
+  if (lower.includes("network") || lower.includes("fetch") || lower.includes("connection")) {
+    return {
+      category: "network",
+      title: "Network Error",
+      message: errorMessage,
+      suggestion: "Check your internet connection and try again.",
+    };
+  }
+
+  if (lower.includes("parse") || lower.includes("validation") || lower.includes("invalid")) {
+    return {
+      category: "parse",
+      title: "Processing Error",
+      message: errorMessage,
+      suggestion: "The report format may not be supported. Try a different file.",
+    };
+  }
+
+  return {
+    category: "unknown",
+    title: "Processing Failed",
+    message: errorMessage,
+    suggestion: "Please try again or import a different report.",
+  };
+}
+
 export function ProcessingScreen() {
   const location = useLocation();
   const navigate = useNavigate();
-  const extractionResult = (
-    location.state as { extractionResult?: ExtractionResult }
-  )?.extractionResult;
+  const locationState = location.state as {
+    extractionResult?: ExtractionResult;
+    clinicalContext?: string;
+    templateId?: number;
+  } | null;
+  const extractionResult = locationState?.extractionResult;
+  const clinicalContext = locationState?.clinicalContext;
+  const templateId = locationState?.templateId;
 
+  const { showToast } = useToast();
   const [currentStep, setCurrentStep] =
     useState<ProcessingStep>("detecting");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<CategorizedError | null>(null);
 
   const runPipeline = useCallback(async () => {
     if (!extractionResult) {
-      setError("No extraction result found. Please import a report first.");
+      setError(categorizeError("No extraction result found. Please import a report first."));
       setCurrentStep("error");
       return;
     }
@@ -67,22 +137,41 @@ export function ProcessingScreen() {
       const response: ExplainResponse = await sidecarApi.explainReport({
         extraction_result: extractionResult,
         test_type: testType,
+        clinical_context: clinicalContext,
+        template_id: templateId,
       });
+
+      // Save to history
+      sidecarApi
+        .saveHistory({
+          test_type: response.parsed_report.test_type,
+          test_type_display: response.parsed_report.test_type_display,
+          filename: extractionResult.filename ?? null,
+          summary: response.explanation.overall_summary.slice(0, 200),
+          full_response: response,
+        })
+        .catch(() => {
+          showToast("error", "Analysis complete but failed to save to history.");
+        });
 
       // Done - navigate to results
       setCurrentStep("done");
       setTimeout(() => {
         navigate("/results", {
-          state: { explainResponse: response },
+          state: {
+            explainResponse: response,
+            extractionResult,
+            clinicalContext,
+            templateId,
+          },
         });
       }, 600);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Processing failed.",
-      );
+      const msg = err instanceof Error ? err.message : "Processing failed.";
+      setError(categorizeError(msg));
       setCurrentStep("error");
     }
-  }, [extractionResult, navigate]);
+  }, [extractionResult, clinicalContext, templateId, navigate, showToast]);
 
   useEffect(() => {
     runPipeline();
@@ -141,13 +230,40 @@ export function ProcessingScreen() {
 
       {currentStep === "error" && error && (
         <div className="processing-error">
-          <p className="error-message">{error}</p>
-          <button
-            className="retry-btn"
-            onClick={() => navigate("/")}
-          >
-            Back to Import
-          </button>
+          <p className="error-title">{error.title}</p>
+          <p className="error-message">{error.message}</p>
+          <p className="error-suggestion">{error.suggestion}</p>
+          <div className="error-actions">
+            {error.category === "auth" ? (
+              <button
+                className="retry-btn"
+                onClick={() => navigate("/settings")}
+              >
+                Go to Settings
+              </button>
+            ) : (
+              <>
+                {["network", "timeout", "quota"].includes(error.category) && (
+                  <button
+                    className="retry-btn"
+                    onClick={() => {
+                      setError(null);
+                      setCurrentStep("detecting");
+                      runPipeline();
+                    }}
+                  >
+                    Retry
+                  </button>
+                )}
+                <button
+                  className="retry-btn"
+                  onClick={() => navigate("/")}
+                >
+                  Back to Import
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
 

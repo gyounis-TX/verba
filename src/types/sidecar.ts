@@ -138,6 +138,8 @@ export interface ExplainRequest {
   literacy_level?: LiteracyLevel;
   provider?: LLMProvider;
   api_key?: string;
+  clinical_context?: string;
+  template_id?: number;
 }
 
 export interface ExplainResponse {
@@ -162,6 +164,8 @@ export interface AppSettings {
   claude_model: string | null;
   openai_model: string | null;
   literacy_level: LiteracyLevel;
+  specialty: string | null;
+  practice_name: string | null;
 }
 
 export interface SettingsUpdate {
@@ -171,4 +175,79 @@ export interface SettingsUpdate {
   claude_model?: string;
   openai_model?: string;
   literacy_level?: LiteracyLevel;
+  specialty?: string;
+  practice_name?: string;
+}
+
+// --- Template Types ---
+
+export interface Template {
+  id: number;
+  name: string;
+  test_type: string | null;
+  tone: string | null;
+  structure_instructions: string | null;
+  closing_text: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateCreateRequest {
+  name: string;
+  test_type?: string;
+  tone?: string;
+  structure_instructions?: string;
+  closing_text?: string;
+}
+
+export interface TemplateUpdateRequest {
+  name?: string;
+  test_type?: string;
+  tone?: string;
+  structure_instructions?: string;
+  closing_text?: string;
+}
+
+export interface TemplateListResponse {
+  items: Template[];
+  total: number;
+}
+
+// --- Phase 6: History Types ---
+
+export interface HistoryListItem {
+  id: number;
+  created_at: string;
+  test_type: string;
+  test_type_display: string;
+  filename: string | null;
+  summary: string;
+}
+
+export interface HistoryListResponse {
+  items: HistoryListItem[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface HistoryDetailResponse extends HistoryListItem {
+  full_response: ExplainResponse;
+}
+
+export interface HistoryCreateRequest {
+  test_type: string;
+  test_type_display: string;
+  filename: string | null;
+  summary: string;
+  full_response: ExplainResponse;
+}
+
+export interface HistoryDeleteResponse {
+  deleted: boolean;
+  id: number;
+}
+
+export interface ConsentStatusResponse {
+  consent_given: boolean;
 }

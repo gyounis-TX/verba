@@ -3,6 +3,7 @@ import "./Sidebar.css";
 
 const navItems = [
   { path: "/", label: "Import" },
+  { path: "/history", label: "History" },
   { path: "/templates", label: "Templates" },
   { path: "/settings", label: "Settings" },
 ];

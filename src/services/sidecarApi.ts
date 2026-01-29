@@ -10,6 +10,15 @@ import type {
   GlossaryResponse,
   AppSettings,
   SettingsUpdate,
+  Template,
+  TemplateCreateRequest,
+  TemplateUpdateRequest,
+  TemplateListResponse,
+  HistoryListResponse,
+  HistoryDetailResponse,
+  HistoryCreateRequest,
+  HistoryDeleteResponse,
+  ConsentStatusResponse,
 } from "../types/sidecar";
 
 class SidecarApi {
@@ -50,7 +59,15 @@ class SidecarApi {
     try {
       const body = await response.json();
       if (body.detail) {
-        detail = body.detail;
+        if (typeof body.detail === "string") {
+          detail = body.detail;
+        } else if (Array.isArray(body.detail)) {
+          detail = body.detail
+            .map((d: { msg?: string }) => d.msg || JSON.stringify(d))
+            .join("; ");
+        } else {
+          detail = JSON.stringify(body.detail);
+        }
       }
     } catch {
       // Response body wasn't JSON
@@ -160,16 +177,22 @@ class SidecarApi {
   async explainReport(request: ExplainRequest): Promise<ExplainResponse> {
     const baseUrl = this.ensureInitialized();
 
+    const body: Record<string, unknown> = {
+      extraction_result: request.extraction_result,
+    };
+    if (request.test_type != null) body.test_type = request.test_type;
+    if (request.literacy_level != null)
+      body.literacy_level = request.literacy_level;
+    if (request.provider != null) body.provider = request.provider;
+    if (request.api_key != null) body.api_key = request.api_key;
+    if (request.clinical_context != null)
+      body.clinical_context = request.clinical_context;
+    if (request.template_id != null) body.template_id = request.template_id;
+
     const response = await fetch(`${baseUrl}/analyze/explain`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        extraction_result: request.extraction_result,
-        test_type: request.test_type ?? null,
-        literacy_level: request.literacy_level ?? null,
-        provider: request.provider ?? null,
-        api_key: request.api_key ?? null,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -216,6 +239,136 @@ class SidecarApi {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(update),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  // --- Templates ---
+
+  async listTemplates(): Promise<TemplateListResponse> {
+    const baseUrl = this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/templates`);
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async createTemplate(request: TemplateCreateRequest): Promise<Template> {
+    const baseUrl = this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/templates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async updateTemplate(
+    id: number,
+    request: TemplateUpdateRequest,
+  ): Promise<Template> {
+    const baseUrl = this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/templates/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async deleteTemplate(id: number): Promise<{ deleted: boolean; id: number }> {
+    const baseUrl = this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/templates/${id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  // --- History ---
+
+  async listHistory(
+    offset = 0,
+    limit = 20,
+    search?: string,
+  ): Promise<HistoryListResponse> {
+    const baseUrl = this.ensureInitialized();
+    const params = new URLSearchParams({
+      offset: String(offset),
+      limit: String(limit),
+    });
+    if (search) {
+      params.set("search", search);
+    }
+    const response = await fetch(`${baseUrl}/history?${params}`);
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async getHistoryDetail(id: number): Promise<HistoryDetailResponse> {
+    const baseUrl = this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/history/${id}`);
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async saveHistory(
+    request: HistoryCreateRequest,
+  ): Promise<HistoryDetailResponse> {
+    const baseUrl = this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/history`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async deleteHistory(id: number): Promise<HistoryDeleteResponse> {
+    const baseUrl = this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/history/${id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  // --- Consent ---
+
+  async getConsent(): Promise<ConsentStatusResponse> {
+    const baseUrl = this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/consent`);
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async grantConsent(): Promise<ConsentStatusResponse> {
+    const baseUrl = this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/consent`, {
+      method: "POST",
     });
     if (!response.ok) {
       await this.handleErrorResponse(response);

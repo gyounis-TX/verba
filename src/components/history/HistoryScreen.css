@@ -1,0 +1,193 @@
+.history-screen {
+  max-width: 800px;
+}
+
+.history-header {
+  margin-bottom: var(--space-lg);
+}
+
+.history-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Search */
+.history-search {
+  margin-bottom: var(--space-lg);
+}
+
+.history-search-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-family: var(--font-sans);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.history-search-input:focus {
+  border-color: var(--color-primary-400);
+}
+
+.history-search-input::placeholder {
+  color: var(--color-gray-400);
+}
+
+/* Cards */
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.history-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.history-card:hover {
+  border-color: var(--color-gray-300);
+  box-shadow: var(--shadow-sm);
+}
+
+.history-card-content {
+  padding: var(--space-md);
+  cursor: pointer;
+}
+
+.history-card-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.history-date {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.history-type-badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-primary-600);
+  background-color: var(--color-primary-50);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.history-filename {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
+  margin-bottom: var(--space-xs);
+}
+
+.history-summary {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Actions */
+.history-card-actions {
+  padding: var(--space-xs) var(--space-md);
+  border-top: 1px solid var(--color-gray-100);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.history-delete-btn {
+  padding: var(--space-xs) var(--space-sm);
+  background: none;
+  border: none;
+  color: var(--color-gray-400);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease;
+}
+
+.history-delete-btn:hover {
+  color: #dc2626;
+}
+
+.history-confirm-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.history-confirm-yes {
+  padding: 2px 10px;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.history-confirm-no {
+  padding: 2px 10px;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+/* Empty & Loading */
+.history-empty,
+.history-loading {
+  text-align: center;
+  padding: var(--space-2xl) 0;
+  color: var(--color-text-secondary);
+}
+
+.history-empty-hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-400);
+  margin-top: var(--space-xs);
+}
+
+/* Load more */
+.history-load-more {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-lg);
+  padding: var(--space-sm);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-primary-600);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.history-load-more:hover {
+  background-color: var(--color-gray-50);
+}
+
+.history-load-more:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

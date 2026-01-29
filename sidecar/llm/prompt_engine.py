@@ -54,6 +54,9 @@ class PromptEngine:
         specialty = prompt_context.get("specialty", "general medicine")
         guidelines = prompt_context.get("guidelines", "standard clinical guidelines")
         explanation_style = prompt_context.get("explanation_style", "")
+        tone = prompt_context.get("tone", "")
+
+        tone_section = f"## Tone\n{tone}\n\n" if tone else ""
 
         return (
             f"You are a medical report explanation assistant specializing "
@@ -64,6 +67,7 @@ class PromptEngine:
             f"## Clinical Guidelines\n"
             f"Base your interpretations on: {guidelines}\n\n"
             f"## Explanation Style\n{explanation_style}\n\n"
+            f"{tone_section}"
             f"## Critical Rules\n"
             f"1. ONLY use data that appears in the report provided. "
             f"NEVER invent, guess, or assume measurements, findings, or "
@@ -90,6 +94,9 @@ class PromptEngine:
         reference_ranges: dict,
         glossary: dict[str, str],
         scrubbed_text: str,
+        clinical_context: str | None = None,
+        template_instructions: str | None = None,
+        closing_text: str | None = None,
     ) -> str:
         """Build the user prompt with report data, ranges, and glossary."""
         sections: list[str] = []
@@ -97,6 +104,24 @@ class PromptEngine:
         # 1. Report text (scrubbed)
         sections.append("## Report Text (PHI Removed)")
         sections.append(scrubbed_text)
+
+        # 1b. Clinical context (if provided)
+        if clinical_context:
+            sections.append("\n## Clinical Context")
+            sections.append(
+                f"The clinical reason for this test: {clinical_context}\n"
+                f"Prioritize findings relevant to this clinical context in your explanation."
+            )
+
+        # 1c. Template instructions (if provided)
+        if template_instructions:
+            sections.append("\n## Structure Instructions")
+            sections.append(template_instructions)
+        if closing_text:
+            sections.append("\n## Closing Text")
+            sections.append(
+                f"End the overall_summary with the following closing text:\n{closing_text}"
+            )
 
         # 2. Parsed measurements with reference ranges
         sections.append("\n## Parsed Measurements")
