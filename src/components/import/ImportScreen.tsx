@@ -37,6 +37,10 @@ export function ImportScreen() {
     number | undefined
   >(undefined);
 
+  // Clinical context state
+  const [clinicalContext, setClinicalContext] = useState("");
+  const [quickReasons, setQuickReasons] = useState<string[]>([]);
+
   // Help Me state
   const [helpMeText, setHelpMeText] = useState("");
   const [helpMeStatus, setHelpMeStatus] = useState<HelpMeStatus>("idle");
@@ -65,7 +69,21 @@ export function ImportScreen() {
       }
       // Templates are optional — silently fall back to empty list
     }
+    async function loadSettings(attempts = 5, backoffMs = 1000) {
+      for (let i = 0; i < attempts; i++) {
+        try {
+          const s = await sidecarApi.getSettings();
+          if (!cancelled) setQuickReasons(s.quick_reasons);
+          return;
+        } catch {
+          if (i < attempts - 1) {
+            await new Promise((r) => setTimeout(r, backoffMs * (i + 1)));
+          }
+        }
+      }
+    }
     loadTemplates();
+    loadSettings();
     return () => {
       cancelled = true;
     };
@@ -270,10 +288,11 @@ export function ImportScreen() {
         state: {
           extractionResult: result,
           templateId: selectedTemplateId,
+          clinicalContext: clinicalContext.trim() || undefined,
         },
       });
     }
-  }, [navigate, result, selectedTemplateId]);
+  }, [navigate, result, selectedTemplateId, clinicalContext]);
 
   const handleHelpMe = useCallback(async () => {
     if (!helpMeText.trim()) return;
@@ -316,220 +335,15 @@ export function ImportScreen() {
         </p>
       </header>
 
-      <div className="mode-toggle">
-        <button
-          className={`mode-toggle-btn ${mode === "pdf" ? "mode-toggle-btn--active" : ""}`}
-          onClick={() => handleModeChange("pdf")}
-        >
-          Upload PDF
-        </button>
-        <button
-          className={`mode-toggle-btn ${mode === "text" ? "mode-toggle-btn--active" : ""}`}
-          onClick={() => handleModeChange("text")}
-        >
-          Paste Text
-        </button>
-      </div>
-
-      {mode === "pdf" && (
-        <div className="input-panel">
-          <div
-            className={`drop-zone ${isDragOver ? "drop-zone--active" : ""} ${selectedFiles.length > 0 ? "drop-zone--has-file" : ""}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,application/pdf"
-              multiple
-              onChange={handleInputChange}
-              className="drop-zone-input"
-            />
-            {selectedFiles.length > 0 ? (
-              <div className="drop-zone-file-info">
-                <span className="file-name">
-                  {selectedFiles.length} file{selectedFiles.length !== 1 ? "s" : ""} selected
-                </span>
-                <span className="file-size">
-                  Click or drop to add more
-                </span>
-              </div>
-            ) : (
-              <div className="drop-zone-prompt">
-                <p className="drop-zone-primary">
-                  Drag and drop PDFs here, or click to browse
-                </p>
-                <p className="drop-zone-secondary">
-                  PDF files up to 50 MB each. Multiple files supported.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {selectedFiles.length > 0 && (
-            <div className="file-list">
-              {selectedFiles.map((file, index) => {
-                const key = fileKey(file);
-                const entry = extractionResults.get(key);
-                return (
-                  <div key={key} className="file-list-item">
-                    <span className="file-list-name">{file.name}</span>
-                    <span className="file-list-size">
-                      {formatFileSize(file.size)}
-                    </span>
-                    {entry && (
-                      <span
-                        className={`file-list-status file-list-status--${entry.status}`}
-                      >
-                        {entry.status === "pending" && "Pending"}
-                        {entry.status === "extracting" && "Extracting..."}
-                        {entry.status === "success" && "Done"}
-                        {entry.status === "error" && (entry.error ?? "Failed")}
-                      </span>
-                    )}
-                    <button
-                      className="file-list-remove"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveFile(index);
-                      }}
-                      aria-label={`Remove ${file.name}`}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {mode === "text" && (
-        <div className="input-panel">
-          <textarea
-            className="text-input"
-            placeholder="Paste your lab report or diagnostic text here..."
-            value={pastedText}
-            onChange={(e) => {
-              setPastedText(e.target.value);
-              resetState();
-            }}
-            rows={12}
-          />
-          <div className="text-input-footer">
-            <span className="char-count">
-              {pastedText.length.toLocaleString()} characters
-            </span>
-          </div>
-        </div>
-      )}
-
-      <button
-        className="extract-btn"
-        onClick={handleExtract}
-        disabled={!canExtract}
-      >
-        {status === "extracting"
-          ? "Extracting..."
-          : mode === "pdf" && selectedFiles.length > 1
-            ? `Extract All (${selectedFiles.length})`
-            : "Extract Text"}
-      </button>
-
-      {error && (
-        <div className="import-error">
-          <p>{error}</p>
-        </div>
-      )}
-
-      {status === "extracting" && (
-        <div className="extraction-progress">
-          <div className="spinner" />
-          <p>Analyzing document{selectedFiles.length > 1 ? "s" : ""}...</p>
-        </div>
-      )}
-
-      {status === "success" && successCount > 1 && (
-        <div className="batch-results-selector">
-          <h3 className="preview-title">
-            {successCount} files extracted. Select one to process:
-          </h3>
-          {selectedFiles.map((file) => {
-            const key = fileKey(file);
-            const entry = extractionResults.get(key);
-            if (entry?.status !== "success") return null;
-            return (
-              <button
-                key={key}
-                className={`batch-result-item ${selectedResultKey === key ? "batch-result-item--selected" : ""}`}
-                onClick={() => handleSelectResult(key)}
-              >
-                {file.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {status === "success" && result && (
-        <div className="extraction-preview">
-          <h3 className="preview-title">Extraction Complete</h3>
-
-          <div className="preview-stats">
-            <div className="stat">
-              <span className="stat-label">Pages</span>
-              <span className="stat-value">{result.total_pages}</span>
-            </div>
-            <div className="stat">
-              <span className="stat-label">Characters</span>
-              <span className="stat-value">
-                {result.total_chars.toLocaleString()}
-              </span>
-            </div>
-            {result.detection && (
-              <div className="stat">
-                <span className="stat-label">Type</span>
-                <span className="stat-value">
-                  {result.detection.overall_type}
-                </span>
-              </div>
-            )}
-            {result.tables.length > 0 && (
-              <div className="stat">
-                <span className="stat-label">Tables</span>
-                <span className="stat-value">{result.tables.length}</span>
-              </div>
-            )}
-          </div>
-
-          {result.warnings.length > 0 && (
-            <div className="preview-warnings">
-              {result.warnings.map((w, i) => (
-                <p key={i} className="warning-text">
-                  {w}
-                </p>
-              ))}
-            </div>
-          )}
-
-          <div className="preview-text-container">
-            <pre className="preview-text">
-              {result.full_text.slice(0, 2000)}
-              {result.full_text.length > 2000 && "\n\n... (truncated)"}
-            </pre>
-          </div>
-
+      <div className="import-grid">
+        {/* Left Column — Clinical Context */}
+        <div className="import-left-panel">
           {templates.length > 0 && (
-            <div className="clinical-context-group">
-              <label className="clinical-context-label">
-                Template (Optional)
-              </label>
+            <div className="import-field">
+              <label className="import-field-label">Template</label>
+              <span className="import-field-subtitle">Optional</span>
               <select
-                className="clinical-context-input"
+                className="import-field-select"
                 value={selectedTemplateId ?? ""}
                 onChange={(e) =>
                   setSelectedTemplateId(
@@ -548,52 +362,295 @@ export function ImportScreen() {
             </div>
           )}
 
-          <button className="proceed-btn" onClick={handleProceed}>
-            Continue to Processing
-          </button>
+          <div className="import-field">
+            <label className="import-field-label import-field-label--bold">
+              Clinical Context
+            </label>
+            <span className="import-field-subtitle">Optional</span>
+            {quickReasons.length > 0 && (
+              <div className="quick-reasons">
+                {quickReasons.map((reason) => (
+                  <button
+                    key={reason}
+                    className={`quick-reason-btn ${clinicalContext === reason ? "quick-reason-btn--active" : ""}`}
+                    onClick={() =>
+                      setClinicalContext((prev) =>
+                        prev === reason ? "" : reason,
+                      )
+                    }
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+            )}
+            <textarea
+              className="import-field-textarea"
+              placeholder="e.g., Chest pain, follow up pericardial effusion, or paste last clinic note text"
+              value={clinicalContext}
+              onChange={(e) => setClinicalContext(e.target.value)}
+              rows={3}
+            />
+          </div>
         </div>
-      )}
 
-      {/* Help Me Section */}
-      <div className="help-me-section">
-        <h3 className="help-me-title">Help Me</h3>
-        <p className="help-me-description">
-          Need help explaining something to a patient? Describe your question,
-          topic, or situation below and we'll generate a clear, patient-friendly
-          explanation, letter, or response. Results appear in the Letters section.
-        </p>
-        <textarea
-          className="help-me-input"
-          placeholder="e.g., Explain to the patient why their potassium is slightly elevated and what dietary changes might help..."
-          value={helpMeText}
-          onChange={(e) => {
-            setHelpMeText(e.target.value);
-            if (helpMeStatus !== "idle") setHelpMeStatus("idle");
-          }}
-          rows={4}
-        />
-        <div className="help-me-footer">
-          <span className="char-count">
-            {helpMeText.length.toLocaleString()} characters
-          </span>
+        {/* Right Column — Import & Help Me */}
+        <div className="import-right-panel">
+          <div className="mode-toggle">
+            <button
+              className={`mode-toggle-btn ${mode === "pdf" ? "mode-toggle-btn--active" : ""}`}
+              onClick={() => handleModeChange("pdf")}
+            >
+              Upload PDF
+            </button>
+            <button
+              className={`mode-toggle-btn ${mode === "text" ? "mode-toggle-btn--active" : ""}`}
+              onClick={() => handleModeChange("text")}
+            >
+              Paste Text
+            </button>
+          </div>
+
+          {mode === "pdf" && (
+            <div className="input-panel">
+              <div
+                className={`drop-zone ${isDragOver ? "drop-zone--active" : ""} ${selectedFiles.length > 0 ? "drop-zone--has-file" : ""}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  multiple
+                  onChange={handleInputChange}
+                  className="drop-zone-input"
+                />
+                {selectedFiles.length > 0 ? (
+                  <div className="drop-zone-file-info">
+                    <span className="file-name">
+                      {selectedFiles.length} file{selectedFiles.length !== 1 ? "s" : ""} selected
+                    </span>
+                    <span className="file-size">
+                      Click or drop to add more
+                    </span>
+                  </div>
+                ) : (
+                  <div className="drop-zone-prompt">
+                    <p className="drop-zone-primary">
+                      Drag and drop PDFs here, or click to browse
+                    </p>
+                    <p className="drop-zone-secondary">
+                      PDF files up to 50 MB each. Multiple files supported.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {selectedFiles.length > 0 && (
+                <div className="file-list">
+                  {selectedFiles.map((file, index) => {
+                    const key = fileKey(file);
+                    const entry = extractionResults.get(key);
+                    return (
+                      <div key={key} className="file-list-item">
+                        <span className="file-list-name">{file.name}</span>
+                        <span className="file-list-size">
+                          {formatFileSize(file.size)}
+                        </span>
+                        {entry && (
+                          <span
+                            className={`file-list-status file-list-status--${entry.status}`}
+                          >
+                            {entry.status === "pending" && "Pending"}
+                            {entry.status === "extracting" && "Extracting..."}
+                            {entry.status === "success" && "Done"}
+                            {entry.status === "error" && (entry.error ?? "Failed")}
+                          </span>
+                        )}
+                        <button
+                          className="file-list-remove"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveFile(index);
+                          }}
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {mode === "text" && (
+            <div className="input-panel">
+              <textarea
+                className="text-input"
+                placeholder="Paste your lab report or diagnostic text here..."
+                value={pastedText}
+                onChange={(e) => {
+                  setPastedText(e.target.value);
+                  resetState();
+                }}
+                rows={12}
+              />
+              <div className="text-input-footer">
+                <span className="char-count">
+                  {pastedText.length.toLocaleString()} characters
+                </span>
+              </div>
+            </div>
+          )}
+
           <button
-            className="help-me-btn"
-            onClick={handleHelpMe}
-            disabled={!helpMeText.trim() || helpMeStatus === "generating"}
+            className="extract-btn"
+            onClick={handleExtract}
+            disabled={!canExtract}
           >
-            {helpMeStatus === "generating" ? "Generating..." : "Generate"}
+            {status === "extracting"
+              ? "Extracting..."
+              : mode === "pdf" && selectedFiles.length > 1
+                ? `Extract All (${selectedFiles.length})`
+                : "Extract Text"}
           </button>
+
+          {error && (
+            <div className="import-error">
+              <p>{error}</p>
+            </div>
+          )}
+
+          {status === "extracting" && (
+            <div className="extraction-progress">
+              <div className="spinner" />
+              <p>Analyzing document{selectedFiles.length > 1 ? "s" : ""}...</p>
+            </div>
+          )}
+
+          {status === "success" && successCount > 1 && (
+            <div className="batch-results-selector">
+              <h3 className="preview-title">
+                {successCount} files extracted. Select one to process:
+              </h3>
+              {selectedFiles.map((file) => {
+                const key = fileKey(file);
+                const entry = extractionResults.get(key);
+                if (entry?.status !== "success") return null;
+                return (
+                  <button
+                    key={key}
+                    className={`batch-result-item ${selectedResultKey === key ? "batch-result-item--selected" : ""}`}
+                    onClick={() => handleSelectResult(key)}
+                  >
+                    {file.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {status === "success" && result && (
+            <div className="extraction-preview">
+              <h3 className="preview-title">Extraction Complete</h3>
+
+              <div className="preview-stats">
+                <div className="stat">
+                  <span className="stat-label">Pages</span>
+                  <span className="stat-value">{result.total_pages}</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-label">Characters</span>
+                  <span className="stat-value">
+                    {result.total_chars.toLocaleString()}
+                  </span>
+                </div>
+                {result.detection && (
+                  <div className="stat">
+                    <span className="stat-label">Type</span>
+                    <span className="stat-value">
+                      {result.detection.overall_type}
+                    </span>
+                  </div>
+                )}
+                {result.tables.length > 0 && (
+                  <div className="stat">
+                    <span className="stat-label">Tables</span>
+                    <span className="stat-value">{result.tables.length}</span>
+                  </div>
+                )}
+              </div>
+
+              {result.warnings.length > 0 && (
+                <div className="preview-warnings">
+                  {result.warnings.map((w, i) => (
+                    <p key={i} className="warning-text">
+                      {w}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              <div className="preview-text-container">
+                <pre className="preview-text">
+                  {result.full_text.slice(0, 2000)}
+                  {result.full_text.length > 2000 && "\n\n... (truncated)"}
+                </pre>
+              </div>
+
+              <button className="proceed-btn" onClick={handleProceed}>
+                Continue to Processing
+              </button>
+            </div>
+          )}
+
+          {/* Help Me Section */}
+          <div className="help-me-section">
+            <h3 className="help-me-title">Help Me</h3>
+            <p className="help-me-description">
+              Need help explaining something to a patient? Describe your question,
+              topic, or situation below and we'll generate a clear, patient-friendly
+              explanation, letter, or response. Results appear in the Letters section.
+            </p>
+            <textarea
+              className="help-me-input"
+              placeholder="e.g., Explain to the patient why their potassium is slightly elevated and what dietary changes might help..."
+              value={helpMeText}
+              onChange={(e) => {
+                setHelpMeText(e.target.value);
+                if (helpMeStatus !== "idle") setHelpMeStatus("idle");
+              }}
+              rows={4}
+            />
+            <div className="help-me-footer">
+              <span className="char-count">
+                {helpMeText.length.toLocaleString()} characters
+              </span>
+              <button
+                className="help-me-btn"
+                onClick={handleHelpMe}
+                disabled={!helpMeText.trim() || helpMeStatus === "generating"}
+              >
+                {helpMeStatus === "generating" ? "Generating..." : "Generate"}
+              </button>
+            </div>
+            {helpMeStatus === "success" && (
+              <p className="help-me-success">
+                Letter generated successfully. View it in the Letters section.
+              </p>
+            )}
+            {helpMeStatus === "error" && (
+              <p className="help-me-error">
+                Failed to generate. Please check your API key in Settings.
+              </p>
+            )}
+          </div>
         </div>
-        {helpMeStatus === "success" && (
-          <p className="help-me-success">
-            Letter generated successfully. View it in the Letters section.
-          </p>
-        )}
-        {helpMeStatus === "error" && (
-          <p className="help-me-error">
-            Failed to generate. Please check your API key in Settings.
-          </p>
-        )}
       </div>
     </div>
   );

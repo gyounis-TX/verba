@@ -261,14 +261,21 @@ async def explain_report(request: ExplainRequest = Body(...)):
     # 5. PHI scrub
     scrub_result = scrub_phi(extraction_result.full_text)
 
-    # 5b. Resolve physician name based on settings
-    source = settings.physician_name_source.value
-    if source == "auto_extract":
-        physician_name = extract_physician_name(extraction_result.full_text)
-    elif source == "custom":
-        physician_name = settings.custom_physician_name
+    # 5b. Resolve physician name — request override takes priority
+    if request.physician_name_override is not None:
+        physician_name = request.physician_name_override or None
     else:
-        physician_name = None
+        source = settings.physician_name_source.value
+        if source == "auto_extract":
+            physician_name = extract_physician_name(extraction_result.full_text)
+        elif source == "custom":
+            physician_name = settings.custom_physician_name
+        else:
+            physician_name = None
+
+    # 5c. Resolve voice & name_drop — request override takes priority
+    voice = request.explanation_voice.value if request.explanation_voice is not None else settings.explanation_voice.value
+    name_drop = request.name_drop if request.name_drop is not None else settings.name_drop
 
     # 6. Build prompts
     literacy_level = LiteracyLevel(request.literacy_level.value)
@@ -285,8 +292,8 @@ async def explain_report(request: ExplainRequest = Body(...)):
         detail_preference=detail_pref,
         physician_name=physician_name,
         short_comment=bool(request.short_comment),
-        explanation_voice=settings.explanation_voice.value,
-        name_drop=settings.name_drop,
+        explanation_voice=voice,
+        name_drop=name_drop,
         short_comment_char_limit=settings.short_comment_char_limit,
     )
     # 6b. Load template if specified

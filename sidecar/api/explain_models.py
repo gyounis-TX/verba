@@ -52,6 +52,9 @@ class ExplainRequest(BaseModel):
     detail_preference: Optional[int] = Field(default=None, ge=1, le=5)
     next_steps: Optional[list[str]] = None
     short_comment: Optional[bool] = None
+    explanation_voice: Optional[ExplanationVoiceEnum] = None
+    name_drop: Optional[bool] = None
+    physician_name_override: Optional[str] = None
 
 
 # --- Response sub-models ---
@@ -124,6 +127,7 @@ class AppSettings(BaseModel):
     name_drop: bool = True
     physician_name_source: PhysicianNameSourceEnum = PhysicianNameSourceEnum.AUTO_EXTRACT
     custom_physician_name: Optional[str] = None
+    practice_providers: list[str] = Field(default_factory=list)
     short_comment_char_limit: Optional[int] = Field(default=1000, ge=500, le=4000)
 
 
@@ -148,4 +152,5 @@ class SettingsUpdate(BaseModel):
     name_drop: Optional[bool] = None
     physician_name_source: Optional[PhysicianNameSourceEnum] = None
     custom_physician_name: Optional[str] = None
+    practice_providers: Optional[list[str]] = None
     short_comment_char_limit: Optional[int] = Field(default=None, ge=500, le=4000)

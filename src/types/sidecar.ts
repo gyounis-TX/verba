@@ -147,6 +147,9 @@ export interface ExplainRequest {
   detail_preference?: number;
   next_steps?: string[];
   short_comment?: boolean;
+  explanation_voice?: ExplanationVoice;
+  name_drop?: boolean;
+  physician_name_override?: string;
 }
 
 export interface ExplainResponse {
@@ -184,6 +187,7 @@ export interface AppSettings {
   name_drop: boolean;
   physician_name_source: PhysicianNameSource;
   custom_physician_name: string | null;
+  practice_providers: string[];
   short_comment_char_limit: number | null;
 }
 
@@ -206,6 +210,7 @@ export interface SettingsUpdate {
   name_drop?: boolean;
   physician_name_source?: PhysicianNameSource;
   custom_physician_name?: string;
+  practice_providers?: string[];
   short_comment_char_limit?: number | null;
 }
 

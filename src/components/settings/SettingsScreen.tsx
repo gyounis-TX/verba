@@ -39,7 +39,7 @@ const LITERACY_OPTIONS: {
   },
   {
     value: "grade_12",
-    label: "Grade 12 (Default)",
+    label: "Grade 12",
     description: "Adult language, medical terms in context",
   },
   {
@@ -75,6 +75,8 @@ export function SettingsScreen() {
   const [nameDrop, setNameDrop] = useState(true);
   const [physicianNameSource, setPhysicianNameSource] = useState<PhysicianNameSource>("auto_extract");
   const [customPhysicianName, setCustomPhysicianName] = useState("");
+  const [practiceProviders, setPracticeProviders] = useState<string[]>([]);
+  const [newProvider, setNewProvider] = useState("");
   const [shortCommentCharLimit, setShortCommentCharLimit] = useState<number | null>(1000);
 
   useEffect(() => {
@@ -97,6 +99,7 @@ export function SettingsScreen() {
         setNameDrop(s.name_drop ?? true);
         setPhysicianNameSource(s.physician_name_source ?? "auto_extract");
         setCustomPhysicianName(s.custom_physician_name ?? "");
+        setPracticeProviders(s.practice_providers ?? []);
         setShortCommentCharLimit(s.short_comment_char_limit ?? 1000);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to load settings";
@@ -129,6 +132,7 @@ export function SettingsScreen() {
         name_drop: nameDrop,
         physician_name_source: physicianNameSource,
         custom_physician_name: customPhysicianName.trim() || null,
+        practice_providers: practiceProviders,
         short_comment_char_limit: shortCommentCharLimit,
       };
 
@@ -143,7 +147,7 @@ export function SettingsScreen() {
     } finally {
       setSaving(false);
     }
-  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, quickReasons, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, shortCommentCharLimit, showToast]);
+  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, quickReasons, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, showToast]);
 
   if (loading) {
     return (
@@ -196,27 +200,16 @@ export function SettingsScreen() {
       {/* Literacy Level */}
       <section className="settings-section">
         <h3 className="settings-section-title">Explanation Level</h3>
-        <div className="literacy-options">
+        <div className="literacy-tabs-settings">
           {LITERACY_OPTIONS.map((opt) => (
-            <label
+            <button
               key={opt.value}
-              className={`literacy-option ${literacyLevel === opt.value ? "literacy-option--selected" : ""}`}
+              className={`literacy-tab-settings ${literacyLevel === opt.value ? "literacy-tab-settings--active" : ""}`}
+              onClick={() => setLiteracyLevel(opt.value)}
             >
-              <input
-                type="radio"
-                name="literacy"
-                value={opt.value}
-                checked={literacyLevel === opt.value}
-                onChange={() => setLiteracyLevel(opt.value)}
-                className="literacy-radio"
-              />
-              <div className="literacy-content">
-                <span className="literacy-label">{opt.label}</span>
-                <span className="literacy-desc">
-                  {opt.description}
-                </span>
-              </div>
-            </label>
+              <span className="literacy-tab-label">{opt.label}</span>
+              <span className="literacy-tab-desc">{opt.description}</span>
+            </button>
           ))}
         </div>
       </section>
@@ -375,9 +368,9 @@ export function SettingsScreen() {
                     className="literacy-radio"
                   />
                   <div className="literacy-content">
-                    <span className="literacy-label">Auto-extract</span>
+                    <span className="literacy-label">Auto-extract from Report</span>
                     <span className="literacy-desc">
-                      Detect physician name from report text
+                      Detects the physician name from the scanned report and replaces "your doctor" with their name
                     </span>
                   </div>
                 </label>
@@ -393,9 +386,9 @@ export function SettingsScreen() {
                     className="literacy-radio"
                   />
                   <div className="literacy-content">
-                    <span className="literacy-label">Custom</span>
+                    <span className="literacy-label">Practice Provider</span>
                     <span className="literacy-desc">
-                      Use a specific physician name
+                      Use a provider from your list below instead of "your doctor"
                     </span>
                   </div>
                 </label>
@@ -413,7 +406,7 @@ export function SettingsScreen() {
                   <div className="literacy-content">
                     <span className="literacy-label">Generic</span>
                     <span className="literacy-desc">
-                      Use generic phrasing ("your doctor")
+                      Keep generic phrasing like "your doctor" — no name replacement
                     </span>
                   </div>
                 </label>
@@ -422,14 +415,25 @@ export function SettingsScreen() {
 
             {physicianNameSource === "custom" && (
               <div className="form-group">
-                <label className="form-label">Custom Physician Name</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g. Dr. Smith"
-                  value={customPhysicianName}
-                  onChange={(e) => setCustomPhysicianName(e.target.value)}
-                />
+                <label className="form-label">Default Provider</label>
+                {practiceProviders.length > 0 ? (
+                  <div className="provider-buttons">
+                    {practiceProviders.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className={`provider-btn ${customPhysicianName === name ? "provider-btn--active" : ""}`}
+                        onClick={() => setCustomPhysicianName(name)}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="settings-description">
+                    Add providers below to select a default.
+                  </p>
+                )}
               </div>
             )}
 
@@ -440,11 +444,66 @@ export function SettingsScreen() {
                   checked={nameDrop}
                   onChange={(e) => setNameDrop(e.target.checked)}
                 />
-                Include explicit attribution phrase (e.g., "Dr. X has reviewed your results")
+                Name drop: Include explicit attribution phrase (e.g., "Dr. X has reviewed your results")
               </label>
             </div>
           </>
         )}
+
+        {/* Practice Providers List */}
+        <div className="form-group" style={{ marginTop: "var(--space-lg)" }}>
+          <label className="form-label">Practice Providers</label>
+          <p className="settings-description" style={{ marginBottom: "var(--space-sm)" }}>
+            Add physicians in your practice. These appear as buttons on the results screen to quickly attribute the report.
+          </p>
+          <div className="list-input-row">
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. Dr. Smith"
+              value={newProvider}
+              onChange={(e) => setNewProvider(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newProvider.trim() && practiceProviders.length < 20) {
+                  e.preventDefault();
+                  if (!practiceProviders.includes(newProvider.trim())) {
+                    setPracticeProviders([...practiceProviders, newProvider.trim()]);
+                  }
+                  setNewProvider("");
+                }
+              }}
+            />
+            <button
+              className="list-add-btn"
+              disabled={!newProvider.trim() || practiceProviders.length >= 20 || practiceProviders.includes(newProvider.trim())}
+              onClick={() => {
+                if (newProvider.trim() && practiceProviders.length < 20 && !practiceProviders.includes(newProvider.trim())) {
+                  setPracticeProviders([...practiceProviders, newProvider.trim()]);
+                  setNewProvider("");
+                }
+              }}
+            >
+              Add
+            </button>
+          </div>
+          {practiceProviders.length > 0 && (
+            <div className="list-items">
+              {practiceProviders.map((name, i) => (
+                <span key={i} className="list-item-chip">
+                  {name}
+                  <button
+                    className="list-item-remove"
+                    onClick={() => setPracticeProviders(practiceProviders.filter((_, idx) => idx !== i))}
+                    aria-label={`Remove ${name}`}
+                  >
+                    &times;
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <span className="list-count">{practiceProviders.length}/20</span>
+        </div>
       </section>
 
       {/* Short Comment Settings */}

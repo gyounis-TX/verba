@@ -7,6 +7,7 @@ import type {
   FindingExplanation,
   ParsedMeasurement,
   LiteracyLevel,
+  ExplanationVoice,
 } from "../../types/sidecar";
 import { sidecarApi } from "../../services/sidecarApi";
 import { useToast } from "../shared/Toast";
@@ -88,6 +89,7 @@ function buildCopyText(
     parts.push("");
     parts.push("KEY FINDINGS");
     for (const f of findings) {
+      parts.push("");
       parts.push(`- ${f.finding}: ${f.explanation}`);
     }
   }
@@ -166,6 +168,12 @@ export function ResultsScreen() {
   const [shortCommentText, setShortCommentText] = useState<string | null>(null);
   const [isGeneratingComment, setIsGeneratingComment] = useState(false);
 
+  // Physician voice & attribution state
+  const [explanationVoice, setExplanationVoice] = useState<ExplanationVoice>("third_person");
+  const [nameDrop, setNameDrop] = useState(true);
+  const [practiceProviders, setPracticeProviders] = useState<string[]>([]);
+  const [physicianOverride, setPhysicianOverride] = useState<string | null>(null);
+
   // Next steps state
   const [nextStepsOptions, setNextStepsOptions] = useState<string[]>([]);
   const [checkedNextSteps, setCheckedNextSteps] = useState<Set<string>>(
@@ -224,6 +232,9 @@ export function ResultsScreen() {
         setDetailSlider(s.detail_preference);
         setSelectedLiteracy(s.literacy_level);
         setNextStepsOptions(s.next_steps_options ?? []);
+        setExplanationVoice(s.explanation_voice ?? "third_person");
+        setNameDrop(s.name_drop ?? true);
+        setPracticeProviders(s.practice_providers ?? []);
       })
       .catch(() => {});
   }, []);
@@ -247,6 +258,7 @@ export function ResultsScreen() {
     if (!extractionResult) return;
     setIsRegenerating(true);
     try {
+      const activePhys = physicianOverride ?? currentResponse?.physician_name;
       const response = await sidecarApi.explainReport({
         extraction_result: extractionResult,
         test_type: currentResponse?.parsed_report.test_type,
@@ -255,6 +267,9 @@ export function ResultsScreen() {
         tone_preference: toneSlider,
         detail_preference: detailSlider,
         next_steps: [...checkedNextSteps].filter(s => s !== "No comment"),
+        explanation_voice: explanationVoice,
+        name_drop: nameDrop,
+        physician_name_override: physicianOverride !== null ? (physicianOverride || "") : undefined,
       });
       setCurrentResponse(response);
       showToast("success", "Explanation regenerated.");
@@ -263,7 +278,7 @@ export function ResultsScreen() {
     } finally {
       setIsRegenerating(false);
     }
-  }, [extractionResult, currentResponse, selectedLiteracy, templateId, toneSlider, detailSlider, checkedNextSteps, showToast]);
+  }, [extractionResult, currentResponse, selectedLiteracy, templateId, toneSlider, detailSlider, checkedNextSteps, explanationVoice, nameDrop, physicianOverride, showToast]);
 
   const handleTranslateToggle = useCallback(async () => {
     if (!extractionResult) return;
@@ -278,6 +293,9 @@ export function ResultsScreen() {
         tone_preference: toneSlider,
         detail_preference: detailSlider,
         next_steps: [...checkedNextSteps].filter(s => s !== "No comment"),
+        explanation_voice: explanationVoice,
+        name_drop: nameDrop,
+        physician_name_override: physicianOverride !== null ? (physicianOverride || "") : undefined,
         refinement_instruction: translatingToSpanish
           ? "Translate the entire explanation into Spanish. Keep all medical values and units in their original form. Use simple, patient-friendly Spanish."
           : undefined,
@@ -319,9 +337,16 @@ export function ResultsScreen() {
 
   const handleCopy = useCallback(async () => {
     if (!currentResponse) return;
+    const physician = physicianOverride ?? currentResponse.physician_name;
     const expl = currentResponse.explanation;
-    const summary = isDirty ? editedSummary : expl.overall_summary;
-    const findings = isDirty ? editedFindings : expl.key_findings;
+    const summary = replacePhysician(
+      isDirty ? editedSummary : expl.overall_summary,
+      physician,
+    );
+    const findings = (isDirty ? editedFindings : expl.key_findings).map((f) => ({
+      finding: f.finding,
+      explanation: replacePhysician(f.explanation, physician),
+    }));
     const text = buildCopyText(
       summary,
       findings,
@@ -339,6 +364,7 @@ export function ResultsScreen() {
     }
   }, [
     currentResponse,
+    physicianOverride,
     isDirty,
     editedSummary,
     editedFindings,
@@ -405,6 +431,9 @@ export function ResultsScreen() {
         detail_preference: detailSlider,
         next_steps: [...checkedNextSteps].filter(s => s !== "No comment"),
         short_comment: true,
+        explanation_voice: explanationVoice,
+        name_drop: nameDrop,
+        physician_name_override: physicianOverride !== null ? (physicianOverride || "") : undefined,
       });
       setShortCommentText(response.explanation.overall_summary);
     } catch {
@@ -412,7 +441,7 @@ export function ResultsScreen() {
     } finally {
       setIsGeneratingComment(false);
     }
-  }, [extractionResult, currentResponse, selectedLiteracy, templateId, toneSlider, detailSlider, checkedNextSteps, showToast]);
+  }, [extractionResult, currentResponse, selectedLiteracy, templateId, toneSlider, detailSlider, checkedNextSteps, explanationVoice, nameDrop, physicianOverride, showToast]);
 
   // Auto-generate short comment when switching to short mode
   useEffect(() => {
@@ -421,10 +450,10 @@ export function ResultsScreen() {
     }
   }, [commentMode, shortCommentText, extractionResult, generateShortComment]);
 
-  // Cache invalidation: clear short comment when response changes
+  // Cache invalidation: clear short comment when response or settings change
   useEffect(() => {
     setShortCommentText(null);
-  }, [currentResponse]);
+  }, [currentResponse, selectedLiteracy, toneSlider, detailSlider, explanationVoice, nameDrop, physicianOverride, checkedNextSteps]);
 
   // Compute preview text for comment panel
   const commentPreviewText = (() => {
@@ -432,9 +461,16 @@ export function ResultsScreen() {
       return shortCommentText ?? "";
     }
     if (!currentResponse) return "";
+    const physician = physicianOverride ?? currentResponse.physician_name;
     const expl = currentResponse.explanation;
-    const summary = isDirty ? editedSummary : expl.overall_summary;
-    const findings = isDirty ? editedFindings : expl.key_findings;
+    const summary = replacePhysician(
+      isDirty ? editedSummary : expl.overall_summary,
+      physician,
+    );
+    const findings = (isDirty ? editedFindings : expl.key_findings).map((f) => ({
+      finding: f.finding,
+      explanation: replacePhysician(f.explanation, physician),
+    }));
     return buildCopyText(
       summary,
       findings,
@@ -475,7 +511,8 @@ export function ResultsScreen() {
 
   const { explanation, parsed_report } = currentResponse;
   const rawSummary = isDirty ? editedSummary : explanation.overall_summary;
-  const displaySummary = replacePhysician(rawSummary, currentResponse?.physician_name);
+  const activePhysician = physicianOverride ?? currentResponse?.physician_name;
+  const displaySummary = replacePhysician(rawSummary, activePhysician);
   const rawFindings = isDirty
     ? editedFindings.map((f, i) => ({
         ...(explanation.key_findings[i] ?? { severity: "informational" }),
@@ -485,7 +522,7 @@ export function ResultsScreen() {
     : explanation.key_findings;
   const displayFindings = rawFindings.map((f) => ({
     ...f,
-    explanation: replacePhysician(f.explanation, currentResponse?.physician_name),
+    explanation: replacePhysician(f.explanation, activePhysician),
   }));
   const measurementMap = new Map<string, ParsedMeasurement>();
   if (parsed_report.measurements) {
@@ -533,22 +570,6 @@ export function ResultsScreen() {
       {/* Refine Toolbar */}
       {canRefine && (
         <div className="refine-toolbar">
-          <label className="refine-label">
-            Literacy:
-            <select
-              className="refine-select"
-              value={selectedLiteracy}
-              onChange={(e) =>
-                setSelectedLiteracy(e.target.value as LiteracyLevel)
-              }
-            >
-              {LITERACY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
           <button
             className="refine-btn"
             onClick={handleRegenerate}
@@ -564,112 +585,6 @@ export function ResultsScreen() {
           </button>
           {isDirty && <span className="edit-indicator">Edited</span>}
         </div>
-      )}
-
-      {/* Quick Adjustments */}
-      {canRefine && (
-        <div className="quick-actions-panel">
-          <span className="quick-actions-label">Quick adjustments:</span>
-          <div className="quick-sliders">
-            <div className="quick-slider-group">
-              <label className="quick-slider-label">
-                Tone
-                <span className="quick-slider-value">{TONE_LABELS[toneSlider]}</span>
-              </label>
-              <div className="quick-slider-row">
-                <span className="quick-slider-end">Concerning</span>
-                <input
-                  type="range"
-                  className="preference-slider"
-                  min={1}
-                  max={5}
-                  step={1}
-                  value={toneSlider}
-                  onChange={(e) => setToneSlider(Number(e.target.value))}
-                />
-                <span className="quick-slider-end">Very Reassuring</span>
-              </div>
-            </div>
-            <div className="quick-slider-group">
-              <label className="quick-slider-label">
-                Detail
-                <span className="quick-slider-value">{DETAIL_LABELS[detailSlider]}</span>
-              </label>
-              <div className="quick-slider-row">
-                <span className="quick-slider-end">Minimal</span>
-                <input
-                  type="range"
-                  className="preference-slider"
-                  min={1}
-                  max={5}
-                  step={1}
-                  value={detailSlider}
-                  onChange={(e) => setDetailSlider(Number(e.target.value))}
-                />
-                <span className="quick-slider-end">Very Detailed</span>
-              </div>
-            </div>
-          </div>
-          <div className="quick-actions-buttons">
-            <button
-              className="quick-action-btn"
-              onClick={handleRegenerate}
-              disabled={isRegenerating}
-            >
-              {isRegenerating ? "Regenerating\u2026" : "Apply"}
-            </button>
-            <button
-              className="quick-action-btn"
-              onClick={handleTranslateToggle}
-              disabled={isRegenerating}
-            >
-              {isSpanish ? "Translate to English" : "Translate to Spanish"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Next Steps */}
-      {(nextStepsOptions.length > 0 || true) && (
-        <section className="results-section next-steps-box">
-          <h3 className="section-heading">Next Steps</h3>
-          <div className="next-steps-checks">
-            {/* Codified "No comment" */}
-            <label className="next-step-check">
-              <input
-                type="checkbox"
-                checked={checkedNextSteps.has("No comment")}
-                onChange={() => {
-                  setCheckedNextSteps(new Set(["No comment"]));
-                }}
-              />
-              <span>No comment</span>
-            </label>
-            {/* Configurable options */}
-            {nextStepsOptions.map((option) => (
-              <label key={option} className="next-step-check">
-                <input
-                  type="checkbox"
-                  checked={checkedNextSteps.has(option)}
-                  onChange={() => {
-                    setCheckedNextSteps((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(option)) {
-                        next.delete(option);
-                        if (next.size === 0) next.add("No comment");
-                      } else {
-                        next.add(option);
-                        next.delete("No comment");
-                      }
-                      return next;
-                    });
-                  }}
-                />
-                <span>{option}</span>
-              </label>
-            ))}
-          </div>
-        </section>
       )}
 
       {/* Overall Summary */}
@@ -887,6 +802,214 @@ export function ResultsScreen() {
       </button>
       </div>
 
+      <div className="results-right-column">
+      {/* Result Settings Panel */}
+      {canRefine && (
+        <div className="results-settings-panel">
+          <h3>Result Settings</h3>
+
+          <div className="settings-panel-label">
+            <span>Literacy</span>
+            <div className="literacy-tabs">
+              {LITERACY_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  className={`literacy-tab-btn ${selectedLiteracy === opt.value ? "literacy-tab-btn--active" : ""}`}
+                  onClick={() => setSelectedLiteracy(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="quick-sliders">
+            <div className="quick-slider-group">
+              <label className="quick-slider-label">
+                Tone
+                <span className="quick-slider-value">{TONE_LABELS[toneSlider]}</span>
+              </label>
+              <div className="quick-slider-row">
+                <span className="quick-slider-end">Concerning</span>
+                <input
+                  type="range"
+                  className="preference-slider"
+                  min={1}
+                  max={5}
+                  step={1}
+                  value={toneSlider}
+                  onChange={(e) => setToneSlider(Number(e.target.value))}
+                />
+                <span className="quick-slider-end">Very Reassuring</span>
+              </div>
+            </div>
+            <div className="quick-slider-group">
+              <label className="quick-slider-label">
+                Detail
+                <span className="quick-slider-value">{DETAIL_LABELS[detailSlider]}</span>
+              </label>
+              <div className="quick-slider-row">
+                <span className="quick-slider-end">Minimal</span>
+                <input
+                  type="range"
+                  className="preference-slider"
+                  min={1}
+                  max={5}
+                  step={1}
+                  value={detailSlider}
+                  onChange={(e) => setDetailSlider(Number(e.target.value))}
+                />
+                <span className="quick-slider-end">Very Detailed</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="quick-toggles">
+            <label className="quick-toggle">
+              <input
+                type="checkbox"
+                checked={sectionSettings.include_key_findings}
+                onChange={(e) =>
+                  setSectionSettings((prev) => ({
+                    ...prev,
+                    include_key_findings: e.target.checked,
+                  }))
+                }
+              />
+              <span>Include Key Findings</span>
+            </label>
+            <label className="quick-toggle">
+              <input
+                type="checkbox"
+                checked={sectionSettings.include_measurements}
+                onChange={(e) =>
+                  setSectionSettings((prev) => ({
+                    ...prev,
+                    include_measurements: e.target.checked,
+                  }))
+                }
+              />
+              <span>Include Measurements</span>
+            </label>
+          </div>
+
+          {/* Voice */}
+          <div className="quick-voice-section">
+            <span className="quick-actions-label">Voice:</span>
+            <div className="quick-voice-toggle">
+              <button
+                className={`physician-picker-btn ${explanationVoice === "first_person" ? "physician-picker-btn--active" : ""}`}
+                onClick={() => setExplanationVoice("first_person")}
+              >
+                1st Person
+              </button>
+              <button
+                className={`physician-picker-btn ${explanationVoice === "third_person" ? "physician-picker-btn--active" : ""}`}
+                onClick={() => setExplanationVoice("third_person")}
+              >
+                3rd Person
+              </button>
+            </div>
+          </div>
+
+          {/* Physician */}
+          {explanationVoice === "third_person" && (
+            <div className="quick-voice-section">
+              <span className="quick-actions-label">Physician:</span>
+              <div className="quick-voice-toggle">
+                {currentResponse?.physician_name && (
+                  <button
+                    className={`physician-picker-btn ${physicianOverride === null ? "physician-picker-btn--active" : ""}`}
+                    onClick={() => setPhysicianOverride(null)}
+                  >
+                    {currentResponse.physician_name} (Extracted)
+                  </button>
+                )}
+                {practiceProviders.map((name) => (
+                  <button
+                    key={name}
+                    className={`physician-picker-btn ${physicianOverride === name ? "physician-picker-btn--active" : ""}`}
+                    onClick={() => setPhysicianOverride(name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+                <button
+                  className={`physician-picker-btn ${physicianOverride === "" || (!currentResponse?.physician_name && physicianOverride === null) ? "physician-picker-btn--active" : ""}`}
+                  onClick={() => setPhysicianOverride("")}
+                >
+                  Generic
+                </button>
+              </div>
+              <label className="quick-toggle" style={{ marginTop: "var(--space-xs)" }}>
+                <input
+                  type="checkbox"
+                  checked={nameDrop}
+                  onChange={(e) => setNameDrop(e.target.checked)}
+                />
+                <span>Name drop</span>
+              </label>
+            </div>
+          )}
+
+          {/* Next Steps */}
+          <div className="settings-panel-next-steps">
+            <span className="quick-actions-label">Next Steps:</span>
+            <div className="next-steps-checks">
+              <label className="next-step-check">
+                <input
+                  type="checkbox"
+                  checked={checkedNextSteps.has("No comment")}
+                  onChange={() => {
+                    setCheckedNextSteps(new Set(["No comment"]));
+                  }}
+                />
+                <span>No comment</span>
+              </label>
+              {nextStepsOptions.map((option) => (
+                <label key={option} className="next-step-check">
+                  <input
+                    type="checkbox"
+                    checked={checkedNextSteps.has(option)}
+                    onChange={() => {
+                      setCheckedNextSteps((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(option)) {
+                          next.delete(option);
+                          if (next.size === 0) next.add("No comment");
+                        } else {
+                          next.add(option);
+                          next.delete("No comment");
+                        }
+                        return next;
+                      });
+                    }}
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="quick-actions-buttons">
+            <button
+              className="quick-action-btn"
+              onClick={handleRegenerate}
+              disabled={isRegenerating}
+            >
+              {isRegenerating ? "Regenerating\u2026" : "Apply"}
+            </button>
+            <button
+              className="quick-action-btn"
+              onClick={handleTranslateToggle}
+              disabled={isRegenerating}
+            >
+              {isSpanish ? "Translate to English" : "Translate to Spanish"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Comment Panel */}
       <div className="results-comment-panel">
         <h3>Result Comment</h3>
@@ -913,6 +1036,7 @@ export function ResultsScreen() {
         <button className="comment-copy-btn" onClick={handleCopyComment}>
           Copy to Clipboard
         </button>
+      </div>
       </div>
     </div>
   );

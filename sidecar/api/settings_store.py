@@ -13,9 +13,9 @@ from storage.database import get_db
 from storage.keychain import get_keychain
 
 # Non-secret settings stored in SQLite
-_DB_KEYS = ("llm_provider", "claude_model", "openai_model", "literacy_level", "specialty", "practice_name", "include_key_findings", "include_measurements", "tone_preference", "detail_preference", "quick_reasons", "next_steps_options", "explanation_voice", "name_drop", "physician_name_source", "custom_physician_name", "short_comment_char_limit")
+_DB_KEYS = ("llm_provider", "claude_model", "openai_model", "literacy_level", "specialty", "practice_name", "include_key_findings", "include_measurements", "tone_preference", "detail_preference", "quick_reasons", "next_steps_options", "explanation_voice", "name_drop", "physician_name_source", "custom_physician_name", "practice_providers", "short_comment_char_limit")
 # Keys that store JSON-encoded lists
-_JSON_LIST_KEYS = {"quick_reasons", "next_steps_options"}
+_JSON_LIST_KEYS = {"quick_reasons", "next_steps_options", "practice_providers"}
 # Secret keys stored in OS keychain
 _SECRET_KEYS = ("claude_api_key", "openai_api_key")
 
@@ -66,6 +66,7 @@ def get_settings() -> AppSettings:
         if "physician_name_source" in all_db
         else PhysicianNameSourceEnum.AUTO_EXTRACT,
         custom_physician_name=all_db.get("custom_physician_name"),
+        practice_providers=_load_json_list("practice_providers"),
         short_comment_char_limit=None
         if all_db.get("short_comment_char_limit") == "none"
         else int(all_db["short_comment_char_limit"])

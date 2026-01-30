@@ -100,9 +100,11 @@ export function ProcessingScreen() {
   const locationState = location.state as {
     extractionResult?: ExtractionResult;
     templateId?: number;
+    clinicalContext?: string;
   } | null;
   const extractionResult = locationState?.extractionResult;
   const templateId = locationState?.templateId;
+  const clinicalContext = locationState?.clinicalContext;
 
   const { showToast } = useToast();
   const [currentStep, setCurrentStep] =
@@ -136,6 +138,7 @@ export function ProcessingScreen() {
         extraction_result: extractionResult,
         test_type: testType,
         template_id: templateId,
+        clinical_context: clinicalContext,
       });
 
       // Save to history
@@ -167,7 +170,7 @@ export function ProcessingScreen() {
       setError(categorizeError(msg));
       setCurrentStep("error");
     }
-  }, [extractionResult, templateId, navigate, showToast]);
+  }, [extractionResult, templateId, clinicalContext, navigate, showToast]);
 
   useEffect(() => {
     runPipeline();

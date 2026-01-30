@@ -9,10 +9,18 @@
   min-width: 0;
 }
 
-.results-comment-panel {
+.results-right-column {
   position: sticky;
   top: var(--space-lg);
   align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-height: calc(100vh - var(--space-xl) * 2);
+  overflow-y: auto;
+}
+
+.results-settings-panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
@@ -20,8 +28,76 @@
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  max-height: calc(100vh - var(--space-xl) * 2);
-  overflow-y: auto;
+}
+
+.results-settings-panel h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.settings-panel-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.literacy-tabs {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.literacy-tab-btn {
+  flex: 1;
+  padding: var(--space-xs) var(--space-sm);
+  border: none;
+  border-right: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.literacy-tab-btn:last-child {
+  border-right: none;
+}
+
+.literacy-tab-btn:hover {
+  background-color: var(--color-gray-50);
+}
+
+.literacy-tab-btn--active {
+  background-color: var(--color-primary-50);
+  color: var(--color-primary-600);
+  font-weight: 600;
+}
+
+.settings-panel-next-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.results-comment-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 
 .results-comment-panel h3 {
@@ -386,6 +462,40 @@
   cursor: pointer;
 }
 
+.quick-toggles {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.quick-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.quick-toggle input[type="checkbox"] {
+  accent-color: var(--color-primary-600);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.quick-voice-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.quick-voice-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
 .quick-actions-buttons {
   display: flex;
   gap: var(--space-xs);
@@ -412,6 +522,30 @@
 .quick-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Physician Picker Buttons */
+.physician-picker-btn {
+  padding: var(--space-xs) var(--space-sm);
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.physician-picker-btn:hover {
+  background-color: var(--color-gray-50);
+  border-color: var(--color-gray-400);
+}
+
+.physician-picker-btn--active {
+  background-color: var(--color-primary-50);
+  border-color: var(--color-primary-400);
+  color: var(--color-primary-600);
+  font-weight: 500;
 }
 
 /* Next Steps Box */
@@ -817,7 +951,7 @@
   .results-footer,
   .validation-warnings,
   .like-btn,
-  .results-comment-panel {
+  .results-right-column {
     display: none !important;
   }
 
