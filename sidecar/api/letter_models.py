@@ -25,6 +25,24 @@ class LetterResponse(BaseModel):
     prompt: str
     content: str
     letter_type: str
+    liked: bool = False
+    model_used: Optional[str] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    sync_id: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class LetterUpdateRequest(BaseModel):
+    """Request body for PUT /letters/{id}."""
+
+    content: str = Field(..., min_length=1)
+
+
+class LetterLikeRequest(BaseModel):
+    """Request body for PUT /letters/{id}/like."""
+
+    liked: bool
 
 
 class LetterListResponse(BaseModel):

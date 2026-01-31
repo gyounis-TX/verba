@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { sidecarApi } from "../../services/sidecarApi";
+import { queueUpsertAfterMutation, deleteFromSupabase } from "../../services/syncEngine";
 import { useToast } from "../shared/Toast";
 import type { TeachingPoint } from "../../types/sidecar";
 import "./TeachingPointsScreen.css";
@@ -10,6 +11,11 @@ export function TeachingPointsScreen() {
   const [loading, setLoading] = useState(true);
   const [newText, setNewText] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Edit state
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editScope, setEditScope] = useState<string | null>(null);
 
   const fetchPoints = useCallback(async () => {
     try {
@@ -34,6 +40,7 @@ export function TeachingPointsScreen() {
       const tp = await sidecarApi.createTeachingPoint({ text });
       setTeachingPoints((prev) => [tp, ...prev]);
       setNewText("");
+      queueUpsertAfterMutation("teaching_points", tp.id).catch(() => {});
       showToast("success", "Teaching point saved.");
     } catch {
       showToast("error", "Failed to save teaching point.");
@@ -45,15 +52,49 @@ export function TeachingPointsScreen() {
   const handleDelete = useCallback(
     async (id: number) => {
       try {
+        const tp = teachingPoints.find((p) => p.id === id);
         await sidecarApi.deleteTeachingPoint(id);
         setTeachingPoints((prev) => prev.filter((p) => p.id !== id));
+        if (tp?.sync_id) {
+          deleteFromSupabase("teaching_points", tp.sync_id).catch(() => {});
+        }
         showToast("success", "Teaching point removed.");
       } catch {
         showToast("error", "Failed to delete teaching point.");
       }
     },
-    [showToast],
+    [showToast, teachingPoints],
   );
+
+  const startEditing = useCallback((tp: TeachingPoint) => {
+    setEditingId(tp.id);
+    setEditText(tp.text);
+    setEditScope(tp.test_type ?? null);
+  }, []);
+
+  const cancelEditing = useCallback(() => {
+    setEditingId(null);
+    setEditText("");
+    setEditScope(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (editingId === null || !editText.trim()) return;
+    try {
+      const updated = await sidecarApi.updateTeachingPoint(editingId, {
+        text: editText.trim(),
+        test_type: editScope,
+      });
+      setTeachingPoints((prev) =>
+        prev.map((p) => (p.id === editingId ? updated : p)),
+      );
+      setEditingId(null);
+      queueUpsertAfterMutation("teaching_points", editingId).catch(() => {});
+      showToast("success", "Teaching point updated.");
+    } catch {
+      showToast("error", "Failed to update teaching point.");
+    }
+  }, [editingId, editText, editScope, showToast]);
 
   if (loading) {
     return (
@@ -125,29 +166,81 @@ export function TeachingPointsScreen() {
           <div className="tp-library-list">
             {teachingPoints.map((tp) => (
               <div key={tp.id} className="tp-card">
-                <div className="tp-card-body">
-                  <p className="tp-card-text">{tp.text}</p>
-                  <div className="tp-card-meta">
-                    {tp.test_type ? (
-                      <span className="tp-card-type">{tp.test_type}</span>
-                    ) : (
-                      <span className="tp-card-type tp-card-type--global">
+                {editingId === tp.id ? (
+                  <div className="tp-card-edit">
+                    <textarea
+                      className="tp-edit-textarea"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      rows={3}
+                      autoFocus
+                    />
+                    <div className="tp-edit-scope">
+                      <span className="tp-edit-scope-label">Scope:</span>
+                      <button
+                        className={`tp-edit-scope-btn${editScope !== null ? " tp-edit-scope-btn--active" : ""}`}
+                        onClick={() => setEditScope(tp.test_type ?? "General")}
+                      >
+                        {tp.test_type || "Original type"}
+                      </button>
+                      <button
+                        className={`tp-edit-scope-btn${editScope === null ? " tp-edit-scope-btn--active" : ""}`}
+                        onClick={() => setEditScope(null)}
+                      >
                         All types
-                      </span>
-                    )}
-                    <span className="tp-card-date">
-                      {new Date(tp.created_at).toLocaleDateString()}
-                    </span>
+                      </button>
+                    </div>
+                    <div className="tp-edit-actions">
+                      <button
+                        className="tp-edit-save"
+                        disabled={!editText.trim()}
+                        onClick={handleSaveEdit}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="tp-edit-cancel"
+                        onClick={cancelEditing}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <button
-                  className="tp-card-delete"
-                  onClick={() => handleDelete(tp.id)}
-                  aria-label={`Delete teaching point: ${tp.text.slice(0, 30)}`}
-                  title="Delete this teaching point"
-                >
-                  &times;
-                </button>
+                ) : (
+                  <>
+                    <div className="tp-card-body">
+                      <p className="tp-card-text">{tp.text}</p>
+                      <div className="tp-card-meta">
+                        {tp.test_type ? (
+                          <span className="tp-card-type">{tp.test_type}</span>
+                        ) : (
+                          <span className="tp-card-type tp-card-type--global">
+                            All types
+                          </span>
+                        )}
+                        <span className="tp-card-date">
+                          {new Date(tp.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      className="tp-card-edit-btn"
+                      onClick={() => startEditing(tp)}
+                      aria-label={`Edit teaching point: ${tp.text.slice(0, 30)}`}
+                      title="Edit this teaching point"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="tp-card-delete"
+                      onClick={() => handleDelete(tp.id)}
+                      aria-label={`Delete teaching point: ${tp.text.slice(0, 30)}`}
+                      title="Delete this teaching point"
+                    >
+                      &times;
+                    </button>
+                  </>
+                )}
               </div>
             ))}
           </div>

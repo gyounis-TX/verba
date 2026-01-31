@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { sidecarApi } from "../../services/sidecarApi";
+import { queueSettingsUpsert } from "../../services/syncEngine";
 import { useToast } from "../shared/Toast";
 import type { LiteracyLevel, ExplanationVoice, PhysicianNameSource, FooterType } from "../../types/sidecar";
 import "./SettingsScreen.css";
@@ -143,6 +144,15 @@ export function SettingsScreen() {
       };
 
       await sidecarApi.updateSettings(update);
+
+      // Queue each setting for cloud sync (API keys are auto-excluded)
+      for (const [key, value] of Object.entries(update)) {
+        if (value !== undefined) {
+          const serialized = typeof value === "string" ? value : JSON.stringify(value);
+          queueSettingsUpsert(key, serialized);
+        }
+      }
+
       setSuccess(true);
       showToast("success", "Settings saved.");
       setTimeout(() => setSuccess(false), 3000);

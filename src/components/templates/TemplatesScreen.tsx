@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { sidecarApi } from "../../services/sidecarApi";
+import { queueUpsertAfterMutation, deleteFromSupabase } from "../../services/syncEngine";
 import { useToast } from "../shared/Toast";
 import type { Template } from "../../types/sidecar";
 import "./TemplatesScreen.css";
@@ -84,9 +85,11 @@ export function TemplatesScreen() {
 
       if (editingId != null) {
         await sidecarApi.updateTemplate(editingId, payload);
+        queueUpsertAfterMutation("templates", editingId).catch(() => {});
         showToast("success", "Template updated.");
       } else {
-        await sidecarApi.createTemplate(payload);
+        const created = await sidecarApi.createTemplate(payload);
+        queueUpsertAfterMutation("templates", created.id).catch(() => {});
         showToast("success", "Template created.");
       }
       closeForm();
@@ -100,8 +103,12 @@ export function TemplatesScreen() {
 
   const handleDelete = async (id: number) => {
     try {
+      const tpl = templates.find((t) => t.id === id);
       await sidecarApi.deleteTemplate(id);
       setTemplates((prev) => prev.filter((t) => t.id !== id));
+      if (tpl?.sync_id) {
+        deleteFromSupabase("templates", tpl.sync_id).catch(() => {});
+      }
       showToast("success", "Template deleted.");
     } catch {
       showToast("error", "Failed to delete template.");

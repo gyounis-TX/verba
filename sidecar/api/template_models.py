@@ -38,6 +38,8 @@ class TemplateResponse(BaseModel):
     closing_text: Optional[str] = None
     created_at: str
     updated_at: str
+    sync_id: Optional[str] = None
+    is_builtin: Optional[bool] = False
 
 
 class TemplateListResponse(BaseModel):

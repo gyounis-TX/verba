@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { ImportScreen } from "./components/import/ImportScreen";
 import { TemplatesScreen } from "./components/templates/TemplatesScreen";
@@ -9,6 +9,12 @@ import { ResultsScreen } from "./components/results/ResultsScreen";
 import { HistoryScreen } from "./components/history/HistoryScreen";
 import { LettersScreen } from "./components/letters/LettersScreen";
 import { TeachingPointsScreen } from "./components/teaching-points/TeachingPointsScreen";
+import { AuthScreen } from "./components/auth/AuthScreen";
+
+function AuthRoute() {
+  const navigate = useNavigate();
+  return <AuthScreen onAuthSuccess={() => navigate("/")} />;
+}
 
 function App() {
   return (
@@ -23,6 +29,7 @@ function App() {
         <Route path="/ai-model" element={<AIModelScreen />} />
         <Route path="/processing" element={<ProcessingScreen />} />
         <Route path="/results" element={<ResultsScreen />} />
+        <Route path="/auth" element={<AuthRoute />} />
       </Route>
     </Routes>
   );

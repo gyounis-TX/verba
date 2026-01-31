@@ -163,6 +163,30 @@ class SidecarApi {
     return response.json();
   }
 
+  async scrubPreview(
+    fullText: string,
+    clinicalContext?: string,
+  ): Promise<{
+    scrubbed_text: string;
+    scrubbed_clinical_context: string;
+    phi_found: string[];
+    redaction_count: number;
+  }> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/extraction/scrub-preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_text: fullText,
+        clinical_context: clinicalContext ?? "",
+      }),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
   async detectTestType(
     extractionResult: ExtractionResult,
   ): Promise<DetectTypeResponse> {
@@ -418,6 +442,16 @@ class SidecarApi {
     return response.json();
   }
 
+  async markHistoryCopied(id: number): Promise<void> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/history/${id}/copied`, {
+      method: "PUT",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+  }
+
   // --- Consent ---
 
   async getConsent(): Promise<ConsentStatusResponse> {
@@ -457,9 +491,23 @@ class SidecarApi {
     return response.json();
   }
 
-  async listLetters(): Promise<LetterListResponse> {
+  async listLetters(
+    offset?: number,
+    limit?: number,
+    search?: string,
+    likedOnly?: boolean,
+  ): Promise<LetterListResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/letters`, { cache: "no-store" });
+    const params = new URLSearchParams();
+    if (offset !== undefined) params.set("offset", String(offset));
+    if (limit !== undefined) params.set("limit", String(limit));
+    if (search) params.set("search", search);
+    if (likedOnly) params.set("liked_only", "true");
+    const qs = params.toString();
+    const response = await fetch(
+      `${baseUrl}/letters${qs ? `?${qs}` : ""}`,
+      { cache: "no-store" },
+    );
     if (!response.ok) {
       await this.handleErrorResponse(response);
     }
@@ -470,6 +518,35 @@ class SidecarApi {
     const baseUrl = await this.ensureInitialized();
     const response = await fetch(`${baseUrl}/letters/${id}`, {
       cache: "no-store",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async updateLetter(id: number, content: string): Promise<LetterResponse> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/letters/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async toggleLetterLiked(
+    id: number,
+    liked: boolean,
+  ): Promise<{ id: number; liked: boolean }> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/letters/${id}/like`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ liked }),
     });
     if (!response.ok) {
       await this.handleErrorResponse(response);
@@ -523,6 +600,22 @@ class SidecarApi {
     return response.json();
   }
 
+  async updateTeachingPoint(id: number, request: {
+    text?: string;
+    test_type?: string | null;
+  }): Promise<TeachingPoint> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/teaching-points/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
   async deleteTeachingPoint(id: number): Promise<void> {
     const baseUrl = await this.ensureInitialized();
     const response = await fetch(`${baseUrl}/teaching-points/${id}`, {
@@ -531,6 +624,49 @@ class SidecarApi {
     if (!response.ok) {
       await this.handleErrorResponse(response);
     }
+  }
+  // --- Sync ---
+
+  async syncExportAll(table: string): Promise<Record<string, unknown>[]> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/sync/export/${table}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async syncExportRecord(
+    table: string,
+    recordId: number,
+  ): Promise<Record<string, unknown>> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await fetch(
+      `${baseUrl}/sync/export/${table}/${recordId}`,
+      { cache: "no-store" },
+    );
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async syncMerge(
+    table: string,
+    rows: Record<string, unknown>[],
+  ): Promise<{ merged: number; skipped: number }> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/sync/merge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ table, rows }),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
   }
 }
 

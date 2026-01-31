@@ -153,6 +153,8 @@ export interface ExplainRequest {
   physician_name_override?: string;
   include_key_findings?: boolean;
   include_measurements?: boolean;
+  patient_age?: number;
+  patient_gender?: string;
 }
 
 export interface ExplainResponse {
@@ -232,6 +234,8 @@ export interface Template {
   closing_text: string | null;
   created_at: string;
   updated_at: string;
+  sync_id?: string;
+  is_builtin?: boolean | number;
 }
 
 export interface TemplateCreateRequest {
@@ -265,6 +269,8 @@ export interface HistoryListItem {
   filename: string | null;
   summary: string;
   liked: boolean;
+  sync_id?: string;
+  updated_at?: string;
 }
 
 export interface HistoryListResponse {
@@ -319,6 +325,12 @@ export interface LetterResponse {
   prompt: string;
   content: string;
   letter_type: string;
+  liked: boolean;
+  model_used?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  sync_id?: string;
+  updated_at?: string;
 }
 
 export interface LetterListResponse {
@@ -338,4 +350,6 @@ export interface TeachingPoint {
   text: string;
   test_type: string | null;
   created_at: string;
+  sync_id?: string;
+  updated_at?: string;
 }

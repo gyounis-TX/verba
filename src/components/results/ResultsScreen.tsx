@@ -12,6 +12,7 @@ import type {
   TeachingPoint,
 } from "../../types/sidecar";
 import { sidecarApi } from "../../services/sidecarApi";
+import { queueUpsertAfterMutation } from "../../services/syncEngine";
 import { useToast } from "../shared/Toast";
 import { GlossaryTooltip } from "./GlossaryTooltip";
 import "./ResultsScreen.css";
@@ -138,8 +139,9 @@ export function ResultsScreen() {
     clinicalContext?: string;
   } | null;
 
-  // Restore from sessionStorage if location.state is empty (e.g. after Settings round-trip)
-  const session = loadSessionState();
+  // Restore from sessionStorage if location.state is empty (e.g. after Settings round-trip).
+  // If locationState carries a fresh explainResponse, this is a NEW report — ignore stale session.
+  const session = locationState?.explainResponse ? null : loadSessionState();
   const initialResponse = (locationState?.explainResponse
     ?? session?.explainResponse as ExplainResponse | undefined) ?? null;
   const fromHistory = locationState?.fromHistory ?? (session?.fromHistory as boolean | undefined) ?? false;
@@ -170,10 +172,14 @@ export function ResultsScreen() {
   const [detailSlider, setDetailSlider] = useState(3);
   const [isSpanish, setIsSpanish] = useState(false);
 
-  // Comment panel state
-  const [commentMode, setCommentMode] = useState<"long" | "short">("long");
-  const [shortCommentText, setShortCommentText] = useState<string | null>(null);
+  // Comment panel state — default to short since that's what we generate first
+  const [commentMode, setCommentMode] = useState<"long" | "short">("short");
+  const [shortCommentText, setShortCommentText] = useState<string | null>(
+    initialResponse?.explanation?.overall_summary ?? null,
+  );
+  const [longExplanationResponse, setLongExplanationResponse] = useState<ExplainResponse | null>(null);
   const [isGeneratingComment, setIsGeneratingComment] = useState(false);
+  const [isGeneratingLong, setIsGeneratingLong] = useState(false);
 
   // Physician voice & attribution state
   const [explanationVoice, setExplanationVoice] = useState<ExplanationVoice>("third_person");
@@ -191,6 +197,7 @@ export function ResultsScreen() {
   const [selectedLiteracy, setSelectedLiteracy] =
     useState<LiteracyLevel>("grade_8");
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [refinementInstruction, setRefinementInstruction] = useState("");
 
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -280,8 +287,8 @@ export function ResultsScreen() {
   const handleRegenerate = useCallback(async () => {
     if (!extractionResult) return;
     setIsRegenerating(true);
+    const isShort = commentMode === "short";
     try {
-      const activePhys = physicianOverride ?? currentResponse?.physician_name;
       const response = await sidecarApi.explainReport({
         extraction_result: extractionResult,
         test_type: currentResponse?.parsed_report.test_type,
@@ -291,12 +298,19 @@ export function ResultsScreen() {
         tone_preference: toneSlider,
         detail_preference: detailSlider,
         next_steps: [...checkedNextSteps].filter(s => s !== "No comment"),
+        short_comment: isShort,
         explanation_voice: explanationVoice,
         name_drop: nameDrop,
         physician_name_override: physicianOverride !== null ? (physicianOverride || "") : undefined,
         include_key_findings: sectionSettings.include_key_findings,
         include_measurements: sectionSettings.include_measurements,
+        refinement_instruction: refinementInstruction.trim() || undefined,
       });
+      if (isShort) {
+        setShortCommentText(response.explanation.overall_summary);
+      } else {
+        setLongExplanationResponse(response);
+      }
       setCurrentResponse(response);
       showToast("success", "Explanation regenerated.");
     } catch {
@@ -304,7 +318,7 @@ export function ResultsScreen() {
     } finally {
       setIsRegenerating(false);
     }
-  }, [extractionResult, currentResponse, selectedLiteracy, templateId, clinicalContext, toneSlider, detailSlider, checkedNextSteps, explanationVoice, nameDrop, physicianOverride, sectionSettings, showToast]);
+  }, [extractionResult, currentResponse, selectedLiteracy, templateId, clinicalContext, toneSlider, detailSlider, checkedNextSteps, explanationVoice, nameDrop, physicianOverride, sectionSettings, refinementInstruction, showToast]);
 
   const handleTranslateToggle = useCallback(async () => {
     if (!extractionResult) return;
@@ -399,12 +413,19 @@ export function ResultsScreen() {
     try {
       await navigator.clipboard.writeText(text);
       showToast("success", "Copied to clipboard.");
+      // Fire-and-forget: record copy as lightweight positive signal
+      if (historyId) {
+        sidecarApi.markHistoryCopied(historyId).then(() => {
+          queueUpsertAfterMutation("history", historyId).catch(() => {});
+        }).catch(() => {});
+      }
     } catch {
       showToast("error", "Failed to copy to clipboard.");
     }
   }, [
     currentResponse,
     physicianOverride,
+    historyId,
     isDirty,
     editedSummary,
     editedFindings,
@@ -431,6 +452,7 @@ export function ResultsScreen() {
         });
         id = detail.id;
         setHistoryId(id);
+        queueUpsertAfterMutation("history", id).catch(() => {});
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -441,6 +463,7 @@ export function ResultsScreen() {
       const newLiked = !isLiked;
       await sidecarApi.toggleHistoryLiked(id, newLiked);
       setIsLiked(newLiked);
+      queueUpsertAfterMutation("history", id).catch(() => {});
       showToast(
         "success",
         newLiked
@@ -486,17 +509,49 @@ export function ResultsScreen() {
     }
   }, [extractionResult, currentResponse, selectedLiteracy, templateId, toneSlider, detailSlider, checkedNextSteps, explanationVoice, nameDrop, physicianOverride, sectionSettings, showToast]);
 
-  // Pre-generate short comment in background as soon as results are available
+  // Generate long explanation on demand when user switches to "long" tab
+  const generateLongExplanation = useCallback(async () => {
+    if (!extractionResult || !currentResponse) return;
+    setIsGeneratingLong(true);
+    try {
+      const response = await sidecarApi.explainReport({
+        extraction_result: extractionResult,
+        test_type: currentResponse.parsed_report.test_type,
+        literacy_level: selectedLiteracy,
+        template_id: templateId,
+        clinical_context: clinicalContext,
+        tone_preference: toneSlider,
+        detail_preference: detailSlider,
+        next_steps: [...checkedNextSteps].filter(s => s !== "No comment"),
+        short_comment: false,
+        explanation_voice: explanationVoice,
+        name_drop: nameDrop,
+        physician_name_override: physicianOverride !== null ? (physicianOverride || "") : undefined,
+        include_key_findings: sectionSettings.include_key_findings,
+        include_measurements: sectionSettings.include_measurements,
+        refinement_instruction: refinementInstruction.trim() || undefined,
+      });
+      setLongExplanationResponse(response);
+    } catch {
+      showToast("error", "Failed to generate detailed explanation.");
+    } finally {
+      setIsGeneratingLong(false);
+    }
+  }, [extractionResult, currentResponse, selectedLiteracy, templateId, clinicalContext, toneSlider, detailSlider, checkedNextSteps, explanationVoice, nameDrop, physicianOverride, sectionSettings, refinementInstruction, showToast]);
+
+  // Generate on-demand when user switches tabs and content isn't cached
   useEffect(() => {
-    if (shortCommentText === null && extractionResult && currentResponse) {
+    if (commentMode === "short" && shortCommentText === null && extractionResult && currentResponse && !isGeneratingComment) {
       generateShortComment();
     }
-  }, [shortCommentText, extractionResult, currentResponse, generateShortComment]);
+  }, [commentMode, shortCommentText, extractionResult, currentResponse, isGeneratingComment, generateShortComment]);
 
-  // Cache invalidation: clear short comment when response or settings change
   useEffect(() => {
-    setShortCommentText(null);
-  }, [currentResponse, selectedLiteracy, toneSlider, detailSlider, explanationVoice, nameDrop, physicianOverride, checkedNextSteps, sectionSettings]);
+    if (commentMode === "long" && longExplanationResponse === null && extractionResult && currentResponse && !isGeneratingLong) {
+      generateLongExplanation();
+    }
+  }, [commentMode, longExplanationResponse, extractionResult, currentResponse, isGeneratingLong, generateLongExplanation]);
+
 
   // Compute preview text for comment panel
   const commentPreviewText = (() => {
@@ -507,14 +562,16 @@ export function ResultsScreen() {
       }
       return base;
     }
-    if (!currentResponse) return "";
-    const physician = physicianOverride ?? currentResponse.physician_name;
-    const expl = currentResponse.explanation;
+    // Long mode: use the dedicated long explanation if available
+    const longSource = longExplanationResponse ?? currentResponse;
+    if (!longSource) return "";
+    const physician = physicianOverride ?? longSource.physician_name;
+    const expl = longSource.explanation;
     const summary = replacePhysician(
-      isDirty ? editedSummary : expl.overall_summary,
+      expl.overall_summary,
       physician,
     );
-    const findings = (isDirty ? editedFindings : expl.key_findings).map((f) => ({
+    const findings = expl.key_findings.map((f) => ({
       finding: f.finding,
       explanation: replacePhysician(f.explanation, physician),
     }));
@@ -647,8 +704,10 @@ export function ResultsScreen() {
             rows={6}
           />
         )}
-        {isGeneratingComment && commentMode === "short" ? (
-          <div className="comment-generating">Generating short comment...</div>
+        {(isGeneratingComment && commentMode === "short") || (isGeneratingLong && commentMode === "long") ? (
+          <div className="comment-generating">
+            {commentMode === "short" ? "Generating short comment..." : "Generating detailed explanation..."}
+          </div>
         ) : (
           <div className="comment-preview">{commentPreviewText}</div>
         )}
@@ -858,43 +917,22 @@ export function ResultsScreen() {
         <div className="teaching-points-body">
           <p className="teaching-points-desc">
             Add personalized instructions that customize how AI interprets and explains results.
-            These points can be stylistic or clinical.
+            These points can be stylistic or clinical. Explify will remember and apply these to all future explanations.
           </p>
-          {teachingPoints.length > 0 && (
-            <div className="teaching-points-list">
-              {teachingPoints.map((tp) => (
-                <div key={tp.id} className="teaching-point-chip">
-                  <span className="teaching-point-text">{tp.text}</span>
-                  {tp.test_type && (
-                    <span className="teaching-point-type">{tp.test_type}</span>
-                  )}
-                  <button
-                    className="teaching-point-remove"
-                    onClick={async () => {
-                      try {
-                        await sidecarApi.deleteTeachingPoint(tp.id);
-                        setTeachingPoints((prev) => prev.filter((p) => p.id !== tp.id));
-                      } catch {
-                        showToast("error", "Failed to delete teaching point.");
-                      }
-                    }}
-                    aria-label="Remove"
-                  >
-                    &times;
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
           <div className="teaching-point-input-row">
             <textarea
               className="teaching-point-input"
               placeholder="e.g. Always mention diastolic dysfunction grading"
               value={newTeachingPoint}
               onChange={(e) => setNewTeachingPoint(e.target.value)}
-              onKeyDown={async (e) => {
-                if (e.key === "Enter" && !e.shiftKey && newTeachingPoint.trim()) {
-                  e.preventDefault();
+              rows={3}
+            />
+            <div className="teaching-point-save-row">
+              <button
+                className="teaching-point-save-btn"
+                disabled={!newTeachingPoint.trim()}
+                onClick={async () => {
+                  if (!newTeachingPoint.trim()) return;
                   try {
                     const tp = await sidecarApi.createTeachingPoint({
                       text: newTeachingPoint.trim(),
@@ -902,32 +940,34 @@ export function ResultsScreen() {
                     });
                     setTeachingPoints((prev) => [tp, ...prev]);
                     setNewTeachingPoint("");
+                    queueUpsertAfterMutation("teaching_points", tp.id).catch(() => {});
                   } catch {
                     showToast("error", "Failed to save teaching point.");
                   }
-                }
-              }}
-              rows={3}
-            />
-            <button
-              className="teaching-point-save-btn"
-              disabled={!newTeachingPoint.trim()}
-              onClick={async () => {
-                if (!newTeachingPoint.trim()) return;
-                try {
-                  const tp = await sidecarApi.createTeachingPoint({
-                    text: newTeachingPoint.trim(),
-                    test_type: currentResponse?.parsed_report.test_type,
-                  });
-                  setTeachingPoints((prev) => [tp, ...prev]);
-                  setNewTeachingPoint("");
-                } catch {
-                  showToast("error", "Failed to save teaching point.");
-                }
-              }}
-            >
-              Save
-            </button>
+                }}
+              >
+                Save for {currentResponse?.parsed_report.test_type_display || "this type"}
+              </button>
+              <button
+                className="teaching-point-save-btn teaching-point-save-btn--all"
+                disabled={!newTeachingPoint.trim()}
+                onClick={async () => {
+                  if (!newTeachingPoint.trim()) return;
+                  try {
+                    const tp = await sidecarApi.createTeachingPoint({
+                      text: newTeachingPoint.trim(),
+                    });
+                    setTeachingPoints((prev) => [tp, ...prev]);
+                    setNewTeachingPoint("");
+                    queueUpsertAfterMutation("teaching_points", tp.id).catch(() => {});
+                  } catch {
+                    showToast("error", "Failed to save teaching point.");
+                  }
+                }}
+              >
+                Save for all types
+              </button>
+            </div>
           </div>
         </div>
       </details>
@@ -947,6 +987,18 @@ export function ResultsScreen() {
 
       {canRefine && (
       <div className="results-right-column">
+      {/* Refine Panel */}
+        <div className="results-refine-panel">
+          <h3>Refine</h3>
+          <textarea
+            className="refine-textarea"
+            placeholder="e.g., Emphasize the elevated LDL given patient's cardiac history"
+            value={refinementInstruction}
+            onChange={(e) => setRefinementInstruction(e.target.value)}
+            rows={3}
+          />
+        </div>
+
       {/* Result Settings Panel */}
         <div className="results-settings-panel">
           <h3>Result Settings</h3>

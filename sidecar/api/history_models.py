@@ -29,6 +29,8 @@ class HistoryListItem(BaseModel):
     filename: Optional[str] = None
     summary: str
     liked: bool = False
+    sync_id: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class HistoryListResponse(BaseModel):
@@ -51,6 +53,8 @@ class HistoryDetailResponse(BaseModel):
     summary: str
     liked: bool = False
     full_response: dict[str, Any]
+    sync_id: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class HistoryDeleteResponse(BaseModel):

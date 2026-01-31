@@ -29,13 +29,16 @@ from api.history_models import (
 from api.letter_models import (
     LetterDeleteResponse,
     LetterGenerateRequest,
+    LetterLikeRequest,
     LetterListResponse,
     LetterResponse,
+    LetterUpdateRequest,
 )
 from api.models import DetectionResult, ExtractionResult
 from api import settings_store
 from storage.database import get_db
 from extraction import ExtractionPipeline, extract_physician_name
+from extraction.demographics import extract_demographics
 from extraction.detector import PDFDetector
 from llm.client import LLMClient, LLMProvider
 from llm.prompt_engine import LiteracyLevel, PromptEngine
@@ -205,6 +208,25 @@ async def detect_pdf_type(file: UploadFile = File(...)):
             os.unlink(tmp_path)
 
 
+@router.post("/extraction/scrub-preview")
+async def scrub_preview(body: dict = Body(...)):
+    """Return PHI-scrubbed text for preview purposes."""
+    full_text = body.get("full_text", "")
+    clinical_context = body.get("clinical_context", "")
+    if not full_text:
+        raise HTTPException(status_code=400, detail="full_text is required.")
+
+    scrub_result = scrub_phi(full_text)
+    scrubbed_clinical = scrub_phi(clinical_context).scrubbed_text if clinical_context else ""
+
+    return {
+        "scrubbed_text": scrub_result.scrubbed_text,
+        "scrubbed_clinical_context": scrubbed_clinical,
+        "phi_found": scrub_result.phi_found,
+        "redaction_count": scrub_result.redaction_count,
+    }
+
+
 @router.post("/analyze/detect-type", response_model=DetectTypeResponse)
 async def detect_test_type(body: dict = Body(...)):
     """Auto-detect the medical test type from extraction results."""
@@ -320,6 +342,11 @@ async def explain_report(request: ExplainRequest = Body(...)):
     # 5. PHI scrub
     scrub_result = scrub_phi(extraction_result.full_text)
 
+    # 5a2. Extract demographics
+    demographics = extract_demographics(extraction_result.full_text)
+    patient_age = request.patient_age if request.patient_age is not None else demographics.age
+    patient_gender = request.patient_gender if request.patient_gender is not None else demographics.gender
+
     # 5b. Resolve physician name — request override takes priority
     if request.physician_name_override is not None:
         physician_name = request.physician_name_override or None
@@ -358,6 +385,8 @@ async def explain_report(request: ExplainRequest = Body(...)):
         short_comment_char_limit=settings.short_comment_char_limit,
         include_key_findings=inc_findings,
         include_measurements=inc_measurements,
+        patient_age=patient_age,
+        patient_gender=patient_gender,
     )
     # 6b. Load template if specified
     template_tone = None
@@ -394,6 +423,15 @@ async def explain_report(request: ExplainRequest = Body(...)):
         liked_examples=liked_examples,
         next_steps=request.next_steps,
         teaching_points=teaching_points,
+        short_comment=bool(request.short_comment),
+    )
+
+    # Log prompt sizes for debugging token issues
+    import logging
+    _logger = logging.getLogger(__name__)
+    _logger.warning(
+        "Prompt sizes — system: %d chars, user: %d chars, short_comment: %s",
+        len(system_prompt), len(user_prompt), bool(request.short_comment),
     )
 
     # 7. Call LLM with retry
@@ -409,6 +447,9 @@ async def explain_report(request: ExplainRequest = Body(...)):
         model=model_override,
     )
 
+    # Short comments need far fewer output tokens
+    max_tokens = 1024 if request.short_comment else 4096
+
     try:
         llm_response = await with_retry(
             client.call_with_tool,
@@ -416,6 +457,7 @@ async def explain_report(request: ExplainRequest = Body(...)):
             user_prompt=user_prompt,
             tool_name=EXPLANATION_TOOL_NAME,
             tool_schema=EXPLANATION_TOOL_SCHEMA,
+            max_tokens=max_tokens,
             max_attempts=2,
         )
     except LLMRetryError as e:
@@ -610,7 +652,7 @@ async def get_history_detail(history_id: int):
 async def create_history(request: HistoryCreateRequest = Body(...)):
     """Save a new analysis history record."""
     db = get_db()
-    new_id = db.save_history(
+    record = db.save_history(
         test_type=request.test_type,
         test_type_display=request.test_type_display,
         summary=request.summary,
@@ -619,8 +661,8 @@ async def create_history(request: HistoryCreateRequest = Body(...)):
         tone_preference=request.tone_preference,
         detail_preference=request.detail_preference,
     )
-    record = db.get_history(new_id)
-    return HistoryDetailResponse(**record)  # type: ignore[arg-type]
+    record["liked"] = bool(record.get("liked", 0))
+    return HistoryDetailResponse(**record)
 
 
 @router.delete("/history/{history_id}", response_model=HistoryDeleteResponse)
@@ -644,6 +686,16 @@ async def toggle_history_liked(
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
     return HistoryLikeResponse(id=history_id, liked=request.liked)
+
+
+@router.put("/history/{history_id}/copied")
+async def mark_history_copied(history_id: int):
+    """Mark a history record as copied (lightweight positive signal)."""
+    db = get_db()
+    updated = db.mark_copied(history_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="History record not found.")
+    return {"id": history_id, "copied": True}
 
 
 # --- Consent Endpoints ---
@@ -700,6 +752,20 @@ async def delete_teaching_point(point_id: int):
     return {"deleted": True, "id": point_id}
 
 
+@router.put("/teaching-points/{point_id}")
+async def update_teaching_point(point_id: int, body: dict = Body(...)):
+    """Update a teaching point's text and/or test_type."""
+    db = get_db()
+    updated = db.update_teaching_point(
+        point_id,
+        text=body.get("text"),
+        test_type=body.get("test_type", "UNSET"),
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Teaching point not found.")
+    return updated
+
+
 @router.post("/letters/generate", response_model=LetterResponse, status_code=201)
 async def generate_letter(request: LetterGenerateRequest = Body(...)):
     """Generate a patient-facing letter/explanation from free-text input."""
@@ -713,15 +779,22 @@ async def generate_letter(request: LetterGenerateRequest = Body(...)):
         )
 
     system_prompt = (
-        "You are a medical communication assistant. Your job is to help physicians "
-        "create clear, empathetic, patient-facing content.\n\n"
+        "You are writing as a physician or member of the care team composing a "
+        "message to a patient. The message must sound exactly like the clinician "
+        "wrote it themselves and require no editing before sending.\n\n"
         "## Rules\n"
         "1. Write in plain, compassionate language appropriate for patients.\n"
         "2. Do NOT include any patient-identifying information.\n"
-        "3. Use hedging language (may, appears to, could suggest) to reflect medical uncertainty.\n"
-        "4. Be thorough but concise.\n"
-        "5. Structure the response clearly with paragraphs or sections as appropriate.\n"
-        "6. Return ONLY the letter/explanation text. No preamble or meta-commentary."
+        "3. Interpret findings — explain WHAT results mean for the patient. "
+        "The patient already has their results; do NOT simply recite values "
+        "they can already read. Synthesize findings into meaningful clinical "
+        "statements that help the patient understand their health.\n"
+        "4. NEVER suggest treatments, future testing, or hypothetical actions. "
+        "Do NOT write phrases like 'your doctor may recommend' or 'we may need to'. "
+        "The physician will add their own specific recommendations separately.\n"
+        "5. Be thorough but concise.\n"
+        "6. Structure the response clearly with paragraphs or sections as appropriate.\n"
+        "7. Return ONLY the letter/explanation text. No preamble or meta-commentary."
     )
 
     llm_provider = LLMProvider(provider_str)
@@ -752,16 +825,29 @@ async def generate_letter(request: LetterGenerateRequest = Body(...)):
         prompt=request.prompt,
         content=content,
         letter_type=request.letter_type,
+        model_used=getattr(llm_response, "model", None),
+        input_tokens=getattr(llm_response, "input_tokens", None),
+        output_tokens=getattr(llm_response, "output_tokens", None),
     )
     record = db.get_letter(letter_id)
     return LetterResponse(**record)  # type: ignore[arg-type]
 
 
 @router.get("/letters", response_model=LetterListResponse)
-async def list_letters():
-    """Return all generated letters, newest first."""
+async def list_letters(
+    offset: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    liked_only: bool = False,
+):
+    """Return generated letters with pagination, newest first."""
     db = get_db()
-    items, total = db.list_letters()
+    items, total = db.list_letters(
+        offset=offset,
+        limit=limit,
+        search=search,
+        liked_only=liked_only,
+    )
     return LetterListResponse(
         items=[LetterResponse(**item) for item in items],
         total=total,
@@ -786,3 +872,82 @@ async def delete_letter(letter_id: int):
     if not deleted:
         raise HTTPException(status_code=404, detail="Letter not found.")
     return LetterDeleteResponse(deleted=True, id=letter_id)
+
+
+@router.put("/letters/{letter_id}", response_model=LetterResponse)
+async def update_letter(letter_id: int, request: LetterUpdateRequest = Body(...)):
+    """Update a letter's content."""
+    db = get_db()
+    record = db.update_letter(letter_id, request.content)
+    if not record:
+        raise HTTPException(status_code=404, detail="Letter not found.")
+    return LetterResponse(**record)
+
+
+@router.put("/letters/{letter_id}/like")
+async def toggle_letter_liked(letter_id: int, request: LetterLikeRequest = Body(...)):
+    """Toggle the liked status of a letter."""
+    db = get_db()
+    updated = db.toggle_letter_liked(letter_id, request.liked)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Letter not found.")
+    return {"id": letter_id, "liked": request.liked}
+
+
+# --- Sync Endpoints ---
+
+
+@router.get("/sync/export/{table}")
+async def sync_export_all(table: str):
+    """Return all local rows for a table (for sync push)."""
+    db = get_db()
+    rows = db.export_table(table)
+    return rows
+
+
+@router.get("/sync/export/{table}/{record_id}")
+async def sync_export_record(table: str, record_id: int):
+    """Return a single row by local id (with sync_id)."""
+    db = get_db()
+    record = db.export_record(table, record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Record not found.")
+    return record
+
+
+@router.post("/sync/merge")
+async def sync_merge(body: dict = Body(...)):
+    """Merge remote rows into local DB.
+
+    Expects: { "table": str, "rows": list[dict] }
+    Settings rows are matched by key, others by sync_id.
+    """
+    table = body.get("table", "")
+    rows = body.get("rows", [])
+    if not table or not isinstance(rows, list):
+        raise HTTPException(status_code=400, detail="table and rows are required.")
+
+    db = get_db()
+    merged = 0
+    skipped = 0
+
+    for row in rows:
+        try:
+            if table == "settings":
+                key = row.get("key")
+                value = row.get("value")
+                updated_at = row.get("updated_at", "")
+                if key and value is not None:
+                    if db.merge_settings_row(key, str(value), updated_at):
+                        merged += 1
+                    else:
+                        skipped += 1
+            else:
+                if db.merge_record(table, row):
+                    merged += 1
+                else:
+                    skipped += 1
+        except Exception:
+            skipped += 1
+
+    return {"merged": merged, "skipped": skipped}
