@@ -114,13 +114,16 @@ class TestPromptEngine:
         assert "Ejection Fraction" in prompt
         assert "How well the heart pumps blood" in prompt
 
-    def test_user_prompt_contains_scrubbed_text(self):
+    def test_user_prompt_omits_raw_scrubbed_text(self):
+        """Raw scrubbed text is no longer included — structured data is used instead."""
         engine = PromptEngine()
         report = _make_parsed_report()
         prompt = engine.build_user_prompt(
             report, MOCK_REFERENCE_RANGES, MOCK_GLOSSARY, "my scrubbed text"
         )
-        assert "my scrubbed text" in prompt
+        assert "my scrubbed text" not in prompt
+        # But structured measurements should still be present
+        assert "LVEF" in prompt
 
     def test_clinical_literacy_level(self):
         engine = PromptEngine()
@@ -250,13 +253,11 @@ class TestPromptEngine:
         report = _make_parsed_report()
         liked_examples = [
             {
-                "overall_summary": "Your heart looks great and healthy.",
-                "key_findings": [
-                    {
-                        "finding": "Normal heart function",
-                        "explanation": "Everything is working well.",
-                    },
-                ],
+                "paragraph_count": 2,
+                "approx_sentence_count": 5,
+                "approx_char_length": 320,
+                "num_key_findings": 1,
+                "finding_severities": ["normal"],
             },
         ]
         prompt = engine.build_user_prompt(
@@ -267,9 +268,11 @@ class TestPromptEngine:
             liked_examples=liked_examples,
         )
         assert "## Preferred Output Style" in prompt
-        assert "Your heart looks great and healthy." in prompt
-        assert "Normal heart function" in prompt
-        assert "Everything is working well." in prompt
+        assert "Style Reference 1" in prompt
+        assert "320 characters" in prompt
+        assert "Paragraphs: 2" in prompt
+        # Must NOT contain any clinical content from prior analyses
+        assert "Your heart looks great" not in prompt
 
     def test_user_prompt_without_liked_examples(self):
         engine = PromptEngine()
@@ -340,7 +343,7 @@ class TestPromptEngine:
         prompt = engine.build_system_prompt(
             LiteracyLevel.GRADE_6, MOCK_PROMPT_CONTEXT, physician_name="Dr. Smith"
         )
-        assert "Physician Attribution" in prompt
+        assert "Physician Voice" in prompt
         assert "Dr. Smith" in prompt
         assert "your doctor" in prompt.lower()
 
@@ -349,14 +352,14 @@ class TestPromptEngine:
         prompt = engine.build_system_prompt(
             LiteracyLevel.GRADE_6, MOCK_PROMPT_CONTEXT, physician_name=None
         )
-        assert "Physician Attribution" not in prompt
+        assert "Physician Voice" not in prompt
 
     def test_system_prompt_no_physician_section_when_empty(self):
         engine = PromptEngine()
         prompt = engine.build_system_prompt(
             LiteracyLevel.GRADE_6, MOCK_PROMPT_CONTEXT, physician_name=""
         )
-        assert "Physician Attribution" not in prompt
+        assert "Physician Voice" not in prompt
 
     def test_system_prompt_no_disclaimer_rule(self):
         engine = PromptEngine()
@@ -527,7 +530,8 @@ class TestResponseParser:
         with pytest.raises(ValueError, match="did not produce"):
             parse_and_validate_response(None, report)
 
-    def test_missing_measurements_warned(self):
+    def test_missing_measurements_not_warned(self):
+        """Missing measurements are acceptable — the LLM synthesizes, not catalogs."""
         report = _make_parsed_report()
         tool_result = {
             "overall_summary": "Summary.",
@@ -539,7 +543,7 @@ class TestResponseParser:
                     "status": "normal",
                     "plain_language": "Normal.",
                 },
-                # LVIDd is missing
+                # LVIDd is missing — that's fine
             ],
             "key_findings": [],
             "questions_for_doctor": [],
@@ -548,4 +552,4 @@ class TestResponseParser:
 
         result, issues = parse_and_validate_response(tool_result, report)
         warning_messages = [i.message for i in issues]
-        assert any("LVIDd" in m and "not explained" in m for m in warning_messages)
+        assert not any("not explained" in m for m in warning_messages)

@@ -150,7 +150,12 @@ class TestHistory:
         db.update_history_liked(id1, True)
         examples = db.get_liked_examples()
         assert len(examples) == 1
-        assert examples[0]["overall_summary"] == "All good."
+        # Should return structural metadata, not clinical content
+        assert "paragraph_count" in examples[0]
+        assert "approx_sentence_count" in examples[0]
+        assert "approx_char_length" in examples[0]
+        assert "num_key_findings" in examples[0]
+        assert "overall_summary" not in examples[0]
 
     def test_get_liked_examples_respects_limit(self, db: Database):
         for i in range(5):
@@ -214,18 +219,22 @@ class TestTemplates:
         assert tpl["closing_text"] == "Please follow up."
 
     def test_list_templates(self, db: Database):
+        # Account for the built-in "Lipid Panel" template seeded on init
+        baseline_items, baseline_total = db.list_templates()
         db.create_template(name="First")
         db.create_template(name="Second")
         items, total = db.list_templates()
-        assert total == 2
-        assert len(items) == 2
-        names = {items[0]["name"], items[1]["name"]}
-        assert names == {"First", "Second"}
+        assert total == baseline_total + 2
+        assert len(items) == baseline_total + 2
+        names = {item["name"] for item in items}
+        assert "First" in names
+        assert "Second" in names
 
-    def test_list_empty(self, db: Database):
+    def test_list_includes_builtin(self, db: Database):
         items, total = db.list_templates()
-        assert total == 0
-        assert items == []
+        assert total >= 1
+        builtin_names = {item["name"] for item in items if item.get("is_builtin")}
+        assert "Lipid Panel" in builtin_names
 
     def test_update_template(self, db: Database):
         tpl = db.create_template(name="Original", tone="formal")

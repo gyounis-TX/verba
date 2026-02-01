@@ -386,12 +386,25 @@ class Database:
                     full_response = json.loads(row["full_response"])
                     explanation = full_response.get("explanation", {})
                     overall_summary = explanation.get("overall_summary", "")
-                    key_findings = explanation.get("key_findings", [])[:2]
-                    if overall_summary:
-                        examples.append({
-                            "overall_summary": overall_summary,
-                            "key_findings": key_findings,
-                        })
+                    key_findings = explanation.get("key_findings", [])
+                    if not overall_summary:
+                        continue
+                    # Extract ONLY structural/style metadata — never
+                    # include clinical content, which can prime the LLM
+                    # to reproduce prior diagnoses on unrelated reports.
+                    paragraphs = [p for p in overall_summary.split("\n\n") if p.strip()]
+                    sentences = overall_summary.replace("\n", " ").split(". ")
+                    examples.append({
+                        "paragraph_count": len(paragraphs),
+                        "approx_sentence_count": len(sentences),
+                        "approx_char_length": len(overall_summary),
+                        "num_key_findings": len(key_findings),
+                        "finding_severities": [
+                            kf.get("severity", "")
+                            for kf in key_findings
+                            if kf.get("severity")
+                        ][:5],
+                    })
                 except (json.JSONDecodeError, TypeError):
                     continue
             return examples

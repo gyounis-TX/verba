@@ -39,6 +39,7 @@ export function ImportScreen() {
 
   // Clinical context state
   const [clinicalContext, setClinicalContext] = useState("");
+  const [selectedReasons, setSelectedReasons] = useState<Set<string>>(new Set());
   const [quickReasons, setQuickReasons] = useState<string[]>([]);
 
   // Help Me state
@@ -52,6 +53,11 @@ export function ImportScreen() {
   const [selectedResultKey, setSelectedResultKey] = useState<string | null>(
     null,
   );
+
+  // PHI scrub preview state
+  const [scrubbedText, setScrubbedText] = useState<string | null>(null);
+  const [scrubbedClinicalContext, setScrubbedClinicalContext] = useState<string | null>(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,7 +101,36 @@ export function ImportScreen() {
     setError(null);
     setExtractionResults(new Map());
     setSelectedResultKey(null);
+    setScrubbedText(null);
+    setScrubbedClinicalContext(null);
+    // Clear stale results so ResultsScreen doesn't restore a prior analysis.
+    try { sessionStorage.removeItem("explify_results_state"); } catch { /* ignore */ }
   }, []);
+
+  // Fetch scrubbed preview when extraction succeeds
+  useEffect(() => {
+    if (!result) return;
+    let cancelled = false;
+    setIsScrubbing(true);
+    sidecarApi
+      .scrubPreview(result.full_text, clinicalContext || undefined)
+      .then((res) => {
+        if (!cancelled) {
+          setScrubbedText(res.scrubbed_text);
+          setScrubbedClinicalContext(res.scrubbed_clinical_context);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setScrubbedText(result.full_text);
+          setScrubbedClinicalContext(clinicalContext);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsScrubbing(false);
+      });
+    return () => { cancelled = true; };
+  }, [result, clinicalContext]);
 
   const handleModeChange = useCallback(
     (newMode: ImportMode) => {
@@ -376,12 +411,19 @@ export function ImportScreen() {
                 {quickReasons.map((reason) => (
                   <button
                     key={reason}
-                    className={`quick-reason-btn ${clinicalContext === reason ? "quick-reason-btn--active" : ""}`}
-                    onClick={() =>
-                      setClinicalContext((prev) =>
-                        prev === reason ? "" : reason,
-                      )
-                    }
+                    className={`quick-reason-btn ${selectedReasons.has(reason) ? "quick-reason-btn--active" : ""}`}
+                    onClick={() => {
+                      setSelectedReasons((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(reason)) {
+                          next.delete(reason);
+                        } else {
+                          next.add(reason);
+                        }
+                        setClinicalContext(Array.from(next).join(", "));
+                        return next;
+                      });
+                    }}
                   >
                     {reason}
                   </button>
@@ -392,10 +434,88 @@ export function ImportScreen() {
               className="import-field-textarea"
               placeholder="e.g., Chest pain, follow up pericardial effusion, or paste last clinic note text"
               value={clinicalContext}
-              onChange={(e) => setClinicalContext(e.target.value)}
+              onChange={(e) => {
+                setClinicalContext(e.target.value);
+                setSelectedReasons(new Set());
+              }}
               rows={3}
             />
           </div>
+
+          {/* Scrubbed Clinical Context Preview */}
+          {status === "success" && scrubbedClinicalContext && clinicalContext.trim() && (
+            <div className="import-field">
+              <label className="import-field-label">Clinical Context Preview (PHI Scrubbed)</label>
+              <div className="scrubbed-preview-box">
+                {scrubbedClinicalContext}
+              </div>
+            </div>
+          )}
+
+          {/* Extraction Preview (moved to left column) */}
+          {status === "success" && result && (
+            <div className="extraction-preview">
+              <h3 className="preview-title">Extraction Complete</h3>
+
+              <div className="preview-stats">
+                <div className="stat">
+                  <span className="stat-label">Pages</span>
+                  <span className="stat-value">{result.total_pages}</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-label">Characters</span>
+                  <span className="stat-value">
+                    {result.total_chars.toLocaleString()}
+                  </span>
+                </div>
+                {result.detection && (
+                  <div className="stat">
+                    <span className="stat-label">Type</span>
+                    <span className="stat-value">
+                      {result.detection.overall_type}
+                    </span>
+                  </div>
+                )}
+                {result.tables.length > 0 && (
+                  <div className="stat">
+                    <span className="stat-label">Tables</span>
+                    <span className="stat-value">{result.tables.length}</span>
+                  </div>
+                )}
+              </div>
+
+              {result.warnings.length > 0 && (
+                <div className="preview-warnings">
+                  {result.warnings.map((w, i) => (
+                    <p key={i} className="warning-text">
+                      {w}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              <div className="preview-text-container">
+                {isScrubbing ? (
+                  <div className="extraction-progress">
+                    <div className="spinner" />
+                    <p>Scrubbing PHI...</p>
+                  </div>
+                ) : (
+                  <pre className="preview-text">
+                    {scrubbedText ?? result.full_text}
+                  </pre>
+                )}
+              </div>
+
+              <p className="phi-notice">
+                No PHI is stored or sent to the AI. All identifiable information is redacted before processing.
+              </p>
+
+              <button className="proceed-btn" onClick={handleProceed}>
+                Continue to Processing
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right Column — Import & Help Me */}
@@ -556,60 +676,6 @@ export function ImportScreen() {
                   </button>
                 );
               })}
-            </div>
-          )}
-
-          {status === "success" && result && (
-            <div className="extraction-preview">
-              <h3 className="preview-title">Extraction Complete</h3>
-
-              <div className="preview-stats">
-                <div className="stat">
-                  <span className="stat-label">Pages</span>
-                  <span className="stat-value">{result.total_pages}</span>
-                </div>
-                <div className="stat">
-                  <span className="stat-label">Characters</span>
-                  <span className="stat-value">
-                    {result.total_chars.toLocaleString()}
-                  </span>
-                </div>
-                {result.detection && (
-                  <div className="stat">
-                    <span className="stat-label">Type</span>
-                    <span className="stat-value">
-                      {result.detection.overall_type}
-                    </span>
-                  </div>
-                )}
-                {result.tables.length > 0 && (
-                  <div className="stat">
-                    <span className="stat-label">Tables</span>
-                    <span className="stat-value">{result.tables.length}</span>
-                  </div>
-                )}
-              </div>
-
-              {result.warnings.length > 0 && (
-                <div className="preview-warnings">
-                  {result.warnings.map((w, i) => (
-                    <p key={i} className="warning-text">
-                      {w}
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              <div className="preview-text-container">
-                <pre className="preview-text">
-                  {result.full_text.slice(0, 2000)}
-                  {result.full_text.length > 2000 && "\n\n... (truncated)"}
-                </pre>
-              </div>
-
-              <button className="proceed-btn" onClick={handleProceed}>
-                Continue to Processing
-              </button>
             </div>
           )}
 
