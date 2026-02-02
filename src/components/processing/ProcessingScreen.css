@@ -145,6 +145,34 @@
   background-color: var(--color-primary-700);
 }
 
+/* Deep Analysis Toggle */
+.deep-analysis-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.deep-analysis-toggle input[type="checkbox"] {
+  accent-color: var(--color-primary-600);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.deep-analysis-label {
+  font-weight: 500;
+}
+
+.deep-analysis-subtext {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
 .processing-complete {
   margin-top: var(--space-xl);
   text-align: center;

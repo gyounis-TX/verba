@@ -10,6 +10,7 @@ use tauri::Manager;
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // Focus the existing window when a second instance is launched
             if let Some(window) = app.get_webview_window("main") {
@@ -22,12 +23,12 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle().clone();
 
-            // In dev mode, resolve the Python venv relative to the project root.
-            // Tauri runs from src-tauri/, so parent is the project root.
-            let project_root = std::env::current_dir()
-                .expect("Failed to get current directory")
+            // Resolve the project root from the compile-time Cargo manifest directory
+            // (src-tauri/). This works regardless of the working directory at runtime,
+            // including when launched from a .app bundle.
+            let project_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .parent()
-                .expect("Failed to get project root")
+                .expect("Failed to get project root from CARGO_MANIFEST_DIR")
                 .to_path_buf();
 
             let python_path = project_root
@@ -39,6 +40,9 @@ pub fn run() {
             let sidecar_dir = project_root.join("sidecar");
 
             // Spawn the Python sidecar process
+            eprintln!("Sidecar python: {:?}", &python_path);
+            eprintln!("Sidecar dir: {:?}", &sidecar_dir);
+
             let mut child = Command::new(&python_path)
                 .arg("-u") // unbuffered stdout
                 .arg("main.py")
@@ -50,6 +54,17 @@ pub fn run() {
 
             // Read stdout in a background thread to capture the PORT line
             let stdout = child.stdout.take().expect("Failed to capture stdout");
+            let stderr = child.stderr.take().expect("Failed to capture stderr");
+
+            // Drain stderr so the pipe buffer doesn't fill up
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        eprintln!("[sidecar stderr] {}", line);
+                    }
+                }
+            });
 
             std::thread::spawn({
                 let handle = app_handle.clone();
@@ -57,6 +72,7 @@ pub fn run() {
                     let reader = BufReader::new(stdout);
                     for line in reader.lines() {
                         if let Ok(line) = line {
+                            eprintln!("[sidecar stdout] {}", line);
                             if let Some(port_str) = line.strip_prefix("PORT:") {
                                 if let Ok(port) = port_str.parse::<u16>() {
                                     let state = handle.state::<Mutex<SidecarState>>();

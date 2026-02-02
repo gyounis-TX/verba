@@ -20,26 +20,64 @@ function fileKey(file: File): string {
   return `${file.name}::${file.size}`;
 }
 
+// Module-level cache — survives component unmount during navigation.
+// Cleared when the user processes or purges the import.
+interface ImportStateCache {
+  mode: ImportMode;
+  selectedFiles: File[];
+  pastedText: string;
+  status: ImportStatus;
+  result: ExtractionResult | null;
+  error: string | null;
+  extractionResults: Map<string, FileExtractionEntry>;
+  selectedResultKey: string | null;
+  clinicalContext: string;
+  selectedReasons: Set<string>;
+  selectedTemplateId: number | undefined;
+  scrubbedText: string | null;
+  scrubbedClinicalContext: string | null;
+}
+
+function freshCache(): ImportStateCache {
+  return {
+    mode: "pdf",
+    selectedFiles: [],
+    pastedText: "",
+    status: "idle",
+    result: null,
+    error: null,
+    extractionResults: new Map(),
+    selectedResultKey: null,
+    clinicalContext: "",
+    selectedReasons: new Set(),
+    selectedTemplateId: undefined,
+    scrubbedText: null,
+    scrubbedClinicalContext: null,
+  };
+}
+
+let _cache: ImportStateCache = freshCache();
+
 export function ImportScreen() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [mode, setMode] = useState<ImportMode>("pdf");
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [pastedText, setPastedText] = useState("");
-  const [status, setStatus] = useState<ImportStatus>("idle");
-  const [result, setResult] = useState<ExtractionResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<ImportMode>(_cache.mode);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>(_cache.selectedFiles);
+  const [pastedText, setPastedText] = useState(_cache.pastedText);
+  const [status, setStatus] = useState<ImportStatus>(_cache.status);
+  const [result, setResult] = useState<ExtractionResult | null>(_cache.result);
+  const [error, setError] = useState<string | null>(_cache.error);
   const [isDragOver, setIsDragOver] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<
     number | undefined
-  >(undefined);
+  >(_cache.selectedTemplateId);
 
   // Clinical context state
-  const [clinicalContext, setClinicalContext] = useState("");
-  const [selectedReasons, setSelectedReasons] = useState<Set<string>>(new Set());
+  const [clinicalContext, setClinicalContext] = useState(_cache.clinicalContext);
+  const [selectedReasons, setSelectedReasons] = useState<Set<string>>(_cache.selectedReasons);
   const [quickReasons, setQuickReasons] = useState<string[]>([]);
 
   // Help Me state
@@ -49,15 +87,25 @@ export function ImportScreen() {
   // Batch extraction state
   const [extractionResults, setExtractionResults] = useState<
     Map<string, FileExtractionEntry>
-  >(new Map());
+  >(_cache.extractionResults);
   const [selectedResultKey, setSelectedResultKey] = useState<string | null>(
-    null,
+    _cache.selectedResultKey,
   );
 
   // PHI scrub preview state
-  const [scrubbedText, setScrubbedText] = useState<string | null>(null);
-  const [scrubbedClinicalContext, setScrubbedClinicalContext] = useState<string | null>(null);
+  const [scrubbedText, setScrubbedText] = useState<string | null>(_cache.scrubbedText);
+  const [scrubbedClinicalContext, setScrubbedClinicalContext] = useState<string | null>(_cache.scrubbedClinicalContext);
   const [isScrubbing, setIsScrubbing] = useState(false);
+
+  // Sync component state → module-level cache so it survives navigation
+  useEffect(() => {
+    _cache = {
+      mode, selectedFiles, pastedText, status, result, error,
+      extractionResults, selectedResultKey, clinicalContext,
+      selectedReasons, selectedTemplateId, scrubbedText,
+      scrubbedClinicalContext,
+    };
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +151,7 @@ export function ImportScreen() {
     setSelectedResultKey(null);
     setScrubbedText(null);
     setScrubbedClinicalContext(null);
+    _cache = freshCache();
     // Clear stale results so ResultsScreen doesn't restore a prior analysis.
     try { sessionStorage.removeItem("explify_results_state"); } catch { /* ignore */ }
   }, []);
@@ -158,30 +207,17 @@ export function ImportScreen() {
 
   const handleFileSelect = useCallback(
     (files: File[]) => {
-      const validFiles: File[] = [];
-      const errors: string[] = [];
-      for (const file of files) {
-        const validationError = validateFile(file);
-        if (validationError) {
-          errors.push(validationError);
-        } else {
-          validFiles.push(file);
-        }
-      }
-      if (errors.length > 0) {
-        setError(errors.join(" "));
-      }
-      if (validFiles.length > 0) {
-        setSelectedFiles((prev) => {
-          const existingKeys = new Set(prev.map(fileKey));
-          const newFiles = validFiles.filter(
-            (f) => !existingKeys.has(fileKey(f)),
-          );
-          return [...prev, ...newFiles];
-        });
-        resetState();
-      } else if (validFiles.length === 0 && errors.length > 0) {
+      if (files.length === 0) return;
+      // Only allow a single file
+      const file = files[0];
+      const validationError = validateFile(file);
+      if (validationError) {
+        setError(validationError);
         setSelectedFiles([]);
+      } else {
+        setError(null);
+        setSelectedFiles([file]);
+        resetState();
       }
     },
     [resetState],
@@ -221,7 +257,7 @@ export function ImportScreen() {
       setIsDragOver(false);
       const files = Array.from(e.dataTransfer.files);
       if (files.length > 0) {
-        handleFileSelect(files);
+        handleFileSelect([files[0]]);
       }
     },
     [handleFileSelect],
@@ -309,19 +345,9 @@ export function ImportScreen() {
     }
   }, [mode, selectedFiles, pastedText, showToast]);
 
-  const handleSelectResult = useCallback(
-    (key: string) => {
-      setSelectedResultKey(key);
-      const entry = extractionResults.get(key);
-      if (entry?.result) {
-        setResult(entry.result);
-      }
-    },
-    [extractionResults],
-  );
-
   const handleProceed = useCallback(() => {
     if (result) {
+      _cache = freshCache();
       navigate("/processing", {
         state: {
           extractionResult: result,
@@ -360,10 +386,6 @@ export function ImportScreen() {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
-
-  const successCount = [...extractionResults.values()].filter(
-    (e) => e.status === "success",
-  ).length;
 
   return (
     <div className="import-screen">
@@ -548,26 +570,25 @@ export function ImportScreen() {
                   ref={fileInputRef}
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png,.txt,application/pdf,image/jpeg,image/png,text/plain"
-                  multiple
                   onChange={handleInputChange}
                   className="drop-zone-input"
                 />
                 {selectedFiles.length > 0 ? (
                   <div className="drop-zone-file-info">
                     <span className="file-name">
-                      {selectedFiles.length} file{selectedFiles.length !== 1 ? "s" : ""} selected
+                      {selectedFiles[0].name}
                     </span>
                     <span className="file-size">
-                      Click or drop to add more
+                      Click or drop to replace
                     </span>
                   </div>
                 ) : (
                   <div className="drop-zone-prompt">
                     <p className="drop-zone-primary">
-                      Drag and drop files here, or click to browse
+                      Drag and drop a file here, or click to browse
                     </p>
                     <p className="drop-zone-secondary">
-                      PDF, JPG, PNG, or TXT files up to 50 MB each. Multiple files supported.
+                      PDF, JPG, PNG, or TXT up to 50 MB
                     </p>
                   </div>
                 )}
@@ -637,11 +658,7 @@ export function ImportScreen() {
             onClick={handleExtract}
             disabled={!canExtract}
           >
-            {status === "extracting"
-              ? "Extracting..."
-              : mode === "pdf" && selectedFiles.length > 1
-                ? `Extract All (${selectedFiles.length})`
-                : "Extract Text"}
+            {status === "extracting" ? "Extracting..." : "Extract Text"}
           </button>
 
           {error && (
@@ -653,29 +670,7 @@ export function ImportScreen() {
           {status === "extracting" && (
             <div className="extraction-progress">
               <div className="spinner" />
-              <p>Analyzing document{selectedFiles.length > 1 ? "s" : ""}...</p>
-            </div>
-          )}
-
-          {status === "success" && successCount > 1 && (
-            <div className="batch-results-selector">
-              <h3 className="preview-title">
-                {successCount} files extracted. Select one to process:
-              </h3>
-              {selectedFiles.map((file) => {
-                const key = fileKey(file);
-                const entry = extractionResults.get(key);
-                if (entry?.status !== "success") return null;
-                return (
-                  <button
-                    key={key}
-                    className={`batch-result-item ${selectedResultKey === key ? "batch-result-item--selected" : ""}`}
-                    onClick={() => handleSelectResult(key)}
-                  >
-                    {file.name}
-                  </button>
-                );
-              })}
+              <p>Analyzing document...</p>
             </div>
           )}
 
