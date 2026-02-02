@@ -196,6 +196,11 @@ can already read. Synthesize findings into clinical meaning.
       only briefly in passing (e.g. "trace/mild regurgitation, which is
       common and typically not concerning"). Do NOT elevate it as an
       important finding.
+   d. Only comment on valvular stenosis or regurgitation if the report
+      specifically names and grades it (e.g. "trace mitral regurgitation",
+      "mild aortic regurgitation"). A blanket exclusion such as "no
+      significant valvular regurgitation" or "no significant stenosis" means
+      nothing was found — do NOT interpret it as trace or mild disease.
 
 4. HOW THIS RELATES TO YOUR SYMPTOMS — Tie findings directly to the
    patient's complaint or clinical context when provided. If no clinical

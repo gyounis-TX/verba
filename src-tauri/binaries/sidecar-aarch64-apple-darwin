@@ -2,5 +2,9 @@
 # Dev-mode wrapper: runs the Python sidecar from the source tree.
 # In production builds, PyInstaller replaces this with a standalone binary.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Walk up from the script location to find the project root (contains sidecar/)
+PROJECT_ROOT="$SCRIPT_DIR"
+while [ ! -d "$PROJECT_ROOT/sidecar" ] && [ "$PROJECT_ROOT" != "/" ]; do
+  PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
+done
 exec "$PROJECT_ROOT/sidecar/.venv/bin/python3" -u "$PROJECT_ROOT/sidecar/main.py" "$@"

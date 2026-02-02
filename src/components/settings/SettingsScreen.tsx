@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -59,6 +59,7 @@ export function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const loaded = useRef(false);
 
   const [literacyLevel, setLiteracyLevel] =
     useState<LiteracyLevel>("grade_12");
@@ -127,6 +128,7 @@ export function SettingsScreen() {
         showToast("error", msg);
       } finally {
         setLoading(false);
+        loaded.current = true;
       }
     }
     loadSettings();
@@ -171,7 +173,6 @@ export function SettingsScreen() {
       }
 
       setSuccess(true);
-      showToast("success", "Settings saved.");
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save settings";
@@ -181,6 +182,20 @@ export function SettingsScreen() {
       setSaving(false);
     }
   }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, quickReasons, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, smsEnabled, smsCharLimit, footerType, customFooterText, showToast]);
+
+  // Auto-save: debounce 800ms after any setting changes
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
+  useEffect(() => {
+    if (!loaded.current) return;
+
+    const timer = setTimeout(() => {
+      handleSaveRef.current();
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, quickReasons, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, smsEnabled, smsCharLimit, footerType, customFooterText]);
 
   const handleCheckForUpdates = async () => {
     setUpdateStatus("checking");
@@ -871,18 +886,10 @@ export function SettingsScreen() {
         )}
       </section>
 
-      {/* Save */}
+      {/* Auto-save Status */}
       <div className="settings-actions">
-        <button
-          className="save-btn"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? "Saving..." : "Save Settings"}
-        </button>
-        {success && (
-          <span className="save-success">Settings saved.</span>
-        )}
+        {saving && <span className="save-status">Saving...</span>}
+        {success && <span className="save-success">Settings saved.</span>}
         {error && <span className="save-error">{error}</span>}
       </div>
 

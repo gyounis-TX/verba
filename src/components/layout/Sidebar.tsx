@@ -31,6 +31,7 @@ export function Sidebar() {
   const navigate = useNavigate();
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
@@ -56,8 +57,8 @@ export function Sidebar() {
   }, []);
 
   useEffect(() => {
-    // Check for updates on mount
     let cancelled = false;
+
     const checkUpdate = async () => {
       try {
         const { check } = await import("@tauri-apps/plugin-updater");
@@ -69,11 +70,24 @@ export function Sidebar() {
         // Updater not available or failed silently
       }
     };
-    checkUpdate();
-    return () => { cancelled = true; };
+
+    checkUpdate(); // Check immediately on mount
+
+    // Re-check every 24 hours
+    const interval = setInterval(checkUpdate, 24 * 60 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
-  const handleInstall = useCallback(async () => {
+  const handleUpdateClick = useCallback(() => {
+    if (!isInstalling) setShowUpdatePrompt((prev) => !prev);
+  }, [isInstalling]);
+
+  const handleInstallUpdate = useCallback(async () => {
+    setShowUpdatePrompt(false);
     setIsInstalling(true);
     try {
       const { check } = await import("@tauri-apps/plugin-updater");
@@ -93,8 +107,33 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <h1 className="sidebar-title">Explify</h1>
-        <span className="sidebar-descriptor">Explain Better</span>
+        {updateInfo?.available ? (
+          <>
+            <button className="sidebar-title-btn" onClick={handleUpdateClick} disabled={isInstalling}>
+              <h1 className="sidebar-title">
+                Explify
+                {!isInstalling && <span className="update-dot" />}
+              </h1>
+              <span className="sidebar-descriptor">
+                {isInstalling ? "Updating..." : `v${updateInfo.version} available`}
+              </span>
+            </button>
+            {showUpdatePrompt && (
+              <div className="update-prompt">
+                <span className="update-prompt-text">Update and restart now?</span>
+                <div className="update-prompt-actions">
+                  <button className="update-prompt-yes" onClick={handleInstallUpdate}>Yes</button>
+                  <button className="update-prompt-no" onClick={() => setShowUpdatePrompt(false)}>No</button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <h1 className="sidebar-title">Explify</h1>
+            <span className="sidebar-descriptor">Explain Better</span>
+          </>
+        )}
       </div>
       <nav className="sidebar-nav">
         {navItems.map((item) => (
@@ -127,18 +166,6 @@ export function Sidebar() {
               Sign In
             </button>
           )}
-        </div>
-      )}
-      {updateInfo?.available && (
-        <div className="sidebar-update-banner">
-          <span className="update-text">Update available: v{updateInfo.version}</span>
-          <button
-            className="update-install-btn"
-            onClick={handleInstall}
-            disabled={isInstalling}
-          >
-            {isInstalling ? "Installing..." : "Install"}
-          </button>
         </div>
       )}
     </aside>

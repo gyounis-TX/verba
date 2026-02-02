@@ -75,29 +75,6 @@
   background-color: rgba(0, 0, 0, 0.08);
 }
 
-.update-banner {
-  background-color: #dbeafe;
-  border-color: #3b82f6;
-  color: #1e3a5f;
-}
-
-.update-banner .setup-banner-btn {
-  background-color: #3b82f6;
-}
-
-.update-banner .setup-banner-btn:hover {
-  background-color: #2563eb;
-}
-
-.update-banner .setup-banner-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.update-banner .setup-banner-dismiss {
-  color: #1e3a5f;
-}
-
 /* Print Styles */
 @media print {
   .sidebar {
@@ -115,8 +92,7 @@
     padding: 0;
   }
 
-  .setup-banner,
-  .update-banner {
+  .setup-banner {
     display: none !important;
   }
 }

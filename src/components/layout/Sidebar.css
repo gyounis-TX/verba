@@ -96,41 +96,87 @@
   color: var(--color-text);
 }
 
-/* Update Banner */
-.sidebar-update-banner {
-  margin-top: auto;
-  padding: var(--space-sm) var(--space-md);
-  background-color: var(--color-primary-50);
-  border: 1px solid var(--color-primary-200);
-  border-radius: var(--radius-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
+/* Clickable title button (update available) */
+.sidebar-title-btn {
+  all: unset;
+  cursor: pointer;
+  display: block;
+  width: 100%;
 }
 
-.update-text {
-  font-size: var(--font-size-sm);
-  font-weight: 500;
+.sidebar-title-btn:hover .sidebar-title {
   color: var(--color-primary-700);
 }
 
-.update-install-btn {
+.sidebar-title-btn .sidebar-descriptor {
+  color: var(--color-primary-600);
+  font-weight: 500;
+}
+
+/* Update prompt */
+.update-prompt {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background-color: var(--color-gray-50);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.update-prompt-text {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  margin-bottom: var(--space-xs);
+}
+
+.update-prompt-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.update-prompt-yes,
+.update-prompt-no {
+  flex: 1;
   padding: var(--space-xs) var(--space-sm);
-  background-color: var(--color-primary-600);
-  color: white;
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s ease;
 }
 
-.update-install-btn:hover:not(:disabled) {
+.update-prompt-yes {
+  background-color: var(--color-primary-600);
+  color: white;
+}
+
+.update-prompt-yes:hover {
   background-color: var(--color-primary-700);
 }
 
-.update-install-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.update-prompt-no {
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.update-prompt-no:hover {
+  background-color: var(--color-gray-100);
+}
+
+/* Notification dot */
+.update-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  margin-left: 6px;
+  vertical-align: super;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }

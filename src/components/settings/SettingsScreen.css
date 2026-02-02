@@ -464,6 +464,12 @@
   cursor: not-allowed;
 }
 
+.save-status {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
 .save-success {
   font-size: var(--font-size-sm);
   color: var(--color-accent-600);
