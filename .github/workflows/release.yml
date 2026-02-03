@@ -64,23 +64,37 @@ jobs:
           TRIPLE=$(rustc -vV | grep host | awk '{print $2}')
           mv src-tauri/binaries/sidecar "src-tauri/binaries/sidecar-${TRIPLE}"
 
-      - name: Build Tauri app
+      - name: Prepare signing key
         env:
           TAURI_SIGNING_PRIVATE_KEY_RAW: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          KEY_FILE="$RUNNER_TEMP/tauri_signing_key"
+          # Minisign keys require an "untrusted comment:" header line.
+          # If the secret was stored without it, prepend the standard header.
+          if echo "$TAURI_SIGNING_PRIVATE_KEY_RAW" | head -1 | grep -q "^untrusted comment:"; then
+            echo "Key has comment header"
+            echo "$TAURI_SIGNING_PRIVATE_KEY_RAW" > "$KEY_FILE"
+          else
+            echo "Prepending minisign comment header..."
+            echo "untrusted comment: minisign encrypted secret key" > "$KEY_FILE"
+            echo "$TAURI_SIGNING_PRIVATE_KEY_RAW" >> "$KEY_FILE"
+          fi
+          echo "Key file lines: $(wc -l < "$KEY_FILE")"
+          echo "Key file bytes: $(wc -c < "$KEY_FILE")"
+          echo "TAURI_KEY_FILE=$KEY_FILE" >> "$GITHUB_ENV"
+
+      - name: Build Tauri app
+        env:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
-          # Minisign keys require an "untrusted comment:" header line.
-          # If the secret was stored without it, prepend the standard header.
-          if echo "$TAURI_SIGNING_PRIVATE_KEY_RAW" | head -1 | grep -q "^untrusted comment:"; then
-            export TAURI_SIGNING_PRIVATE_KEY="$TAURI_SIGNING_PRIVATE_KEY_RAW"
-          else
-            echo "Prepending minisign comment header to key..."
-            TAURI_SIGNING_PRIVATE_KEY="$(printf 'untrusted comment: minisign encrypted secret key\n%s' "$TAURI_SIGNING_PRIVATE_KEY_RAW")"
-            export TAURI_SIGNING_PRIVATE_KEY
-          fi
+          export TAURI_SIGNING_PRIVATE_KEY="$TAURI_KEY_FILE"
           npx tauri build
+
+      - name: Clean up signing key
+        if: always()
+        run: rm -f "$TAURI_KEY_FILE"
 
       - name: List build artifacts
         run: |
@@ -154,24 +168,38 @@ jobs:
           TRIPLE=$(rustc -vV | grep host | awk '{print $2}')
           mv "src-tauri/binaries/sidecar.exe" "src-tauri/binaries/sidecar-${TRIPLE}.exe"
 
-      - name: Build Tauri app
+      - name: Prepare signing key
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY_RAW: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          KEY_FILE="$RUNNER_TEMP/tauri_signing_key"
+          if echo "$TAURI_SIGNING_PRIVATE_KEY_RAW" | head -1 | grep -q "^untrusted comment:"; then
+            echo "Key has comment header"
+            echo "$TAURI_SIGNING_PRIVATE_KEY_RAW" > "$KEY_FILE"
+          else
+            echo "Prepending minisign comment header..."
+            echo "untrusted comment: minisign encrypted secret key" > "$KEY_FILE"
+            echo "$TAURI_SIGNING_PRIVATE_KEY_RAW" >> "$KEY_FILE"
+          fi
+          echo "Key file lines: $(wc -l < "$KEY_FILE")"
+          echo "Key file bytes: $(wc -c < "$KEY_FILE")"
+          echo "TAURI_KEY_FILE=$KEY_FILE" >> "$GITHUB_ENV"
+
+      - name: Build Tauri app
+        shell: bash
+        env:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
-          # Minisign keys require an "untrusted comment:" header line.
-          # If the secret was stored without it, prepend the standard header.
-          if echo "$TAURI_SIGNING_PRIVATE_KEY_RAW" | head -1 | grep -q "^untrusted comment:"; then
-            export TAURI_SIGNING_PRIVATE_KEY="$TAURI_SIGNING_PRIVATE_KEY_RAW"
-          else
-            echo "Prepending minisign comment header to key..."
-            TAURI_SIGNING_PRIVATE_KEY="$(printf 'untrusted comment: minisign encrypted secret key\n%s' "$TAURI_SIGNING_PRIVATE_KEY_RAW")"
-            export TAURI_SIGNING_PRIVATE_KEY
-          fi
+          export TAURI_SIGNING_PRIVATE_KEY="$TAURI_KEY_FILE"
           npx tauri build
+
+      - name: Clean up signing key
+        if: always()
+        shell: bash
+        run: rm -f "$TAURI_KEY_FILE"
 
       - name: List build artifacts
         shell: bash
