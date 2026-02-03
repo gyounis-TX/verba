@@ -69,9 +69,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for sig in $(find src-tauri/target/release/bundle -name "*.app.tar.gz.sig"); do
-            echo "Uploading $sig"
-            gh release upload "${{ github.ref_name }}" "$sig" --clobber
+          echo "Listing bundle contents:"
+          ls -R src-tauri/target/release/bundle/ || true
+          for sig in src-tauri/target/release/bundle/macos/*.sig; do
+            if [ -f "$sig" ]; then
+              echo "Uploading $sig"
+              gh release upload "${{ github.ref_name }}" "$sig" --clobber
+            fi
           done
 
   build-windows:
@@ -136,9 +140,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for f in $(find src-tauri/target/release/bundle -name "*.nsis.zip" -o -name "*.nsis.zip.sig"); do
-            echo "Uploading $f"
-            gh release upload "${{ github.ref_name }}" "$f" --clobber
+          echo "Listing bundle contents:"
+          ls -R src-tauri/target/release/bundle/ || true
+          for f in src-tauri/target/release/bundle/nsis/*.nsis.zip src-tauri/target/release/bundle/nsis/*.nsis.zip.sig; do
+            if [ -f "$f" ]; then
+              echo "Uploading $f"
+              gh release upload "${{ github.ref_name }}" "$f" --clobber
+            fi
           done
 
   create-updater-json:
