@@ -74,7 +74,7 @@ jobs:
           TARGZ=$(ls src-tauri/target/release/bundle/macos/*.app.tar.gz 2>/dev/null | head -1)
           if [ -n "$TARGZ" ]; then
             echo "Signing $TARGZ"
-            npx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$TARGZ"
+            npx tauri signer sign "$TARGZ"
             echo "Uploading ${TARGZ}.sig"
             gh release upload "${{ github.ref_name }}" "${TARGZ}.sig" --clobber
           fi
@@ -149,7 +149,7 @@ jobs:
             echo "Creating $NSIS_ZIP"
             powershell.exe -Command "Compress-Archive -Path '$EXE' -DestinationPath '$NSIS_ZIP'"
             echo "Signing $NSIS_ZIP"
-            npx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$NSIS_ZIP"
+            npx tauri signer sign "$NSIS_ZIP"
             echo "Uploading $NSIS_ZIP and ${NSIS_ZIP}.sig"
             gh release upload "${{ github.ref_name }}" "$NSIS_ZIP" --clobber
             gh release upload "${{ github.ref_name }}" "${NSIS_ZIP}.sig" --clobber
