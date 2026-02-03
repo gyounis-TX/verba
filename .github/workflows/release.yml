@@ -86,20 +86,27 @@ jobs:
           TAG="${{ github.ref_name }}"
           REPO="${{ github.repository }}"
 
-          # Upload .app.tar.gz (updater bundle)
-          for f in src-tauri/target/release/bundle/macos/*.app.tar.gz; do
-            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
-          done
+          upload_with_retry() {
+            local file="$1" attempt
+            for attempt in 1 2 3; do
+              echo "Uploading $file (attempt $attempt)..."
+              if gh release upload "$TAG" "$file" --clobber --repo "$REPO"; then
+                return 0
+              fi
+              echo "Attempt $attempt failed, retrying in 5s..."
+              sleep 5
+            done
+            echo "ERROR: Failed to upload $file after 3 attempts"
+            return 1
+          }
 
-          # Upload .app.tar.gz.sig (updater signature)
-          for f in src-tauri/target/release/bundle/macos/*.app.tar.gz.sig; do
-            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
+          FAILED=0
+          for f in src-tauri/target/release/bundle/macos/*.app.tar.gz \
+                   src-tauri/target/release/bundle/macos/*.app.tar.gz.sig \
+                   src-tauri/target/release/bundle/dmg/*.dmg; do
+            [ -f "$f" ] && upload_with_retry "$f" || FAILED=1
           done
-
-          # Upload .dmg (installer)
-          for f in src-tauri/target/release/bundle/dmg/*.dmg; do
-            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
-          done
+          exit $FAILED
 
   build-windows:
     needs: create-release
@@ -166,20 +173,27 @@ jobs:
           TAG="${{ github.ref_name }}"
           REPO="${{ github.repository }}"
 
-          # Upload NSIS installer (.exe)
-          for f in src-tauri/target/release/bundle/nsis/*-setup.exe; do
-            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
-          done
+          upload_with_retry() {
+            local file="$1" attempt
+            for attempt in 1 2 3; do
+              echo "Uploading $file (attempt $attempt)..."
+              if gh release upload "$TAG" "$file" --clobber --repo "$REPO"; then
+                return 0
+              fi
+              echo "Attempt $attempt failed, retrying in 5s..."
+              sleep 5
+            done
+            echo "ERROR: Failed to upload $file after 3 attempts"
+            return 1
+          }
 
-          # Upload .nsis.zip (updater bundle)
-          for f in src-tauri/target/release/bundle/nsis/*.nsis.zip; do
-            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
+          FAILED=0
+          for f in src-tauri/target/release/bundle/nsis/*-setup.exe \
+                   src-tauri/target/release/bundle/nsis/*.nsis.zip \
+                   src-tauri/target/release/bundle/nsis/*.nsis.zip.sig; do
+            [ -f "$f" ] && upload_with_retry "$f" || FAILED=1
           done
-
-          # Upload .nsis.zip.sig (updater signature)
-          for f in src-tauri/target/release/bundle/nsis/*.nsis.zip.sig; do
-            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
-          done
+          exit $FAILED
 
   create-updater-json:
     needs: [build-macos, build-windows]
