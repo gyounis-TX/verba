@@ -9,7 +9,21 @@ permissions:
   contents: write
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --title "Explify ${{ github.ref_name }}" \
+            --notes "See the assets to download and install this version." \
+            2>/dev/null || true
+
   build-macos:
+    needs: create-release
     runs-on: macos-latest
 
     steps:
@@ -51,35 +65,44 @@ jobs:
           mv src-tauri/binaries/sidecar "src-tauri/binaries/sidecar-${TRIPLE}"
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0.5
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Explify ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: false
-          prerelease: false
+        run: npx tauri build
 
-      - name: Sign and upload updater artifact
+      - name: List build artifacts
+        run: |
+          echo "=== macos bundle ==="
+          ls -la src-tauri/target/release/bundle/macos/ 2>/dev/null || echo "No macos bundle dir"
+          echo "=== dmg bundle ==="
+          ls -la src-tauri/target/release/bundle/dmg/ 2>/dev/null || echo "No dmg bundle dir"
+
+      - name: Upload release artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          TARGZ=$(ls src-tauri/target/release/bundle/macos/*.app.tar.gz 2>/dev/null | head -1)
-          if [ -n "$TARGZ" ]; then
-            echo "Signing $TARGZ"
-            npx tauri signer sign "$TARGZ"
-            echo "Uploading ${TARGZ}.sig"
-            gh release upload "${{ github.ref_name }}" "${TARGZ}.sig" --clobber
-          fi
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+
+          # Upload .app.tar.gz (updater bundle)
+          for f in src-tauri/target/release/bundle/macos/*.app.tar.gz; do
+            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
+          done
+
+          # Upload .app.tar.gz.sig (updater signature)
+          for f in src-tauri/target/release/bundle/macos/*.app.tar.gz.sig; do
+            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
+          done
+
+          # Upload .dmg (installer)
+          for f in src-tauri/target/release/bundle/dmg/*.dmg; do
+            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
+          done
 
   build-windows:
+    needs: create-release
     runs-on: windows-latest
 
     steps:
@@ -122,38 +145,41 @@ jobs:
           mv "src-tauri/binaries/sidecar.exe" "src-tauri/binaries/sidecar-${TRIPLE}.exe"
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0.5
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Explify ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: false
-          prerelease: false
+        run: npx tauri build
 
-      - name: Create and upload updater bundle
+      - name: List build artifacts
+        shell: bash
+        run: |
+          echo "=== nsis bundle ==="
+          ls -la src-tauri/target/release/bundle/nsis/ 2>/dev/null || echo "No nsis bundle dir"
+
+      - name: Upload release artifacts
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          EXE=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe 2>/dev/null | head -1)
-          if [ -n "$EXE" ]; then
-            NSIS_ZIP="${EXE%.exe}.nsis.zip"
-            echo "Creating $NSIS_ZIP"
-            powershell.exe -Command "Compress-Archive -Path '$EXE' -DestinationPath '$NSIS_ZIP'"
-            echo "Signing $NSIS_ZIP"
-            npx tauri signer sign "$NSIS_ZIP"
-            echo "Uploading $NSIS_ZIP and ${NSIS_ZIP}.sig"
-            gh release upload "${{ github.ref_name }}" "$NSIS_ZIP" --clobber
-            gh release upload "${{ github.ref_name }}" "${NSIS_ZIP}.sig" --clobber
-          fi
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+
+          # Upload NSIS installer (.exe)
+          for f in src-tauri/target/release/bundle/nsis/*-setup.exe; do
+            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
+          done
+
+          # Upload .nsis.zip (updater bundle)
+          for f in src-tauri/target/release/bundle/nsis/*.nsis.zip; do
+            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
+          done
+
+          # Upload .nsis.zip.sig (updater signature)
+          for f in src-tauri/target/release/bundle/nsis/*.nsis.zip.sig; do
+            [ -f "$f" ] && echo "Uploading $f" && gh release upload "$TAG" "$f" --clobber --repo "$REPO"
+          done
 
   create-updater-json:
     needs: [build-macos, build-windows]
@@ -175,8 +201,14 @@ jobs:
           mkdir -p sigs
           gh release download "$TAG" --repo "$REPO" --pattern "*.sig" --dir sigs 2>/dev/null || true
 
+          echo "=== Downloaded sig files ==="
+          ls -la sigs/
+
           # Get list of release assets
           ASSETS=$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name')
+
+          echo "=== Release assets ==="
+          echo "$ASSETS"
 
           # Start building platforms JSON
           PLATFORMS='{}'
