@@ -58,6 +58,13 @@ class DetectTypeResponse(BaseModel):
     test_type: Optional[str] = None
     confidence: float = 0.0
     available_types: list[dict] = Field(default_factory=list)
+    detection_method: str = "keyword"   # "keyword" | "llm" | "none"
+    llm_attempted: bool = False
+
+
+class DetectTypeRequest(BaseModel):
+    extraction_result: dict
+    user_hint: Optional[str] = None
 
 
 class ParseRequest(BaseModel):

@@ -5,20 +5,29 @@ from __future__ import annotations
 import re
 
 # Labels that indicate the patient's referring/ordering physician.
-# Ordered by priority — "Referred by" is the strongest signal.
+# Ordered by priority — "Referred by" / "Ordering" are the strongest signals.
 _REFERRING_LABELS = (
     r"Referred\s+by",
     r"Referring\s+Physician",
     r"Referring\s+Provider",
+    r"Referring\s+Doctor",
     r"Ordering\s+Physician",
+    r"Ordering\s+Provider",
+    r"Ordering\s+Doctor",
     r"Ordered\s+by",
     r"Requesting\s+Physician",
+    r"Requesting\s+Provider",
     r"Primary\s+Care\s+Physician",
+    r"Primary\s+Care\s+Provider",
+    r"PCP",
 )
 
 _SECONDARY_LABELS = (
     r"Attending\s+Physician",
+    r"Attending\s+Provider",
     r"Clinician",
+    r"Practice\s+Provider",
+    r"Provider",
 )
 
 # Same-line pattern: label and name on one line.
@@ -48,7 +57,9 @@ _SUFFIX_PATTERN = re.compile(
 # Boundary words that signal the end of the physician name section.
 # If any of these appear in the captured text, truncate before them.
 _BOUNDARY_PATTERN = re.compile(
-    r"\b(?:age|dob|date|patient|sex|gender|mrn|acct|account|location|dept)\b",
+    r"\b(?:age|dob|date|patient|sex|gender|mrn|acct|account|location|dept"
+    r"|phone|fax|tel|address|npi|specialty|clinic|hospital|department"
+    r"|indication|reason|history|findings)\b",
     re.IGNORECASE,
 )
 
@@ -101,7 +112,12 @@ def _try_patterns(text: str, labels: tuple[str, ...]) -> str | None:
 
 
 def extract_physician_name(text: str | None) -> str | None:
-    """Extract physician name from report text and return 'Dr. LastName' or None."""
+    """Extract the ordering/referring physician name from report text.
+
+    Returns 'Dr. LastName' or None.  Prioritises ordering/referring labels
+    and deliberately ignores interpreting/reading physician labels to avoid
+    confusing the person who read the study with the one who ordered it.
+    """
     if not text:
         return None
 
@@ -110,5 +126,7 @@ def extract_physician_name(text: str | None) -> str | None:
     if result:
         return result
 
-    # Fall back to secondary labels
+    # Fall back to secondary labels (attending, clinician, provider)
+    # but NOT interpreting/reading physicians — those are the ones who
+    # read the study, not who ordered it.
     return _try_patterns(text, _SECONDARY_LABELS)

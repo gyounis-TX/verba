@@ -33,8 +33,19 @@ class BaseTestType(ABC):
         ...
 
     @abstractmethod
-    def parse(self, extraction_result: ExtractionResult) -> ParsedReport:
-        """Parse extraction result into structured report."""
+    def parse(
+        self,
+        extraction_result: ExtractionResult,
+        gender: str | None = None,
+        age: int | None = None,
+    ) -> ParsedReport:
+        """Parse extraction result into structured report.
+
+        Args:
+            extraction_result: The extracted text/data from the report
+            gender: Patient gender for sex-specific reference ranges (optional)
+            age: Patient age for age-specific reference ranges (optional)
+        """
         ...
 
     @abstractmethod
@@ -47,7 +58,13 @@ class BaseTestType(ABC):
         """Map medical terms to plain English definitions."""
         ...
 
-    def get_prompt_context(self) -> dict:
+    @property
+    def category(self) -> str:
+        """Category for grouping in UI (e.g., 'cardiac', 'imaging_ct').
+        Override in subclass; defaults to 'other'."""
+        return "other"
+
+    def get_prompt_context(self, extraction_result: ExtractionResult | None = None) -> dict:
         """Additional context for LLM prompt construction (Phase 4).
         Default returns empty dict; override in subclass."""
         return {}
@@ -58,4 +75,5 @@ class BaseTestType(ABC):
             "test_type_id": self.test_type_id,
             "display_name": self.display_name,
             "keywords": self.keywords,
+            "category": self.category,
         }

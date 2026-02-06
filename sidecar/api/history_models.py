@@ -55,6 +55,7 @@ class HistoryDetailResponse(BaseModel):
     full_response: dict[str, Any]
     sync_id: Optional[str] = None
     updated_at: Optional[str] = None
+    edited_text: Optional[str] = None
 
 
 class HistoryDeleteResponse(BaseModel):

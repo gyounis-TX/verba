@@ -44,6 +44,10 @@ class EchocardiogramHandler(BaseTestType):
             "lvpwd",
         ]
 
+    @property
+    def category(self) -> str:
+        return "cardiac"
+
     def detect(self, extraction_result: ExtractionResult) -> float:
         """Keyword-based detection with tiered scoring."""
         text = extraction_result.full_text.lower()
@@ -96,7 +100,12 @@ class EchocardiogramHandler(BaseTestType):
         bonus = min(0.3, moderate_count * 0.05 + weak_count * 0.02)
         return min(1.0, base + bonus)
 
-    def parse(self, extraction_result: ExtractionResult) -> ParsedReport:
+    def parse(
+        self,
+        extraction_result: ExtractionResult,
+        gender: str | None = None,
+        age: int | None = None,
+    ) -> ParsedReport:
         """Extract structured measurements, sections, and findings."""
         text = extraction_result.full_text
         warnings: list[str] = []
@@ -105,7 +114,7 @@ class EchocardiogramHandler(BaseTestType):
 
         parsed_measurements: list[ParsedMeasurement] = []
         for m in raw_measurements:
-            classification = classify_measurement(m.abbreviation, m.value)
+            classification = classify_measurement(m.abbreviation, m.value, gender)
             parsed_measurements.append(
                 ParsedMeasurement(
                     name=m.name,
@@ -155,15 +164,21 @@ class EchocardiogramHandler(BaseTestType):
     def get_glossary(self) -> dict[str, str]:
         return ECHO_GLOSSARY
 
-    def get_prompt_context(self) -> dict:
+    def get_prompt_context(self, extraction_result: ExtractionResult | None = None) -> dict:
         return {
             "specialty": "cardiology",
             "test_type": "echocardiogram",
+            "category": "cardiac",
             "guidelines": "ASE 2015 Chamber Quantification Guidelines",
             "explanation_style": (
                 "Explain each measurement in plain language. "
                 "Compare to normal ranges. Highlight any abnormalities. "
                 "Avoid medical jargon where possible."
+            ),
+            "interpretation_rules": (
+                "Organize findings in this order: LV systolic function first, "
+                "then diastolic function, then chamber sizes, then valvular "
+                "findings, then right heart, then pericardium."
             ),
         }
 

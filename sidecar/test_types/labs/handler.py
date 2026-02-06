@@ -41,7 +41,15 @@ class LabResultsHandler(BaseTestType):
             "tsh",
             "hba1c",
             "ferritin",
+            "blood test", "blood work", "blood panel",
+            "serum chemistry", "coagulation", "pt/inr",
+            "vitamin d", "vitamin b12", "troponin", "bnp",
+            "psa", "sed rate", "esr", "crp", "hemogram",
         ]
+
+    @property
+    def category(self) -> str:
+        return "lab"
 
     def detect(self, extraction_result: ExtractionResult) -> float:
         """Keyword-based detection with tiered scoring."""
@@ -117,6 +125,40 @@ class LabResultsHandler(BaseTestType):
             "lakh/",
         ]
 
+        # Negative keywords — if these appear the report is likely imaging/radiology,
+        # not a blood lab.  Penalise heavily so the correct handler (or the
+        # "unknown type" path) wins instead.
+        imaging_keywords = [
+            "calcium score",
+            "agatston",
+            "coronary artery calcium",
+            "coronary calcium",
+            "ct scan",
+            "ct chest",
+            "computed tomography",
+            "axial images",
+            "non-contrast",
+            "gated ct",
+            "cardiac ct",
+            "hounsfield",
+            "lung fields",
+            "pulmonary",
+            "cardiac mri",
+            "echocardiogram",
+            "ultrasound",
+            "doppler",
+            "x-ray",
+            "xray",
+            "radiograph",
+            "mri",
+            "magnetic resonance",
+            "nuclear medicine",
+            "perfusion",
+            "angiography",
+            "catheterization",
+        ]
+        imaging_count = sum(1 for k in imaging_keywords if k in text)
+
         strong_count = sum(1 for k in strong_keywords if k in text)
         moderate_count = sum(1 for k in moderate_keywords if k in text)
         weak_count = sum(1 for k in weak_keywords if k in text)
@@ -131,9 +173,20 @@ class LabResultsHandler(BaseTestType):
             base = 0.0
 
         bonus = min(0.3, moderate_count * 0.05 + weak_count * 0.02)
-        return min(1.0, base + bonus)
+        score = min(1.0, base + bonus)
 
-    def parse(self, extraction_result: ExtractionResult) -> ParsedReport:
+        # Heavily penalise when imaging keywords are present
+        if imaging_count > 0:
+            score = score * max(0.0, 1.0 - imaging_count * 0.3)
+
+        return score
+
+    def parse(
+        self,
+        extraction_result: ExtractionResult,
+        gender: str | None = None,
+        age: int | None = None,
+    ) -> ParsedReport:
         """Extract structured measurements, sections, and findings."""
         text = extraction_result.full_text
         warnings: list[str] = []
@@ -144,7 +197,7 @@ class LabResultsHandler(BaseTestType):
 
         parsed_measurements: list[ParsedMeasurement] = []
         for m in raw_measurements:
-            classification = classify_measurement(m.abbreviation, m.value)
+            classification = classify_measurement(m.abbreviation, m.value, gender)
             parsed_measurements.append(
                 ParsedMeasurement(
                     name=m.name,
@@ -198,10 +251,11 @@ class LabResultsHandler(BaseTestType):
     def get_glossary(self) -> dict[str, str]:
         return LAB_GLOSSARY
 
-    def get_prompt_context(self) -> dict:
+    def get_prompt_context(self, extraction_result: ExtractionResult | None = None) -> dict:
         return {
             "specialty": "laboratory medicine",
             "test_type": "blood_lab_results",
+            "category": "lab",
             "guidelines": "Standard clinical laboratory reference ranges for adult patients",
             "explanation_style": (
                 "Group related analytes (kidney: BUN+Creatinine+eGFR; "
@@ -215,6 +269,14 @@ class LabResultsHandler(BaseTestType):
                 "'Desirable: <200'. Your interpretation must come solely from the "
                 "structured measurements and their statuses provided below, not from "
                 "the lab's own commentary."
+            ),
+            "interpretation_rules": (
+                "Group findings by organ system: kidney function first (BUN, "
+                "Creatinine, eGFR), then liver panel (AST, ALT, ALP, Bilirubin), "
+                "then glucose metabolism (Glucose, A1C), then lipids (Cholesterol, "
+                "LDL, HDL, Triglycerides), then thyroid (TSH, T4), then iron "
+                "studies (Iron, Ferritin, TIBC), then CBC (WBC, RBC, HGB, HCT, "
+                "Platelets, MCV)."
             ),
         }
 

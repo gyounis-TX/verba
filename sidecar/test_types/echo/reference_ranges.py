@@ -36,6 +36,111 @@ class RangeThresholds:
     source: str = "ASE 2015 Guidelines"
 
 
+# Sex-stratified reference ranges for key echo measurements
+# Based on ASE 2015 Guidelines
+SEX_STRATIFIED_RANGES: dict[str, dict[str, RangeThresholds]] = {
+    # LVEF: Male >= 52%, Female >= 54%
+    "LVEF": {
+        "male": RangeThresholds(
+            normal_min=52.0,
+            mild_min=41.0,
+            moderate_min=30.0,
+            severe_low=30.0,
+            unit="%",
+        ),
+        "female": RangeThresholds(
+            normal_min=54.0,
+            mild_min=41.0,
+            moderate_min=30.0,
+            severe_low=30.0,
+            unit="%",
+        ),
+    },
+    # LVIDd: Male 4.2-5.8, Female 3.8-5.2 cm
+    "LVIDd": {
+        "male": RangeThresholds(
+            normal_min=4.2,
+            normal_max=5.8,
+            mild_max=6.1,
+            moderate_max=6.8,
+            severe_high=6.8,
+            mild_min=3.9,
+            moderate_min=3.5,
+            severe_low=3.5,
+            unit="cm",
+        ),
+        "female": RangeThresholds(
+            normal_min=3.8,
+            normal_max=5.2,
+            mild_max=5.6,
+            moderate_max=6.2,
+            severe_high=6.2,
+            mild_min=3.5,
+            moderate_min=3.2,
+            severe_low=3.2,
+            unit="cm",
+        ),
+    },
+    # LVIDs: Male 2.5-4.0, Female 2.2-3.5 cm
+    "LVIDs": {
+        "male": RangeThresholds(
+            normal_min=2.5,
+            normal_max=4.0,
+            mild_max=4.4,
+            moderate_max=5.0,
+            severe_high=5.0,
+            unit="cm",
+        ),
+        "female": RangeThresholds(
+            normal_min=2.2,
+            normal_max=3.5,
+            mild_max=3.9,
+            moderate_max=4.5,
+            severe_high=4.5,
+            unit="cm",
+        ),
+    },
+    # LA diameter: Male 3.0-4.0, Female 2.7-3.8 cm
+    "LA": {
+        "male": RangeThresholds(
+            normal_min=3.0,
+            normal_max=4.0,
+            mild_max=4.6,
+            moderate_max=5.0,
+            severe_high=5.0,
+            unit="cm",
+        ),
+        "female": RangeThresholds(
+            normal_min=2.7,
+            normal_max=3.8,
+            mild_max=4.2,
+            moderate_max=4.6,
+            severe_high=4.6,
+            unit="cm",
+        ),
+    },
+    # Aortic Root: Male 2.9-4.0, Female 2.5-3.5 cm
+    "AoRoot": {
+        "male": RangeThresholds(
+            normal_min=2.9,
+            normal_max=4.0,
+            mild_max=4.3,
+            moderate_max=4.7,
+            severe_high=4.7,
+            unit="cm",
+        ),
+        "female": RangeThresholds(
+            normal_min=2.5,
+            normal_max=3.5,
+            mild_max=3.9,
+            moderate_max=4.3,
+            severe_high=4.3,
+            unit="cm",
+        ),
+    },
+}
+
+
 REFERENCE_RANGES: dict[str, RangeThresholds] = {
     # --- LVEF ---
     # Normal >= 52% (male) / >= 54% (female). Using 52%.
@@ -222,9 +327,32 @@ def _format_reference_range(rr: RangeThresholds) -> str:
     return "N/A"
 
 
-def classify_measurement(abbreviation: str, value: float) -> ClassificationResult:
-    """Classify a measurement value against ASE reference ranges."""
-    rr = REFERENCE_RANGES.get(abbreviation)
+def classify_measurement(
+    abbreviation: str, value: float, gender: Optional[str] = None
+) -> ClassificationResult:
+    """Classify a measurement value against ASE reference ranges.
+
+    If gender is provided and a sex-stratified range exists for this measurement,
+    uses the sex-specific range; otherwise falls back to the union range.
+    """
+    rr: Optional[RangeThresholds] = None
+
+    # Try sex-stratified range first if gender is provided
+    if gender is not None:
+        gender_key = gender.lower()
+        if gender_key in ("f", "female"):
+            gender_key = "female"
+        elif gender_key in ("m", "male"):
+            gender_key = "male"
+
+        stratified = SEX_STRATIFIED_RANGES.get(abbreviation)
+        if stratified is not None:
+            rr = stratified.get(gender_key)
+
+    # Fall back to union range
+    if rr is None:
+        rr = REFERENCE_RANGES.get(abbreviation)
+
     if rr is None:
         return ClassificationResult(
             status=SeverityStatus.UNDETERMINED,

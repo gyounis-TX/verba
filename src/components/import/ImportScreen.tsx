@@ -2,10 +2,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { sidecarApi } from "../../services/sidecarApi";
 import { useToast } from "../shared/Toast";
-import type { ExtractionResult, Template, SharedTemplate, DetectTypeResponse } from "../../types/sidecar";
+import type { ExtractionResult, Template, SharedTemplate, DetectTypeResponse, TestTypeInfo } from "../../types/sidecar";
 import "./ImportScreen.css";
-
-type HelpMeStatus = "idle" | "generating" | "success" | "error";
 
 type ImportMode = "pdf" | "text";
 type ImportStatus = "idle" | "extracting" | "success" | "error";
@@ -67,13 +65,56 @@ function freshCache(): ImportStateCache {
 
 let _cache: ImportStateCache = freshCache();
 
+const CATEGORY_LABELS: Record<string, string> = {
+  cardiac: "Cardiac",
+  vascular: "Vascular",
+  lab: "Laboratory",
+  imaging_ct: "CT Scans",
+  imaging_mri: "MRI",
+  imaging_ultrasound: "Ultrasound",
+  imaging_xray: "X-Ray / Radiography",
+  pulmonary: "Pulmonary",
+  neurophysiology: "Neurophysiology",
+  endoscopy: "Endoscopy",
+  pathology: "Pathology",
+};
+
+const CATEGORY_ORDER = [
+  "cardiac", "vascular", "lab",
+  "imaging_ct", "imaging_mri", "imaging_ultrasound", "imaging_xray",
+  "pulmonary", "neurophysiology", "endoscopy", "pathology",
+];
+
+function groupTypesByCategory(types: TestTypeInfo[]): [string, TestTypeInfo[]][] {
+  const groups = new Map<string, TestTypeInfo[]>();
+  for (const t of types) {
+    const cat = t.category ?? "other";
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat)!.push(t);
+  }
+  const result: [string, TestTypeInfo[]][] = [];
+  for (const cat of CATEGORY_ORDER) {
+    const items = groups.get(cat);
+    if (items) {
+      result.push([CATEGORY_LABELS[cat] ?? cat, items]);
+      groups.delete(cat);
+    }
+  }
+  // Append any remaining categories not in the predefined order
+  for (const [cat, items] of groups) {
+    const label = CATEGORY_LABELS[cat] ?? cat.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    result.push([label, items]);
+  }
+  return result;
+}
+
 export function ImportScreen() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [mode, setMode] = useState<ImportMode>(_cache.mode);
   const [selectedFiles, setSelectedFiles] = useState<File[]>(_cache.selectedFiles);
+  const mode: ImportMode = selectedFiles.length > 0 ? "pdf" : "text";
   const [pastedText, setPastedText] = useState(_cache.pastedText);
   const [status, setStatus] = useState<ImportStatus>(_cache.status);
   const [result, setResult] = useState<ExtractionResult | null>(_cache.result);
@@ -89,10 +130,6 @@ export function ImportScreen() {
   const [clinicalContext, setClinicalContext] = useState(_cache.clinicalContext);
   const [selectedReasons, setSelectedReasons] = useState<Set<string>>(_cache.selectedReasons);
   const [quickReasons, setQuickReasons] = useState<string[]>([]);
-
-  // Help Me state
-  const [helpMeText, setHelpMeText] = useState("");
-  const [helpMeStatus, setHelpMeStatus] = useState<HelpMeStatus>("idle");
 
   // Batch extraction state
   const [extractionResults, setExtractionResults] = useState<
@@ -259,14 +296,6 @@ export function ImportScreen() {
     (testTypeHint.trim() || null) ??
     (detectionStatus === "success" ? detectionResult?.test_type ?? undefined : undefined);
 
-  const handleModeChange = useCallback(
-    (newMode: ImportMode) => {
-      setMode(newMode);
-      resetState();
-    },
-    [resetState],
-  );
-
   const validateFile = (file: File): string | null => {
     const name = file.name.toLowerCase();
     const validExts = [".pdf", ".jpg", ".jpeg", ".png", ".txt"];
@@ -295,6 +324,7 @@ export function ImportScreen() {
       } else {
         setError(null);
         setSelectedFiles([file]);
+        setPastedText("");
         resetState();
       }
     },
@@ -326,7 +356,11 @@ export function ImportScreen() {
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragOver(false);
+    const currentTarget = e.currentTarget as HTMLElement;
+    const relatedTarget = e.relatedTarget as Node | null;
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      setIsDragOver(false);
+    }
   }, []);
 
   const handleDrop = useCallback(
@@ -411,17 +445,40 @@ export function ImportScreen() {
           setStatus("error");
           return;
         }
+
+        // Classify the input
+        const classification = await sidecarApi.classifyInput(pastedText);
+
+        if (classification.classification === "question") {
+          // Generate a letter and navigate to results in letter mode
+          const letter = await sidecarApi.generateLetter({
+            prompt: pastedText.trim(),
+            letter_type: "general",
+          });
+          _cache = freshCache();
+          navigate("/results", {
+            state: {
+              letterMode: true,
+              letterId: letter.id,
+              letterContent: letter.content,
+              letterPrompt: pastedText.trim(),
+            },
+          });
+          return;
+        }
+
+        // It's a report — extract as before
         const extractionResult = await sidecarApi.extractText(pastedText);
         setResult(extractionResult);
         setStatus("success");
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Extraction failed.";
+      const msg = err instanceof Error ? err.message : "Analysis failed.";
       setError(msg);
       setStatus("error");
       showToast("error", msg);
     }
-  }, [mode, selectedFiles, pastedText, showToast]);
+  }, [mode, selectedFiles, pastedText, showToast, navigate]);
 
   const handleProceed = useCallback(() => {
     if (result && resolvedTestType) {
@@ -440,28 +497,9 @@ export function ImportScreen() {
     }
   }, [navigate, result, selectedTemplateValue, clinicalContext, resolvedTestType]);
 
-  const handleHelpMe = useCallback(async () => {
-    if (!helpMeText.trim()) return;
-    setHelpMeStatus("generating");
-    try {
-      await sidecarApi.generateLetter({
-        prompt: helpMeText.trim(),
-        letter_type: "general",
-      });
-      setHelpMeStatus("success");
-      setHelpMeText("");
-      showToast("success", "Letter generated.");
-      navigate("/letters");
-    } catch {
-      setHelpMeStatus("error");
-      showToast("error", "Failed to generate letter. Check your API key in Settings.");
-    }
-  }, [helpMeText, showToast]);
-
   const canExtract =
     status !== "extracting" &&
-    ((mode === "pdf" && selectedFiles.length > 0) ||
-      (mode === "text" && pastedText.trim().length > 0));
+    (selectedFiles.length > 0 || pastedText.trim().length > 0);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -472,127 +510,106 @@ export function ImportScreen() {
   return (
     <div className="import-screen">
       <header className="import-header">
-        <h2 className="import-title">Import Report</h2>
+        <h2 className="import-title">Import</h2>
         <p className="import-description">
-          Upload files (PDF, images, text) or paste text from your EMR system.
+          Upload files (PDF, images, text), paste results from EHR, or ask a question.
         </p>
       </header>
 
       <div className="import-grid">
-        {/* Left Column — Clinical Context */}
+        {/* Left Column — Input */}
         <div className="import-left-panel">
-          {(templates.length > 0 || sharedTemplates.length > 0) && (
-            <div className="import-field">
-              <label className="import-field-label">Template</label>
-              <span className="import-field-subtitle">Optional</span>
-              <select
-                className="import-field-select"
-                value={selectedTemplateValue}
-                onChange={(e) => setSelectedTemplateValue(e.target.value)}
-              >
-                <option value="">No template</option>
-                {templates.length > 0 && (
-                  <optgroup label="My Templates">
-                    {templates.map((t) => (
-                      <option key={t.id} value={`own:${t.id}`}>
-                        {t.name}
-                        {t.test_type ? ` (${t.test_type})` : ""}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {sharedTemplates.length > 0 && (
-                  <optgroup label="Shared Templates">
-                    {sharedTemplates.map((t) => (
-                      <option key={t.sync_id} value={`shared:${t.sync_id}`}>
-                        {t.name} — Shared by {t.sharer_email}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </div>
-          )}
-
-          <div className="import-field">
-            <label className="import-field-label import-field-label--bold">
-              Clinical Context
-            </label>
-            <span className="import-field-subtitle">Optional</span>
-            {quickReasons.length > 0 && (
-              <div className="quick-reasons">
-                {quickReasons.map((reason) => (
-                  <button
-                    key={reason}
-                    className={`quick-reason-btn ${selectedReasons.has(reason) ? "quick-reason-btn--active" : ""}`}
-                    onClick={() => {
-                      setSelectedReasons((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(reason)) {
-                          next.delete(reason);
-                        } else {
-                          next.add(reason);
-                        }
-                        setClinicalContext(Array.from(next).join(", "));
-                        return next;
-                      });
-                    }}
-                  >
-                    {reason}
-                  </button>
-                ))}
-              </div>
-            )}
-            <textarea
-              className="import-field-textarea"
-              placeholder="e.g., Chest pain, follow up pericardial effusion, or paste last clinic note text"
-              value={clinicalContext}
-              onChange={(e) => {
-                setClinicalContext(e.target.value);
-                setSelectedReasons(new Set());
-              }}
-              rows={3}
+          <div
+            className={`input-panel unified-input${isDragOver ? " unified-input--drag-over" : ""}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.txt,application/pdf,image/jpeg,image/png,text/plain"
+              onChange={handleInputChange}
+              className="drop-zone-input"
             />
+            {selectedFiles.length > 0 ? (
+              <div className="unified-file-display">
+                <div className="file-list-item">
+                  <span className="file-list-name">{selectedFiles[0].name}</span>
+                  <span className="file-list-size">
+                    {formatFileSize(selectedFiles[0].size)}
+                  </span>
+                  {(() => {
+                    const entry = extractionResults.get(fileKey(selectedFiles[0]));
+                    return entry ? (
+                      <span className={`file-list-status file-list-status--${entry.status}`}>
+                        {entry.status === "pending" && "Pending"}
+                        {entry.status === "extracting" && "Extracting..."}
+                        {entry.status === "success" && "Done"}
+                        {entry.status === "error" && (entry.error ?? "Failed")}
+                      </span>
+                    ) : null;
+                  })()}
+                  <button
+                    className="file-list-remove"
+                    onClick={() => handleRemoveFile(0)}
+                    aria-label={`Remove ${selectedFiles[0].name}`}
+                  >
+                    &times;
+                  </button>
+                </div>
+                <p className="unified-file-hint">Drop a different file to replace</p>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  className="text-input"
+                  placeholder={"\u2022 Paste a test result\n\u2022 Drag and drop a PDF, JPG, PNG, or TXT file (up to 50 MB)\n\u2022 Ask for help explaining a question, topic, or situation to a patient"}
+                  value={pastedText}
+                  onChange={(e) => {
+                    setPastedText(e.target.value);
+                    resetState();
+                  }}
+                  rows={12}
+                />
+                <div className="text-input-footer">
+                  <span className="char-count">
+                    {pastedText.length.toLocaleString()} characters
+                  </span>
+                  <button
+                    type="button"
+                    className="browse-file-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    or browse files
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Scrubbed Clinical Context Preview */}
-          {status === "success" && scrubbedClinicalContext && clinicalContext.trim() && (
-            <div className="import-field">
-              <label className="import-field-label">Clinical Context Preview (PHI Scrubbed)</label>
-              <div className="scrubbed-preview-box">
-                {scrubbedClinicalContext}
-              </div>
+          <button
+            className="extract-btn"
+            onClick={handleExtract}
+            disabled={!canExtract}
+          >
+            {status === "extracting" ? "Analyzing..." : "Analyze"}
+          </button>
+
+          {error && (
+            <div className="import-error">
+              <p>{error}</p>
             </div>
           )}
 
-          {/* Test Type Hint */}
-          <div className="import-field">
-            <label className="import-field-label">Test Type Hint</label>
-            <span className="import-field-subtitle">
-              Optional — helps identify the report type
-            </span>
-            <div className="test-type-hint-row">
-              <input
-                type="text"
-                className="import-field-textarea"
-                style={{ resize: "none", minHeight: "auto" }}
-                placeholder='e.g., "echocardiogram", "lipid panel", "stress test"'
-                value={testTypeHint}
-                onChange={(e) => setTestTypeHint(e.target.value)}
-              />
-              {status === "success" && result && testTypeHint.trim() && (
-                <button
-                  className="redetect-btn"
-                  onClick={handleRedetect}
-                  disabled={detectionStatus === "detecting"}
-                >
-                  Re-detect
-                </button>
-              )}
+          {status === "extracting" && (
+            <div className="extraction-progress">
+              <div className="spinner" />
+              <p>Analyzing document...</p>
             </div>
-          </div>
+          )}
 
-          {/* Extraction Preview (moved to left column) */}
+          {/* Extraction Preview */}
           {status === "success" && result && (
             <div className="extraction-preview">
               <h3 className="preview-title">Extraction Complete</h3>
@@ -679,19 +696,41 @@ export function ImportScreen() {
                   detectionStatus === "error") && (
                   <div className="detection-fallback">
                     <p className="detection-fallback-message">
+                      <span className="detection-fallback-icon">{"\u26A0"}</span>
                       {detectionStatus === "low_confidence" && detectionResult
                         ? `Low confidence detection: ${
                             detectionResult.available_types.find(
                               (t) => t.test_type_id === detectionResult.test_type,
                             )?.display_name ?? detectionResult.test_type
-                          }. Please confirm or enter the report type below.`
-                        : "Could not identify the report type. Please enter it below."}
+                          }. Please confirm or select the correct report type below.`
+                        : "Could not automatically identify the report type. Select a type below or enter it manually to continue."}
                     </p>
+                    {detectionResult?.available_types && detectionResult.available_types.length > 0 && (
+                      <div className="detection-type-buttons">
+                        {groupTypesByCategory(detectionResult.available_types).map(([label, types]) => (
+                          <div key={label} className="detection-type-group">
+                            <span className="detection-type-group-label">{label}</span>
+                            <div className="detection-type-group-buttons">
+                              {types.map((t) => (
+                                <button
+                                  key={t.test_type_id}
+                                  type="button"
+                                  className={`detection-type-btn${manualTestType === t.test_type_id ? " detection-type-btn--active" : ""}`}
+                                  onClick={() => setManualTestType(t.test_type_id)}
+                                >
+                                  {t.display_name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <input
                       type="text"
                       className="import-field-textarea"
                       style={{ resize: "none", minHeight: "auto" }}
-                      placeholder='e.g., "echocardiogram", "lipid panel", "stress test"'
+                      placeholder='Or type a report type, e.g. "calcium score", "renal ultrasound"'
                       value={manualTestType ?? ""}
                       onChange={(e) =>
                         setManualTestType(e.target.value || null)
@@ -739,180 +778,117 @@ export function ImportScreen() {
           )}
         </div>
 
-        {/* Right Column — Import & Help Me */}
+        {/* Right Column — Settings */}
         <div className="import-right-panel">
-          <div className="mode-toggle">
-            <button
-              className={`mode-toggle-btn ${mode === "text" ? "mode-toggle-btn--active" : ""}`}
-              onClick={() => handleModeChange("text")}
-            >
-              Paste Text
-            </button>
-            <button
-              className={`mode-toggle-btn ${mode === "pdf" ? "mode-toggle-btn--active" : ""}`}
-              onClick={() => handleModeChange("pdf")}
-            >
-              Upload File
-            </button>
+          {(templates.length > 0 || sharedTemplates.length > 0) && (
+            <div className="import-field">
+              <label className="import-field-label">Template</label>
+              <span className="import-field-subtitle">Optional</span>
+              <select
+                className="import-field-select"
+                value={selectedTemplateValue}
+                onChange={(e) => setSelectedTemplateValue(e.target.value)}
+              >
+                <option value="">No template</option>
+                {templates.length > 0 && (
+                  <optgroup label="My Templates">
+                    {templates.map((t) => (
+                      <option key={t.id} value={`own:${t.id}`}>
+                        {t.name}
+                        {t.test_type ? ` (${t.test_type})` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {sharedTemplates.length > 0 && (
+                  <optgroup label="Shared Templates">
+                    {sharedTemplates.map((t) => (
+                      <option key={t.sync_id} value={`shared:${t.sync_id}`}>
+                        {t.name} — Shared by {t.sharer_email}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          )}
+
+          <div className="import-field">
+            <label className="import-field-label import-field-label--bold">
+              Clinical Context
+            </label>
+            <span className="import-field-subtitle">Optional but recommended — more context = more personalized interpretation</span>
+            {quickReasons.length > 0 && (
+              <div className="quick-reasons">
+                {quickReasons.map((reason) => (
+                  <button
+                    key={reason}
+                    className={`quick-reason-btn ${selectedReasons.has(reason) ? "quick-reason-btn--active" : ""}`}
+                    onClick={() => {
+                      setSelectedReasons((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(reason)) {
+                          next.delete(reason);
+                        } else {
+                          next.add(reason);
+                        }
+                        setClinicalContext(Array.from(next).join(", "));
+                        return next;
+                      });
+                    }}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+            )}
+            <textarea
+              className="import-field-textarea"
+              placeholder="Paste the patient's office note, HPI, or relevant history here. Example: chest pain, follow up pericardial effusion, or full clinic note text."
+              value={clinicalContext}
+              onChange={(e) => {
+                setClinicalContext(e.target.value);
+                setSelectedReasons(new Set());
+              }}
+              rows={3}
+            />
           </div>
 
-          {mode === "pdf" && (
-            <div className="input-panel">
-              <div
-                className={`drop-zone ${isDragOver ? "drop-zone--active" : ""} ${selectedFiles.length > 0 ? "drop-zone--has-file" : ""}`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.txt,application/pdf,image/jpeg,image/png,text/plain"
-                  onChange={handleInputChange}
-                  className="drop-zone-input"
-                />
-                {selectedFiles.length > 0 ? (
-                  <div className="drop-zone-file-info">
-                    <span className="file-name">
-                      {selectedFiles[0].name}
-                    </span>
-                    <span className="file-size">
-                      Click or drop to replace
-                    </span>
-                  </div>
-                ) : (
-                  <div className="drop-zone-prompt">
-                    <p className="drop-zone-primary">
-                      Drag and drop a file here, or click to browse
-                    </p>
-                    <p className="drop-zone-secondary">
-                      PDF, JPG, PNG, or TXT up to 50 MB
-                    </p>
-                  </div>
-                )}
+          {/* Scrubbed Clinical Context Preview */}
+          {status === "success" && scrubbedClinicalContext && clinicalContext.trim() && (
+            <div className="import-field">
+              <label className="import-field-label">Clinical Context Preview (PHI Scrubbed)</label>
+              <div className="scrubbed-preview-box">
+                {scrubbedClinicalContext}
               </div>
+            </div>
+          )}
 
-              {selectedFiles.length > 0 && (
-                <div className="file-list">
-                  {selectedFiles.map((file, index) => {
-                    const key = fileKey(file);
-                    const entry = extractionResults.get(key);
-                    return (
-                      <div key={key} className="file-list-item">
-                        <span className="file-list-name">{file.name}</span>
-                        <span className="file-list-size">
-                          {formatFileSize(file.size)}
-                        </span>
-                        {entry && (
-                          <span
-                            className={`file-list-status file-list-status--${entry.status}`}
-                          >
-                            {entry.status === "pending" && "Pending"}
-                            {entry.status === "extracting" && "Extracting..."}
-                            {entry.status === "success" && "Done"}
-                            {entry.status === "error" && (entry.error ?? "Failed")}
-                          </span>
-                        )}
-                        <button
-                          className="file-list-remove"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveFile(index);
-                          }}
-                          aria-label={`Remove ${file.name}`}
-                        >
-                          &times;
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+          {/* Test Type Hint */}
+          <div className="import-field">
+            <label className="import-field-label">Test Type Hint</label>
+            <span className="import-field-subtitle">
+              Optional — helps identify the report type
+            </span>
+            <div className="test-type-hint-row">
+              <input
+                type="text"
+                className="import-field-textarea"
+                style={{ resize: "none", minHeight: "auto" }}
+                placeholder='e.g., "echocardiogram", "lipid panel", "stress test"'
+                value={testTypeHint}
+                onChange={(e) => setTestTypeHint(e.target.value)}
+              />
+              {status === "success" && result && testTypeHint.trim() && (
+                <button
+                  className="redetect-btn"
+                  onClick={handleRedetect}
+                  disabled={detectionStatus === "detecting"}
+                >
+                  Re-detect
+                </button>
               )}
             </div>
-          )}
-
-          {mode === "text" && (
-            <div className="input-panel">
-              <textarea
-                className="text-input"
-                placeholder="Paste your lab report or diagnostic text here..."
-                value={pastedText}
-                onChange={(e) => {
-                  setPastedText(e.target.value);
-                  resetState();
-                }}
-                rows={12}
-              />
-              <div className="text-input-footer">
-                <span className="char-count">
-                  {pastedText.length.toLocaleString()} characters
-                </span>
-              </div>
-            </div>
-          )}
-
-          <button
-            className="extract-btn"
-            onClick={handleExtract}
-            disabled={!canExtract}
-          >
-            {status === "extracting" ? "Extracting..." : "Extract Text"}
-          </button>
-
-          {error && (
-            <div className="import-error">
-              <p>{error}</p>
-            </div>
-          )}
-
-          {status === "extracting" && (
-            <div className="extraction-progress">
-              <div className="spinner" />
-              <p>Analyzing document...</p>
-            </div>
-          )}
-
-          {/* Help Me Section */}
-          <div className="help-me-section">
-            <h3 className="help-me-title">Help Me</h3>
-            <p className="help-me-description">
-              Need help explaining something to a patient? Describe your question,
-              topic, or situation below and we'll generate a clear, patient-friendly
-              explanation, letter, or response. Results appear in the Letters section.
-            </p>
-            <textarea
-              className="help-me-input"
-              placeholder="e.g., Explain to the patient why their potassium is slightly elevated and what dietary changes might help..."
-              value={helpMeText}
-              onChange={(e) => {
-                setHelpMeText(e.target.value);
-                if (helpMeStatus !== "idle") setHelpMeStatus("idle");
-              }}
-              rows={4}
-            />
-            <div className="help-me-footer">
-              <span className="char-count">
-                {helpMeText.length.toLocaleString()} characters
-              </span>
-              <button
-                className="help-me-btn"
-                onClick={handleHelpMe}
-                disabled={!helpMeText.trim() || helpMeStatus === "generating"}
-              >
-                {helpMeStatus === "generating" ? "Generating..." : "Generate"}
-              </button>
-            </div>
-            {helpMeStatus === "success" && (
-              <p className="help-me-success">
-                Letter generated successfully. View it in the Letters section.
-              </p>
-            )}
-            {helpMeStatus === "error" && (
-              <p className="help-me-error">
-                Failed to generate. Please check your API key in Settings.
-              </p>
-            )}
           </div>
         </div>
       </div>

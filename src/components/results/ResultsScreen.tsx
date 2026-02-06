@@ -10,6 +10,7 @@ import type {
   ExplanationVoice,
   FooterType,
   TeachingPoint,
+  SharedTeachingPoint,
 } from "../../types/sidecar";
 import { sidecarApi } from "../../services/sidecarApi";
 import { logUsage } from "../../services/usageTracker";
@@ -138,6 +139,10 @@ export function ResultsScreen() {
     historyId?: number;
     historyLiked?: boolean;
     clinicalContext?: string;
+    letterMode?: boolean;
+    letterId?: number;
+    letterContent?: string;
+    letterPrompt?: string;
   } | null;
 
   // Restore from sessionStorage if location.state is empty (e.g. after Settings round-trip).
@@ -150,6 +155,14 @@ export function ResultsScreen() {
     ?? session?.extractionResult as ExtractionResult | undefined) ?? null;
   const templateId = locationState?.templateId ?? (session?.templateId as number | undefined);
   const clinicalContext = locationState?.clinicalContext ?? (session?.clinicalContext as string | undefined);
+
+  // Letter mode state
+  const letterMode = locationState?.letterMode ?? false;
+  const [letterContent, setLetterContent] = useState(locationState?.letterContent ?? "");
+  const [letterPrompt] = useState(locationState?.letterPrompt ?? "");
+  const [letterId] = useState(locationState?.letterId ?? null);
+  const [isRefiningLetter, setIsRefiningLetter] = useState(false);
+  const [letterRefineText, setLetterRefineText] = useState("");
 
   const { showToast } = useToast();
   const [currentResponse, setCurrentResponse] =
@@ -221,10 +234,21 @@ export function ResultsScreen() {
 
   // Extracted text state
   const [showExtractedText, setShowExtractedText] = useState(false);
+  const [showReportType, setShowReportType] = useState(false);
+  const [scrubbedText, setScrubbedText] = useState<string | null>(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
 
   // Teaching points state
   const [teachingPoints, setTeachingPoints] = useState<TeachingPoint[]>([]);
+  const [sharedTeachingPoints, setSharedTeachingPoints] = useState<SharedTeachingPoint[]>([]);
   const [newTeachingPoint, setNewTeachingPoint] = useState("");
+
+  // Test type override — lets the user correct a misdetected type
+  const [testTypeOverride, setTestTypeOverride] = useState<string | null>(null);
+  const effectiveTestType = testTypeOverride?.trim() || currentResponse?.parsed_report.test_type || "";
+  const effectiveTestTypeDisplay = testTypeOverride?.trim()
+    ? testTypeOverride.trim().replace(/\b\w/g, (c) => c.toUpperCase())
+    : currentResponse?.parsed_report.test_type_display || "this type";
 
   // Sync edit state when response changes
   useEffect(() => {
@@ -253,13 +277,27 @@ export function ResultsScreen() {
   }, [currentResponse, showToast]);
 
   useEffect(() => {
+    if (letterMode) {
+      // In letter mode, load global teaching points (no test type filter)
+      Promise.all([
+        sidecarApi.listTeachingPoints(),
+        sidecarApi.listSharedTeachingPoints().catch(() => [] as SharedTeachingPoint[]),
+      ]).then(([pts, shared]) => {
+        setTeachingPoints(pts);
+        setSharedTeachingPoints(shared);
+      }).catch(() => {});
+      return;
+    }
     if (!currentResponse) return;
     const testType = currentResponse.parsed_report.test_type;
-    sidecarApi
-      .listTeachingPoints(testType)
-      .then((pts) => setTeachingPoints(pts))
-      .catch(() => {});
-  }, [currentResponse]);
+    Promise.all([
+      sidecarApi.listTeachingPoints(testType),
+      sidecarApi.listSharedTeachingPoints(testType).catch(() => [] as SharedTeachingPoint[]),
+    ]).then(([pts, shared]) => {
+      setTeachingPoints(pts);
+      setSharedTeachingPoints(shared);
+    }).catch(() => {});
+  }, [currentResponse, letterMode]);
 
   useEffect(() => {
     sidecarApi
@@ -317,7 +355,7 @@ export function ResultsScreen() {
     try {
       const response = await sidecarApi.explainReport({
         extraction_result: extractionResult,
-        test_type: currentResponse?.parsed_report.test_type,
+        test_type: effectiveTestType,
         literacy_level: selectedLiteracy,
         template_id: templateId,
         clinical_context: clinicalContext,
@@ -355,32 +393,66 @@ export function ResultsScreen() {
     } finally {
       setIsRegenerating(false);
     }
-  }, [extractionResult, currentResponse, selectedLiteracy, templateId, clinicalContext, toneSlider, detailSlider, checkedNextSteps, commentMode, explanationVoice, nameDrop, physicianOverride, sectionSettings, refinementInstruction, deepAnalysis, showToast]);
+  }, [extractionResult, effectiveTestType, selectedLiteracy, templateId, clinicalContext, toneSlider, detailSlider, checkedNextSteps, commentMode, explanationVoice, nameDrop, physicianOverride, sectionSettings, refinementInstruction, deepAnalysis, showToast]);
 
   const handleTranslateToggle = useCallback(async () => {
+    const translatingToSpanish = !isSpanish;
+
+    // Letter mode: translate via generateLetter
+    if (letterMode) {
+      setIsRefiningLetter(true);
+      try {
+        const translatePrompt = translatingToSpanish
+          ? `${letterPrompt}\n\nTranslate the entire letter into Spanish. Keep all medical values and units in their original form. Use simple, patient-friendly Spanish.`
+          : letterPrompt;
+        const refined = await sidecarApi.generateLetter({
+          prompt: translatePrompt,
+          letter_type: "general",
+        });
+        setLetterContent(refined.content);
+        setIsSpanish(translatingToSpanish);
+        showToast("success", translatingToSpanish ? "Translated to Spanish." : "Translated to English.");
+      } catch {
+        showToast("error", "Failed to translate letter.");
+      } finally {
+        setIsRefiningLetter(false);
+      }
+      return;
+    }
+
     if (!extractionResult) return;
     setIsRegenerating(true);
-    const translatingToSpanish = !isSpanish;
+    const isShort = commentMode === "short";
+    const isSms = commentMode === "sms";
     try {
       const response = await sidecarApi.explainReport({
         extraction_result: extractionResult,
-        test_type: currentResponse?.parsed_report.test_type,
+        test_type: effectiveTestType,
         literacy_level: selectedLiteracy,
         template_id: templateId,
         clinical_context: clinicalContext,
         tone_preference: toneSlider,
         detail_preference: detailSlider,
         next_steps: [...checkedNextSteps].filter(s => s !== "No comment"),
+        short_comment: isShort,
+        sms_summary: isSms,
         explanation_voice: explanationVoice,
         name_drop: nameDrop,
         physician_name_override: physicianOverride !== null ? (physicianOverride || "") : undefined,
-        include_key_findings: sectionSettings.include_key_findings,
-        include_measurements: sectionSettings.include_measurements,
+        include_key_findings: (isShort || isSms) ? true : sectionSettings.include_key_findings,
+        include_measurements: (isShort || isSms) ? true : sectionSettings.include_measurements,
         refinement_instruction: translatingToSpanish
           ? "Translate the entire explanation into Spanish. Keep all medical values and units in their original form. Use simple, patient-friendly Spanish."
           : undefined,
         deep_analysis: deepAnalysis || undefined,
       });
+      if (isSms) {
+        setSmsText(response.explanation.overall_summary);
+      } else if (isShort) {
+        setShortCommentText(response.explanation.overall_summary);
+      } else {
+        setLongExplanationResponse(response);
+      }
       setCurrentResponse(response);
       logUsage({
         model_used: response.model_used,
@@ -396,7 +468,7 @@ export function ResultsScreen() {
     } finally {
       setIsRegenerating(false);
     }
-  }, [extractionResult, currentResponse, selectedLiteracy, templateId, clinicalContext, toneSlider, detailSlider, checkedNextSteps, isSpanish, explanationVoice, nameDrop, physicianOverride, sectionSettings, deepAnalysis, showToast]);
+  }, [extractionResult, effectiveTestType, selectedLiteracy, templateId, clinicalContext, toneSlider, detailSlider, checkedNextSteps, commentMode, isSpanish, explanationVoice, nameDrop, physicianOverride, sectionSettings, deepAnalysis, showToast, letterMode, letterPrompt]);
 
   const handleExportPdf = useCallback(async () => {
     if (!currentResponse) return;
@@ -442,7 +514,7 @@ export function ResultsScreen() {
       if (id == null) {
         // Auto-save to history first
         const detail = await sidecarApi.saveHistory({
-          test_type: currentResponse.parsed_report.test_type,
+          test_type: effectiveTestType,
           test_type_display: currentResponse.parsed_report.test_type_display,
           filename: null,
           summary: (currentResponse.explanation.overall_summary || "").slice(0, 200),
@@ -487,7 +559,7 @@ export function ResultsScreen() {
     try {
       const response = await sidecarApi.explainReport({
         extraction_result: extractionResult,
-        test_type: currentResponse.parsed_report.test_type,
+        test_type: effectiveTestType,
         literacy_level: selectedLiteracy,
         template_id: templateId,
         clinical_context: clinicalContext,
@@ -524,7 +596,7 @@ export function ResultsScreen() {
     try {
       const response = await sidecarApi.explainReport({
         extraction_result: extractionResult,
-        test_type: currentResponse.parsed_report.test_type,
+        test_type: effectiveTestType,
         literacy_level: selectedLiteracy,
         template_id: templateId,
         clinical_context: clinicalContext,
@@ -562,7 +634,7 @@ export function ResultsScreen() {
     try {
       const response = await sidecarApi.explainReport({
         extraction_result: extractionResult,
-        test_type: currentResponse.parsed_report.test_type,
+        test_type: effectiveTestType,
         literacy_level: selectedLiteracy,
         template_id: templateId,
         clinical_context: clinicalContext,
@@ -614,26 +686,28 @@ export function ResultsScreen() {
 
   // Compute preview text for comment panel
   const commentPreviewText = (() => {
+    const physician = physicianOverride ?? currentResponse?.physician_name;
     if (commentMode === "sms") {
-      return smsText ?? "";
+      return replacePhysician(smsText ?? "", physician);
     }
     if (commentMode === "short") {
-      const base = shortCommentText ?? "";
+      const base = replacePhysician(shortCommentText ?? "", physician);
       if (computedFooter) {
         return base + "\n\n" + computedFooter;
       }
       return base;
     }
-    // Long mode: use the dedicated long explanation if available
+    // Long mode: use edited text if dirty, otherwise use the dedicated long explanation
     const longSource = longExplanationResponse ?? currentResponse;
     if (!longSource) return "";
-    const physician = physicianOverride ?? longSource.physician_name;
     const expl = longSource.explanation;
+    // Use editedSummary if the user has made edits
     const summary = replacePhysician(
-      expl.overall_summary,
+      isDirty ? editedSummary : expl.overall_summary,
       physician,
     );
-    const findings = expl.key_findings.map((f) => ({
+    // Use editedFindings if the user has made edits
+    const findings = (isDirty ? editedFindings : expl.key_findings).map((f) => ({
       finding: f.finding,
       explanation: replacePhysician(f.explanation, physician),
     }));
@@ -652,10 +726,360 @@ export function ResultsScreen() {
     try {
       await navigator.clipboard.writeText(commentPreviewText);
       showToast("success", "Copied to clipboard.");
+
+      // Track that this explanation was copied
+      if (historyId) {
+        // Fire-and-forget: mark as copied
+        sidecarApi.markHistoryCopied(historyId).catch(() => {
+          // Silently ignore errors
+        });
+
+        // If the user edited the text, save their edited version
+        if (isDirty && commentMode === "long") {
+          sidecarApi.saveEditedText(historyId, editedSummary).catch(() => {
+            // Silently ignore errors
+          });
+        }
+      }
     } catch {
       showToast("error", "Failed to copy to clipboard.");
     }
-  }, [commentPreviewText, showToast]);
+  }, [commentPreviewText, showToast, historyId, isDirty, commentMode, editedSummary]);
+
+  const handleCopyLetter = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(letterContent);
+      showToast("success", "Copied to clipboard.");
+    } catch {
+      showToast("error", "Failed to copy to clipboard.");
+    }
+  }, [letterContent, showToast]);
+
+  const handleLikeLetter = useCallback(async () => {
+    if (letterId == null) return;
+    const newLiked = !isLiked;
+    try {
+      await sidecarApi.toggleLetterLiked(letterId, newLiked);
+      setIsLiked(newLiked);
+      showToast("success", newLiked ? "Letter liked." : "Like removed.");
+    } catch {
+      showToast("error", "Failed to update like status.");
+    }
+  }, [letterId, isLiked, showToast]);
+
+  const handleRefineLetter = useCallback(async () => {
+    setIsRefiningLetter(true);
+    try {
+      const parts = [letterPrompt];
+      if (refinementInstruction.trim()) {
+        parts.push(`\n\nRefinement: ${refinementInstruction.trim()}`);
+      }
+      if (letterRefineText.trim()) {
+        parts.push(`\n\nAdditional refinement: ${letterRefineText.trim()}`);
+      }
+      const refined = await sidecarApi.generateLetter({
+        prompt: parts.join(""),
+        letter_type: "general",
+      });
+      setLetterContent(refined.content);
+      setLetterRefineText("");
+      showToast("success", "Letter refined.");
+    } catch {
+      showToast("error", "Failed to refine letter.");
+    } finally {
+      setIsRefiningLetter(false);
+    }
+  }, [letterPrompt, letterRefineText, refinementInstruction, showToast]);
+
+  if (letterMode) {
+    return (
+      <div className="results-screen">
+        <div className="results-main-panel">
+          <header className="results-header">
+            <h2 className="results-title">Generated Letter</h2>
+          </header>
+
+          {/* Letter Comment Panel */}
+          <div className="results-comment-panel">
+            <div className="comment-panel-header">
+              <h3>Result Comment</h3>
+              <button
+                className={`like-btn${isLiked ? " like-btn--active" : ""}`}
+                onClick={handleLikeLetter}
+              >
+                {isLiked ? "\u2665 Liked" : "\u2661 Like"}
+              </button>
+            </div>
+            {isRefiningLetter ? (
+              <div className="comment-generating">Generating...</div>
+            ) : (
+              <div className="comment-preview">{letterContent}</div>
+            )}
+            <span className="comment-char-count">{letterContent.length} chars</span>
+            <button className="comment-copy-btn" onClick={handleCopyLetter}>
+              Copy to Clipboard
+            </button>
+          </div>
+
+          {/* Teaching Points */}
+          <details className="teaching-points-panel teaching-points-collapsible">
+            <summary className="teaching-points-header">
+              <h3>Teaching Points</h3>
+              {(teachingPoints.length + sharedTeachingPoints.length) > 0 && (
+                <span className="teaching-points-count">{teachingPoints.length + sharedTeachingPoints.length}</span>
+              )}
+            </summary>
+            <div className="teaching-points-body">
+              <p className="teaching-points-desc">
+                Add personalized instructions that customize how AI generates letters.
+                These points can be stylistic or clinical. Explify will remember and apply these to all future outputs.
+              </p>
+              <div className="teaching-point-input-row">
+                <textarea
+                  className="teaching-point-input"
+                  placeholder="e.g. Always use a warm, conversational tone"
+                  value={newTeachingPoint}
+                  onChange={(e) => setNewTeachingPoint(e.target.value)}
+                  rows={3}
+                />
+                <div className="teaching-point-save-row">
+                  <button
+                    className="teaching-point-save-btn"
+                    disabled={!newTeachingPoint.trim()}
+                    onClick={async () => {
+                      if (!newTeachingPoint.trim()) return;
+                      try {
+                        const tp = await sidecarApi.createTeachingPoint({
+                          text: newTeachingPoint.trim(),
+                        });
+                        setTeachingPoints((prev) => [tp, ...prev]);
+                        setNewTeachingPoint("");
+                        queueUpsertAfterMutation("teaching_points", tp.id).catch(() => {});
+                      } catch {
+                        showToast("error", "Failed to save teaching point.");
+                      }
+                    }}
+                  >
+                    Save for all types
+                  </button>
+                </div>
+              </div>
+              {sharedTeachingPoints.length > 0 && (
+                <div className="shared-teaching-points">
+                  <span className="shared-teaching-points-label">Shared with you</span>
+                  {sharedTeachingPoints.map((sp) => (
+                    <div key={sp.sync_id} className="shared-teaching-point-card">
+                      <p className="shared-teaching-point-text">{sp.text}</p>
+                      <div className="shared-teaching-point-meta">
+                        <span className="shared-teaching-point-sharer">
+                          Shared by {sp.sharer_email}
+                        </span>
+                        {sp.test_type ? (
+                          <span className="shared-teaching-point-type">{sp.test_type}</span>
+                        ) : (
+                          <span className="shared-teaching-point-type shared-teaching-point-type--global">All types</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+
+          <button
+            className="results-back-btn"
+            onClick={() => navigate("/")}
+          >
+            Analyze Another Report
+          </button>
+        </div>
+
+        {/* Right Column — Refine + Settings */}
+        <div className="results-right-column">
+          {/* Refine Panel */}
+          <div className="results-refine-panel">
+            <h3>Refine Context</h3>
+            <textarea
+              className="refine-textarea"
+              placeholder="e.g., Make it shorter, add more detail, emphasize dietary changes..."
+              value={refinementInstruction}
+              onChange={(e) => setRefinementInstruction(e.target.value)}
+              rows={3}
+            />
+          </div>
+
+          {/* Result Settings Panel */}
+          <div className="results-settings-panel">
+            <h3>Result Settings</h3>
+
+            <div className="settings-panel-label">
+              <span>Literacy</span>
+              <div className="literacy-tabs">
+                {LITERACY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    className={`literacy-tab-btn ${selectedLiteracy === opt.value ? "literacy-tab-btn--active" : ""}`}
+                    onClick={() => setSelectedLiteracy(opt.value)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="quick-sliders">
+              <div className="quick-slider-group">
+                <label className="quick-slider-label">
+                  Tone
+                  <span className="quick-slider-value">{TONE_LABELS[toneSlider]}</span>
+                </label>
+                <div className="quick-slider-row">
+                  <span className="quick-slider-end">Concerning</span>
+                  <input
+                    type="range"
+                    className="preference-slider"
+                    min={1}
+                    max={5}
+                    step={1}
+                    value={toneSlider}
+                    onChange={(e) => setToneSlider(Number(e.target.value))}
+                  />
+                  <span className="quick-slider-end">Very Reassuring</span>
+                </div>
+              </div>
+              <div className="quick-slider-group">
+                <label className="quick-slider-label">
+                  Detail
+                  <span className="quick-slider-value">{DETAIL_LABELS[detailSlider]}</span>
+                </label>
+                <div className="quick-slider-row">
+                  <span className="quick-slider-end">Minimal</span>
+                  <input
+                    type="range"
+                    className="preference-slider"
+                    min={1}
+                    max={5}
+                    step={1}
+                    value={detailSlider}
+                    onChange={(e) => setDetailSlider(Number(e.target.value))}
+                  />
+                  <span className="quick-slider-end">Very Detailed</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Voice */}
+            <div className="quick-voice-section">
+              <span className="quick-actions-label">Voice:</span>
+              <div className="quick-voice-toggle">
+                <button
+                  className={`physician-picker-btn ${explanationVoice === "first_person" ? "physician-picker-btn--active" : ""}`}
+                  onClick={() => setExplanationVoice("first_person")}
+                >
+                  1st Person
+                </button>
+                <button
+                  className={`physician-picker-btn ${explanationVoice === "third_person" ? "physician-picker-btn--active" : ""}`}
+                  onClick={() => setExplanationVoice("third_person")}
+                >
+                  3rd Person
+                </button>
+              </div>
+            </div>
+
+            {/* Physician */}
+            {explanationVoice === "third_person" && (
+              <div className="quick-voice-section">
+                <span className="quick-actions-label">Physician:</span>
+                <div className="quick-voice-toggle">
+                  {practiceProviders.map((name) => (
+                    <button
+                      key={name}
+                      className={`physician-picker-btn ${physicianOverride === name ? "physician-picker-btn--active" : ""}`}
+                      onClick={() => setPhysicianOverride(name)}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                  <button
+                    className={`physician-picker-btn ${physicianOverride === "" || physicianOverride === null ? "physician-picker-btn--active" : ""}`}
+                    onClick={() => setPhysicianOverride("")}
+                  >
+                    Generic
+                  </button>
+                </div>
+                <label className="quick-toggle" style={{ marginTop: "var(--space-xs)" }}>
+                  <input
+                    type="checkbox"
+                    checked={nameDrop}
+                    onChange={(e) => setNameDrop(e.target.checked)}
+                  />
+                  <span>Name drop</span>
+                </label>
+              </div>
+            )}
+
+            {/* Next Steps */}
+            <div className="settings-panel-next-steps">
+              <span className="quick-actions-label">Next Steps:</span>
+              <div className="next-steps-checks">
+                <label className="next-step-check">
+                  <input
+                    type="checkbox"
+                    checked={checkedNextSteps.has("No comment")}
+                    onChange={() => {
+                      setCheckedNextSteps(new Set(["No comment"]));
+                    }}
+                  />
+                  <span>No comment</span>
+                </label>
+                {nextStepsOptions.map((option) => (
+                  <label key={option} className="next-step-check">
+                    <input
+                      type="checkbox"
+                      checked={checkedNextSteps.has(option)}
+                      onChange={() => {
+                        setCheckedNextSteps((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(option)) {
+                            next.delete(option);
+                            if (next.size === 0) next.add("No comment");
+                          } else {
+                            next.add(option);
+                            next.delete("No comment");
+                          }
+                          return next;
+                        });
+                      }}
+                    />
+                    <span>{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="quick-actions-buttons">
+              <button
+                className="quick-action-btn"
+                onClick={handleRefineLetter}
+                disabled={isRefiningLetter}
+              >
+                {isRefiningLetter ? "Regenerating\u2026" : "Apply"}
+              </button>
+              <button
+                className="quick-action-btn"
+                onClick={handleTranslateToggle}
+                disabled={isRefiningLetter}
+              >
+                {isSpanish ? "Translate to English" : "Translate to Spanish"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentResponse) {
     return (
@@ -699,10 +1123,7 @@ export function ResultsScreen() {
     <div className={`results-screen${!canRefine ? " results-screen--single-column" : ""}`}>
       <div className="results-main-panel">
       <header className="results-header">
-        <h2 className="results-title">Report Explanation</h2>
-        <span className="results-test-type">
-          {parsed_report.test_type_display}
-        </span>
+        <h2 className="results-title">Explanation</h2>
         {fromHistory && (
           <span className="results-from-history">Viewed from history</span>
         )}
@@ -978,11 +1399,21 @@ export function ResultsScreen() {
       <details className="teaching-points-panel teaching-points-collapsible">
         <summary className="teaching-points-header">
           <h3>Teaching Points</h3>
-          {teachingPoints.length > 0 && (
-            <span className="teaching-points-count">{teachingPoints.length}</span>
+          {(teachingPoints.length + sharedTeachingPoints.length) > 0 && (
+            <span className="teaching-points-count">{teachingPoints.length + sharedTeachingPoints.length}</span>
           )}
         </summary>
         <div className="teaching-points-body">
+          <div className="teaching-points-type-row">
+            <label className="teaching-points-type-label">Report type:</label>
+            <input
+              type="text"
+              className="teaching-points-type-input"
+              value={testTypeOverride ?? currentResponse?.parsed_report.test_type_display ?? ""}
+              onChange={(e) => setTestTypeOverride(e.target.value)}
+              placeholder="e.g. Calcium Score CT"
+            />
+          </div>
           <p className="teaching-points-desc">
             Add personalized instructions that customize how AI interprets and explains results.
             These points can be stylistic or clinical. Explify will remember and apply these to all future explanations.
@@ -1004,7 +1435,7 @@ export function ResultsScreen() {
                   try {
                     const tp = await sidecarApi.createTeachingPoint({
                       text: newTeachingPoint.trim(),
-                      test_type: currentResponse?.parsed_report.test_type,
+                      test_type: effectiveTestType,
                     });
                     setTeachingPoints((prev) => [tp, ...prev]);
                     setNewTeachingPoint("");
@@ -1014,7 +1445,7 @@ export function ResultsScreen() {
                   }
                 }}
               >
-                Save for {currentResponse?.parsed_report.test_type_display || "this type"}
+                Save for {effectiveTestTypeDisplay}
               </button>
               <button
                 className="teaching-point-save-btn teaching-point-save-btn--all"
@@ -1037,6 +1468,26 @@ export function ResultsScreen() {
               </button>
             </div>
           </div>
+          {sharedTeachingPoints.length > 0 && (
+            <div className="shared-teaching-points">
+              <span className="shared-teaching-points-label">Shared with you</span>
+              {sharedTeachingPoints.map((sp) => (
+                <div key={sp.sync_id} className="shared-teaching-point-card">
+                  <p className="shared-teaching-point-text">{sp.text}</p>
+                  <div className="shared-teaching-point-meta">
+                    <span className="shared-teaching-point-sharer">
+                      Shared by {sp.sharer_email}
+                    </span>
+                    {sp.test_type ? (
+                      <span className="shared-teaching-point-type">{sp.test_type}</span>
+                    ) : (
+                      <span className="shared-teaching-point-type shared-teaching-point-type--global">All types</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </details>
 
@@ -1286,21 +1737,52 @@ export function ResultsScreen() {
             </button>
           </div>
 
-          {extractionResult?.full_text && (
-            <div className="extracted-text-section">
+          <div className="extracted-text-section">
+            <div className="extracted-text-buttons">
+              {extractionResult?.full_text && (
+                <button
+                  className="extracted-text-toggle"
+                  onClick={async () => {
+                    const willShow = !showExtractedText;
+                    setShowExtractedText(willShow);
+                    if (willShow && scrubbedText === null && !isScrubbing) {
+                      setIsScrubbing(true);
+                      try {
+                        const res = await sidecarApi.scrubPreview(extractionResult.full_text);
+                        setScrubbedText(res.scrubbed_text);
+                      } catch {
+                        setScrubbedText(extractionResult.full_text);
+                      } finally {
+                        setIsScrubbing(false);
+                      }
+                    }
+                  }}
+                >
+                  {showExtractedText ? "Hide Extracted Text" : "View Extracted Text"}
+                </button>
+              )}
               <button
                 className="extracted-text-toggle"
-                onClick={() => setShowExtractedText((prev) => !prev)}
+                onClick={() => setShowReportType((prev) => !prev)}
               >
-                {showExtractedText ? "Hide Extracted Text" : "View Extracted Text"}
+                {showReportType ? "Hide Report Type" : "View Report Type"}
               </button>
-              {showExtractedText && (
-                <div className="extracted-text-container">
-                  <pre className="extracted-text">{extractionResult.full_text}</pre>
-                </div>
-              )}
             </div>
-          )}
+            {showReportType && (
+              <div className="report-type-reveal">
+                {currentResponse.parsed_report.test_type_display}
+              </div>
+            )}
+            {showExtractedText && extractionResult?.full_text && (
+              <div className="extracted-text-container">
+                {isScrubbing ? (
+                  <pre className="extracted-text">Redacting PHI...</pre>
+                ) : (
+                  <pre className="extracted-text">{scrubbedText ?? extractionResult.full_text}</pre>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       )}

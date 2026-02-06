@@ -36,6 +36,154 @@ class RangeThresholds:
     source: str = "Standard adult clinical reference ranges"
 
 
+# Sex-stratified reference ranges for key analytes
+# Used when gender is provided; otherwise falls back to union ranges
+SEX_STRATIFIED_RANGES: dict[str, dict[str, RangeThresholds]] = {
+    # Hemoglobin: Male 13.5-17.5, Female 12.0-16.0 g/dL
+    "HGB": {
+        "male": RangeThresholds(
+            normal_min=13.5,
+            normal_max=17.5,
+            mild_min=12.0,
+            mild_max=18.5,
+            moderate_min=10.0,
+            moderate_max=20.0,
+            severe_low=8.0,
+            severe_high=22.0,
+            unit="g/dL",
+        ),
+        "female": RangeThresholds(
+            normal_min=12.0,
+            normal_max=16.0,
+            mild_min=10.0,
+            mild_max=17.0,
+            moderate_min=8.0,
+            moderate_max=18.0,
+            severe_low=7.0,
+            severe_high=20.0,
+            unit="g/dL",
+        ),
+    },
+    # Hematocrit: Male 38.3-48.6%, Female 35.5-44.9%
+    "HCT": {
+        "male": RangeThresholds(
+            normal_min=38.3,
+            normal_max=48.6,
+            mild_min=35.0,
+            mild_max=52.0,
+            moderate_min=30.0,
+            moderate_max=56.0,
+            severe_low=25.0,
+            severe_high=60.0,
+            unit="%",
+        ),
+        "female": RangeThresholds(
+            normal_min=35.5,
+            normal_max=44.9,
+            mild_min=32.0,
+            mild_max=48.0,
+            moderate_min=28.0,
+            moderate_max=52.0,
+            severe_low=22.0,
+            severe_high=58.0,
+            unit="%",
+        ),
+    },
+    # RBC: Male 4.5-5.5, Female 4.0-5.0 M/uL
+    "RBC": {
+        "male": RangeThresholds(
+            normal_min=4.5,
+            normal_max=5.5,
+            mild_min=4.0,
+            mild_max=6.0,
+            moderate_min=3.5,
+            moderate_max=6.5,
+            severe_low=3.0,
+            severe_high=7.0,
+            unit="M/uL",
+        ),
+        "female": RangeThresholds(
+            normal_min=4.0,
+            normal_max=5.0,
+            mild_min=3.5,
+            mild_max=5.5,
+            moderate_min=3.0,
+            moderate_max=6.0,
+            severe_low=2.5,
+            severe_high=6.5,
+            unit="M/uL",
+        ),
+    },
+    # Creatinine: Male 0.7-1.3, Female 0.6-1.1 mg/dL
+    "CREAT": {
+        "male": RangeThresholds(
+            normal_min=0.7,
+            normal_max=1.3,
+            mild_min=0.6,
+            mild_max=1.6,
+            moderate_min=0.5,
+            moderate_max=2.5,
+            severe_low=0.4,
+            severe_high=5.0,
+            unit="mg/dL",
+        ),
+        "female": RangeThresholds(
+            normal_min=0.6,
+            normal_max=1.1,
+            mild_min=0.5,
+            mild_max=1.4,
+            moderate_min=0.4,
+            moderate_max=2.2,
+            severe_low=0.3,
+            severe_high=4.5,
+            unit="mg/dL",
+        ),
+    },
+    # Ferritin: Male 12-300, Female 12-150 ng/mL
+    "FERR": {
+        "male": RangeThresholds(
+            normal_min=12.0,
+            normal_max=300.0,
+            mild_min=8.0,
+            mild_max=400.0,
+            moderate_min=4.0,
+            moderate_max=600.0,
+            severe_low=2.0,
+            severe_high=1000.0,
+            unit="ng/mL",
+        ),
+        "female": RangeThresholds(
+            normal_min=12.0,
+            normal_max=150.0,
+            mild_min=8.0,
+            mild_max=200.0,
+            moderate_min=4.0,
+            moderate_max=350.0,
+            severe_low=2.0,
+            severe_high=600.0,
+            unit="ng/mL",
+        ),
+    },
+    # HDL: Male >= 40, Female >= 50 mg/dL
+    "HDL": {
+        "male": RangeThresholds(
+            normal_min=40.0,
+            mild_min=35.0,
+            moderate_min=25.0,
+            severe_low=20.0,
+            unit="mg/dL",
+        ),
+        "female": RangeThresholds(
+            normal_min=50.0,
+            mild_min=40.0,
+            moderate_min=30.0,
+            severe_low=20.0,
+            unit="mg/dL",
+        ),
+    },
+}
+
+
 REFERENCE_RANGES: dict[str, RangeThresholds] = {
     # ===== Comprehensive Metabolic Panel (CMP) =====
 
@@ -554,9 +702,32 @@ def _format_reference_range(rr: RangeThresholds) -> str:
     return "N/A"
 
 
-def classify_measurement(abbreviation: str, value: float) -> ClassificationResult:
-    """Classify a measurement value against standard clinical reference ranges."""
-    rr = REFERENCE_RANGES.get(abbreviation)
+def classify_measurement(
+    abbreviation: str, value: float, gender: Optional[str] = None
+) -> ClassificationResult:
+    """Classify a measurement value against standard clinical reference ranges.
+
+    If gender is provided and a sex-stratified range exists for this analyte,
+    uses the sex-specific range; otherwise falls back to the union range.
+    """
+    rr: Optional[RangeThresholds] = None
+
+    # Try sex-stratified range first if gender is provided
+    if gender is not None:
+        gender_key = gender.lower()
+        if gender_key in ("f", "female"):
+            gender_key = "female"
+        elif gender_key in ("m", "male"):
+            gender_key = "male"
+
+        stratified = SEX_STRATIFIED_RANGES.get(abbreviation)
+        if stratified is not None:
+            rr = stratified.get(gender_key)
+
+    # Fall back to union range
+    if rr is None:
+        rr = REFERENCE_RANGES.get(abbreviation)
+
     if rr is None:
         return ClassificationResult(
             status=SeverityStatus.UNDETERMINED,

@@ -1112,6 +1112,34 @@
   border-bottom-right-radius: var(--radius-md);
 }
 
+.teaching-points-type-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.teaching-points-type-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.teaching-points-type-input {
+  flex: 1;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.teaching-points-type-input:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+}
+
 .teaching-points-desc {
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
@@ -1203,6 +1231,22 @@
   color: var(--color-text);
 }
 
+.extracted-text-buttons {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.report-type-reveal {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--color-gray-50);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  font-weight: 500;
+}
+
 .extracted-text-container {
   max-height: 400px;
   overflow-y: auto;
@@ -1219,6 +1263,93 @@
   white-space: pre-wrap;
   margin: 0;
   line-height: 1.4;
+}
+
+/* Shared Teaching Points */
+.shared-teaching-points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.shared-teaching-points-label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.shared-teaching-point-card {
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--color-gray-50);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-primary-300);
+}
+
+.shared-teaching-point-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  margin: 0 0 var(--space-xs) 0;
+  line-height: 1.5;
+}
+
+.shared-teaching-point-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.shared-teaching-point-sharer {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.shared-teaching-point-type {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--color-primary-600);
+  background-color: var(--color-primary-50);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.shared-teaching-point-type--global {
+  color: var(--color-text-secondary);
+  background-color: var(--color-gray-100);
+}
+
+/* Letter Mode */
+.letter-body {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  padding: var(--space-md);
+  background-color: var(--color-gray-50);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-sm);
+  min-height: 200px;
+  max-height: 500px;
+  overflow-y: auto;
+  word-break: break-word;
+}
+
+.letter-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.letter-refine {
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 
 /* Print Styles */

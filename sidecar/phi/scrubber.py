@@ -19,12 +19,44 @@ class ScrubResult:
 
 
 _PHI_PATTERNS: list[tuple[str, re.Pattern, str]] = [
-    # Patient name: "Patient: John Doe" or "Name: Jane Smith"
+    # Catch-all: redact everything after "patient name:" (or similar labels)
+    # regardless of name format. Must come before structured name patterns.
+    (
+        "patient_name_catchall",
+        re.compile(
+            r"(?i)(?:patient\s+name|patient|pt\.?\s*name|pt\.?|name)\s*[:=]\s*[^\n]+"
+        ),
+        "[PATIENT NAME REDACTED]",
+    ),
+    # Patient name: "Patient: John Doe", "Name: Jane Smith", "Pt: John Doe"
+    # Also handles "Patient Name:", "Pt Name:", "Pt.:", variations with commas
+    # (Last, First), and optional suffixes/middle initials.
     (
         "patient_name",
         re.compile(
-            r"(?i)(?:patient|patient\s+name|name)\s*[:=]\s*"
-            r"[A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+"
+            r"(?i)(?:patient|patient\s+name|pt\.?\s*name|pt\.?|name)\s*[:=]\s*"
+            r"(?:"
+            # Last, First Middle? format
+            r"[A-Z][a-z]+(?:\-[A-Z][a-z]+)?\s*,\s*[A-Z][a-z]+(?:\s+[A-Z]\.?)?"
+            r"|"
+            # First Middle? Last format
+            r"[A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+(?:\-[A-Z][a-z]+)?"
+            r")"
+            r"(?:\s+(?:Jr|Sr|II|III|IV)\.?)?"
+        ),
+        "[PATIENT NAME REDACTED]",
+    ),
+    # Patient name on labeled lines with broader labels seen in reports:
+    # "PATIENT:", "CLIENT:", "SUBJECT:", "Examinee:"
+    (
+        "patient_name",
+        re.compile(
+            r"(?i)(?:client|subject|examinee|individual)\s*[:=]\s*"
+            r"(?:"
+            r"[A-Z][a-z]+(?:\-[A-Z][a-z]+)?\s*,\s*[A-Z][a-z]+(?:\s+[A-Z]\.?)?"
+            r"|"
+            r"[A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+(?:\-[A-Z][a-z]+)?"
+            r")"
             r"(?:\s+(?:Jr|Sr|II|III|IV)\.?)?"
         ),
         "[PATIENT NAME REDACTED]",

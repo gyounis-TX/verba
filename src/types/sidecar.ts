@@ -98,6 +98,7 @@ export interface TestTypeInfo {
   test_type_id: string;
   display_name: string;
   keywords: string[];
+  category?: string;
 }
 
 export interface DetectTypeResponse {
@@ -297,6 +298,7 @@ export interface HistoryListResponse {
 
 export interface HistoryDetailResponse extends HistoryListItem {
   full_response: ExplainResponse;
+  edited_text?: string;
 }
 
 export interface HistoryCreateRequest {

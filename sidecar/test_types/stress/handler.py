@@ -46,6 +46,10 @@ class StressTestHandler(BaseTestType):
             "exercise capacity",
         ]
 
+    @property
+    def category(self) -> str:
+        return "cardiac"
+
     def detect(self, extraction_result: ExtractionResult) -> float:
         """Keyword-based detection with tiered scoring."""
         text = extraction_result.full_text.lower()
@@ -118,7 +122,12 @@ class StressTestHandler(BaseTestType):
         bonus = min(0.3, moderate_count * 0.05 + weak_count * 0.02)
         return min(1.0, base + bonus)
 
-    def parse(self, extraction_result: ExtractionResult) -> ParsedReport:
+    def parse(
+        self,
+        extraction_result: ExtractionResult,
+        gender: str | None = None,
+        age: int | None = None,
+    ) -> ParsedReport:
         """Extract structured measurements, sections, and findings."""
         text = extraction_result.full_text
         warnings: list[str] = []
@@ -177,18 +186,56 @@ class StressTestHandler(BaseTestType):
     def get_glossary(self) -> dict[str, str]:
         return STRESS_GLOSSARY
 
-    def get_prompt_context(self) -> dict:
-        return {
-            "specialty": "cardiology",
-            "test_type": "exercise_stress_test",
-            "guidelines": "ACC/AHA 2002 Guideline Update for Exercise Testing",
-            "explanation_style": (
+    _PHARMA_AGENTS = ["lexiscan", "adenosine", "regadenoson"]
+
+    def _is_pharmacological(self, text: str) -> bool:
+        """Return True if the report mentions a pharmacological stress agent."""
+        lower = text.lower()
+        return any(agent in lower for agent in self._PHARMA_AGENTS)
+
+    def get_prompt_context(self, extraction_result: ExtractionResult | None = None) -> dict:
+        text = extraction_result.full_text if extraction_result else ""
+        is_pharma = self._is_pharmacological(text)
+
+        if is_pharma:
+            explanation_style = (
+                "This is a pharmacological stress test (not exercise-based). "
+                "IMPORTANT pharmacological stress rules:\n"
+                "- Do NOT mention heart rate response to stress AT ALL. "
+                "Heart rate response to exercise is invalid with pharmacological "
+                "stress. Do NOT say anything like 'your heart rate response was "
+                "lower than expected' or 'reaching X% of predicted maximum'. "
+                "Do NOT comment on target heart rate, predicted maximum "
+                "heart rate, or % of max predicted heart rate. The predicted "
+                "maximum heart rate calculation does not apply because heart "
+                "rate does not increase significantly with pharmacological stress.\n"
+                "- Do NOT state that the heart rate response may limit "
+                "interpretation of the EKG stress test. That caveat only "
+                "applies to exercise-based tests.\n"
+                "- If the test is inconclusive due to ST/T wave abnormalities, "
+                "simply state that without attributing it to heart rate response.\n"
+                "Focus on perfusion findings, wall motion, ejection fraction, "
+                "ECG changes, and overall interpretation "
+                "(normal, abnormal, equivocal). "
+                "Explain what the results mean for the patient's heart health."
+            )
+        else:
+            explanation_style = (
                 "Focus on exercise capacity (METs), heart rate response "
                 "(% of max predicted), blood pressure response, ECG changes "
                 "(ST depression/elevation), and overall interpretation "
                 "(positive, negative, equivocal, non-diagnostic). "
+                "Comment on whether the patient reached target heart rate "
+                "only because they exercised on a treadmill. "
                 "Explain what the results mean for the patient's heart health."
-            ),
+            )
+
+        return {
+            "specialty": "cardiology",
+            "test_type": "pharmacological_stress_test" if is_pharma else "exercise_stress_test",
+            "category": "cardiac",
+            "guidelines": "ACC/AHA 2002 Guideline Update for Exercise Testing",
+            "explanation_style": explanation_style,
         }
 
     def _extract_sections(self, text: str) -> list[ReportSection]:

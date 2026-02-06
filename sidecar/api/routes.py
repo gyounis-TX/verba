@@ -240,7 +240,7 @@ async def detect_test_type(body: DetectTypeRequest = Body(...)):
     _logger = logging.getLogger(__name__)
 
     try:
-        extraction_result = ExtractionResult(**body.extraction_result)
+        extraction_result = ExtractionResult.model_validate(body.extraction_result)
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -274,8 +274,9 @@ async def detect_test_type(body: DetectTypeRequest = Body(...)):
             llm_attempted = True
             provider_enum = LLMProvider(provider_str)
             client = LLMClient(provider=provider_enum, api_key=api_key)
-            llm_type_id, llm_confidence = await llm_detect_test_type(
+            llm_type_id, llm_confidence, llm_display = await llm_detect_test_type(
                 client, extraction_result.full_text, body.user_hint,
+                registry_types=available,
             )
 
             if llm_type_id is not None and llm_confidence >= 0.5:
@@ -299,11 +300,90 @@ async def detect_test_type(body: DetectTypeRequest = Body(...)):
     )
 
 
+@router.post("/analyze/classify-input")
+async def classify_input(body: dict = Body(...)):
+    """Classify whether input text is a medical report or a question/request."""
+    import re as _re
+
+    text = body.get("text", "").strip()
+    if not text:
+        return {"classification": "question", "confidence": 0.5}
+
+    # Heuristic tier — fast, no API call
+    text_lower = text.lower()
+    lines = text.strip().split("\n")
+
+    # Strong report signals
+    report_signals = 0
+    if len(text) > 500:
+        report_signals += 2
+    if len(lines) > 10:
+        report_signals += 1
+    # Medical report headers
+    report_headers = [
+        "findings:", "impression:", "conclusion:", "indication:",
+        "technique:", "comparison:", "history:", "procedure:",
+        "clinical information:", "report:", "examination:",
+        "echocardiogram", "stress test", "nuclear", "catheterization",
+        "electrocardiogram", "holter", "mri", "ct scan",
+    ]
+    for header in report_headers:
+        if header in text_lower:
+            report_signals += 2
+    # Measurement patterns (e.g., "3.5 cm", "120/80", "55%")
+    if _re.search(r'\d+\.?\d*\s*(?:cm|mm|mg|ml|%|mmHg|bpm)', text):
+        report_signals += 2
+
+    # Strong question signals
+    question_signals = 0
+    if text.endswith("?"):
+        question_signals += 3
+    question_starters = [
+        "explain", "help me", "how do i", "what does", "what is",
+        "can you", "please", "write", "draft", "tell the patient",
+        "why is", "why are", "what should", "how should",
+    ]
+    for starter in question_starters:
+        if text_lower.startswith(starter):
+            question_signals += 3
+    if len(text) < 200 and len(lines) <= 3:
+        question_signals += 1
+
+    if report_signals > question_signals:
+        return {"classification": "report", "confidence": 0.9}
+    elif question_signals > report_signals:
+        return {"classification": "question", "confidence": 0.9}
+
+    # Ambiguous — use LLM for tiebreak (optional, if API key available)
+    try:
+        settings = settings_store.get_settings()
+        api_key = settings_store.get_api_key_for_provider(settings.llm_provider.value)
+        if api_key:
+            client = LLMClient(
+                provider=LLMProvider(settings.llm_provider.value),
+                api_key=api_key,
+            )
+            resp = await client.call(
+                system_prompt="Classify the following text as either 'report' (a medical test report) or 'question' (a question or request for help). Reply with exactly one word: report or question.",
+                user_prompt=text[:1000],
+            )
+            word = resp.text_content.strip().lower()
+            if word in ("report", "question"):
+                return {"classification": word, "confidence": 0.7}
+    except Exception:
+        pass
+
+    # Default: if short text, assume question; if long, assume report
+    if len(text) < 300:
+        return {"classification": "question", "confidence": 0.5}
+    return {"classification": "report", "confidence": 0.5}
+
+
 @router.post("/analyze/parse", response_model=ParsedReport)
 async def parse_report(request: ParseRequest = Body(...)):
     """Parse extraction results into structured medical report."""
     try:
-        extraction_result = ExtractionResult(**request.extraction_result)
+        extraction_result = ExtractionResult.model_validate(request.extraction_result)
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -343,7 +423,7 @@ async def explain_report(request: ExplainRequest = Body(...)):
 
     # 1. Parse extraction result
     try:
-        extraction_result = ExtractionResult(**request.extraction_result)
+        extraction_result = ExtractionResult.model_validate(request.extraction_result)
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -363,19 +443,19 @@ async def explain_report(request: ExplainRequest = Body(...)):
         test_type = type_id
         detection_confidence = confidence
 
-    handler = registry.get(test_type)
+    resolved_id, handler = registry.resolve(test_type)
+    if handler is not None:
+        test_type = resolved_id  # Use canonical ID
 
-    # If the user provided a free-text type that doesn't match a registered
-    # handler ID, treat it as an unknown type — don't fall back to a
-    # mismatched handler (e.g. don't use the lab_results handler to parse a
-    # calcium score CT report).
-    if handler is not None and request.test_type and request.test_type != handler.test_type_id:
-        handler = None
+    # 2b. Extract demographics early so they can be used in parsing
+    demographics = extract_demographics(extraction_result.full_text)
+    patient_age = request.patient_age if request.patient_age is not None else demographics.age
+    patient_gender = request.patient_gender if request.patient_gender is not None else demographics.gender
 
     # 3. Parse report (or build a generic one for unknown types)
     if handler is not None:
         try:
-            parsed_report = handler.parse(extraction_result)
+            parsed_report = handler.parse(extraction_result, gender=patient_gender, age=patient_age)
         except Exception as e:
             raise HTTPException(
                 status_code=422,
@@ -408,10 +488,14 @@ async def explain_report(request: ExplainRequest = Body(...)):
     # 5. PHI scrub
     scrub_result = scrub_phi(extraction_result.full_text)
 
-    # 5a2. Extract demographics
-    demographics = extract_demographics(extraction_result.full_text)
-    patient_age = request.patient_age if request.patient_age is not None else demographics.age
-    patient_gender = request.patient_gender if request.patient_gender is not None else demographics.gender
+    # 5a. PHI scrub clinical context if provided
+    scrubbed_clinical_context = (
+        scrub_phi(request.clinical_context).scrubbed_text
+        if request.clinical_context
+        else None
+    )
+
+    # Note: demographics (patient_age, patient_gender) already extracted above in step 2b
 
     # 5b. Always extract physician name from report text (for the UI)
     extracted_physician = extract_physician_name(extraction_result.full_text)
@@ -435,7 +519,7 @@ async def explain_report(request: ExplainRequest = Body(...)):
     # 6. Build prompts
     literacy_level = LiteracyLevel(request.literacy_level.value)
     prompt_engine = PromptEngine()
-    prompt_context = handler.get_prompt_context() if handler else {}
+    prompt_context = handler.get_prompt_context(extraction_result) if handler else {}
     if not handler:
         # For unknown test types, tell the LLM what the user thinks it is
         prompt_context["test_type_hint"] = test_type
@@ -495,12 +579,18 @@ async def explain_report(request: ExplainRequest = Body(...)):
     # 6d. Fetch teaching points (global + type-specific, including shared)
     teaching_points = get_db().list_all_teaching_points_for_prompt(test_type=test_type)
 
+    # 6e. Fetch prior results for longitudinal trend comparison
+    prior_results = get_db().get_prior_measurements(test_type=test_type, limit=3)
+
+    # 6f. Fetch recent doctor edits for style learning
+    recent_edits = get_db().get_recent_edits(test_type=test_type, limit=3)
+
     user_prompt = prompt_engine.build_user_prompt(
         parsed_report=parsed_report,
         reference_ranges=handler.get_reference_ranges() if handler else {},
         glossary=handler.get_glossary() if handler else {},
         scrubbed_text=scrub_result.scrubbed_text,
-        clinical_context=request.clinical_context,
+        clinical_context=scrubbed_clinical_context,
         template_instructions=template_instructions,
         closing_text=template_closing,
         refinement_instruction=request.refinement_instruction,
@@ -508,6 +598,10 @@ async def explain_report(request: ExplainRequest = Body(...)):
         next_steps=request.next_steps,
         teaching_points=teaching_points,
         short_comment=bool(request.short_comment) or is_sms,
+        prior_results=prior_results,
+        recent_edits=recent_edits,
+        patient_age=patient_age,
+        patient_gender=patient_gender,
     )
 
     # Log prompt sizes for debugging token issues
@@ -592,14 +686,10 @@ async def explain_report(request: ExplainRequest = Body(...)):
 @router.get("/glossary/{test_type}")
 async def get_glossary(test_type: str):
     """Return glossary of medical terms for a given test type."""
-    handler = registry.get(test_type)
+    resolved_id, handler = registry.resolve(test_type)
     if handler is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Unknown test type: {test_type}. "
-            f"Available: {[t['test_type_id'] for t in registry.list_types()]}",
-        )
-    return {"test_type": test_type, "glossary": handler.get_glossary()}
+        return {"test_type": test_type, "glossary": {}}
+    return {"test_type": resolved_id, "glossary": handler.get_glossary()}
 
 
 @router.post("/export/pdf")
@@ -810,6 +900,20 @@ async def mark_history_copied(history_id: int):
     return {"id": history_id, "copied": True}
 
 
+class EditedTextRequest(BaseModel):
+    edited_text: str
+
+
+@router.patch("/history/{history_id}/edited_text")
+async def save_edited_text(history_id: int, request: EditedTextRequest = Body(...)):
+    """Save the doctor's edited version of the explanation text."""
+    db = get_db()
+    updated = db.save_edited_text(history_id, request.edited_text)
+    if not updated:
+        raise HTTPException(status_code=404, detail="History record not found.")
+    return {"id": history_id, "edited_text_saved": True}
+
+
 # --- Consent Endpoints ---
 
 
@@ -890,7 +994,10 @@ async def sync_shared_teaching_points(body: dict = Body(...)):
         raise HTTPException(status_code=400, detail="rows must be a list.")
     db = get_db()
     count = db.replace_shared_teaching_points(rows)
-    return {"replaced": count}
+    # Remove any shared content that was incorrectly merged into the user's
+    # own teaching_points table during earlier syncs.
+    purged = db.purge_shared_duplicates_from_own()
+    return {"replaced": count, "purged_duplicates": purged}
 
 
 @router.get("/teaching-points/shared")

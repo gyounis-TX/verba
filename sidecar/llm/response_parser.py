@@ -49,6 +49,12 @@ def parse_and_validate_response(
     # 2. Build lookup of expected measurements
     expected = {m.abbreviation: m for m in parsed_report.measurements}
 
+    # Only validate against pre-extracted measurements if we have them.
+    # For unknown test types, the LLM extracts measurements from raw text,
+    # so there's nothing to cross-check against — let them through.
+    if not expected:
+        return result, issues
+
     # 3. Check each measurement in the response
     for mexp in result.measurements:
         if mexp.abbreviation not in expected:

@@ -40,6 +40,10 @@ class VenousDopplerHandler(BaseTestType):
             "93971",
         ]
 
+    @property
+    def category(self) -> str:
+        return "vascular"
+
     def detect(self, extraction_result: ExtractionResult) -> float:
         text = extraction_result.full_text.lower()
 
@@ -90,7 +94,12 @@ class VenousDopplerHandler(BaseTestType):
         bonus = min(0.2, moderate_count * 0.05 + weak_count * 0.02)
         return min(1.0, base + bonus)
 
-    def parse(self, extraction_result: ExtractionResult) -> ParsedReport:
+    def parse(
+        self,
+        extraction_result: ExtractionResult,
+        gender: str | None = None,
+        age: int | None = None,
+    ) -> ParsedReport:
         text = extraction_result.full_text
         warnings: list[str] = []
 
@@ -148,10 +157,11 @@ class VenousDopplerHandler(BaseTestType):
     def get_glossary(self) -> dict[str, str]:
         return VENOUS_GLOSSARY
 
-    def get_prompt_context(self) -> dict:
+    def get_prompt_context(self, extraction_result: ExtractionResult | None = None) -> dict:
         return {
             "specialty": "vascular medicine / cardiology",
             "test_type": "venous_duplex",
+            "category": "vascular",
             "guidelines": "SVS/AVF Clinical Practice Guidelines",
             "explanation_style": (
                 "Explain whether any blood clots (DVT) were found. "

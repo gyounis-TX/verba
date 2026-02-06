@@ -148,6 +148,21 @@ class SidecarApi {
     return response.json();
   }
 
+  async classifyInput(
+    text: string,
+  ): Promise<{ classification: "report" | "question"; confidence: number }> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/analyze/classify-input`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
   async detectPdfType(file: File): Promise<DetectionResult> {
     const baseUrl = await this.ensureInitialized();
     const formData = new FormData();
@@ -468,6 +483,18 @@ class SidecarApi {
     const baseUrl = await this.ensureInitialized();
     const response = await fetch(`${baseUrl}/history/${id}/copied`, {
       method: "PUT",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+  }
+
+  async saveEditedText(id: number, editedText: string): Promise<void> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await fetch(`${baseUrl}/history/${id}/edited_text`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ edited_text: editedText }),
     });
     if (!response.ok) {
       await this.handleErrorResponse(response);

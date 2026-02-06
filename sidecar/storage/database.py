@@ -140,6 +140,7 @@ class Database:
                 "ALTER TABLE teaching_points ADD COLUMN sync_id TEXT",
                 "ALTER TABLE settings ADD COLUMN updated_at TEXT",
                 "ALTER TABLE templates ADD COLUMN sync_id TEXT",
+                "ALTER TABLE history ADD COLUMN edited_text TEXT",
             ]
             for migration in migrations:
                 try:
@@ -374,6 +375,125 @@ class Database:
             )
             conn.commit()
             return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    def save_edited_text(self, history_id: int, edited_text: str) -> bool:
+        """Save the doctor's edited version of the explanation text."""
+        conn = self._get_conn()
+        try:
+            cursor = conn.execute(
+                "UPDATE history SET edited_text = ?, updated_at = ? WHERE id = ?",
+                (edited_text, _now(), history_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    def get_recent_edits(
+        self, test_type: str, limit: int = 3
+    ) -> list[dict[str, Any]]:
+        """Analyze recent doctor edits to find structural patterns.
+
+        Returns structural metadata ONLY (length change, paragraph change) —
+        never clinical content — to guide future output without biasing
+        the LLM with prior diagnoses.
+        """
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT full_response, edited_text FROM history
+                   WHERE test_type = ? AND edited_text IS NOT NULL
+                   ORDER BY updated_at DESC LIMIT ?""",
+                (test_type, limit),
+            ).fetchall()
+
+            edits: list[dict[str, Any]] = []
+            for row in rows:
+                try:
+                    if not row["edited_text"]:
+                        continue
+
+                    full_response = json.loads(row["full_response"])
+                    original = full_response.get("explanation", {}).get("overall_summary", "")
+                    edited = row["edited_text"]
+
+                    if not original:
+                        continue
+
+                    # Calculate structural metadata
+                    original_len = len(original)
+                    edited_len = len(edited)
+                    length_change_pct = ((edited_len - original_len) / original_len * 100) if original_len > 0 else 0
+
+                    original_paragraphs = len([p for p in original.split("\n\n") if p.strip()])
+                    edited_paragraphs = len([p for p in edited.split("\n\n") if p.strip()])
+                    paragraph_change = edited_paragraphs - original_paragraphs
+
+                    edits.append({
+                        "length_change_pct": round(length_change_pct, 1),
+                        "paragraph_change": paragraph_change,
+                        "shorter": edited_len < original_len,
+                        "longer": edited_len > original_len,
+                    })
+                except (json.JSONDecodeError, TypeError, KeyError):
+                    continue
+
+            return edits
+        finally:
+            conn.close()
+
+    def get_prior_measurements(
+        self, test_type: str, limit: int = 3
+    ) -> list[dict[str, Any]]:
+        """Fetch prior measurements for the same test type for trend comparison.
+
+        Returns a list of dicts with:
+        - date: ISO date string (e.g., "2025-01-15")
+        - measurements: list of {abbreviation, value, unit, status}
+        """
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT created_at, full_response FROM history
+                   WHERE test_type = ?
+                   ORDER BY created_at DESC LIMIT ?""",
+                (test_type, limit),
+            ).fetchall()
+
+            results: list[dict[str, Any]] = []
+            for row in rows:
+                try:
+                    full_response = json.loads(row["full_response"])
+                    parsed_report = full_response.get("parsed_report", {})
+                    measurements = parsed_report.get("measurements", [])
+
+                    # Extract date portion from ISO timestamp
+                    created_at = row["created_at"]
+                    date_str = created_at[:10] if created_at else "Unknown"
+
+                    # Extract only the essential measurement info
+                    measurement_summary = [
+                        {
+                            "abbreviation": m.get("abbreviation", ""),
+                            "value": m.get("value"),
+                            "unit": m.get("unit", ""),
+                            "status": m.get("status", ""),
+                        }
+                        for m in measurements
+                        if m.get("abbreviation") and m.get("value") is not None
+                    ]
+
+                    if measurement_summary:
+                        results.append({
+                            "date": date_str,
+                            "measurements": measurement_summary,
+                        })
+                except (json.JSONDecodeError, TypeError, KeyError):
+                    continue
+
+            return results
         finally:
             conn.close()
 
@@ -736,17 +856,27 @@ class Database:
     def list_shared_teaching_points(
         self, test_type: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Return shared teaching points, optionally filtered by test_type (includes global)."""
+        """Return shared teaching points, optionally filtered by test_type (includes global).
+
+        Excludes shared points whose sync_id already exists in the user's own
+        teaching_points table to avoid duplicates when a sharer's content
+        overlaps with the user's own library.
+        """
         conn = self._get_conn()
         try:
             if test_type:
                 rows = conn.execute(
-                    "SELECT * FROM shared_teaching_points WHERE test_type IS NULL OR test_type = ? ORDER BY created_at DESC",
+                    """SELECT * FROM shared_teaching_points
+                       WHERE (test_type IS NULL OR test_type = ?)
+                         AND sync_id NOT IN (SELECT sync_id FROM teaching_points WHERE sync_id IS NOT NULL)
+                       ORDER BY created_at DESC""",
                     (test_type,),
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    "SELECT * FROM shared_teaching_points ORDER BY created_at DESC",
+                    """SELECT * FROM shared_teaching_points
+                       WHERE sync_id NOT IN (SELECT sync_id FROM teaching_points WHERE sync_id IS NOT NULL)
+                       ORDER BY created_at DESC""",
                 ).fetchall()
             return [dict(row) for row in rows]
         finally:
@@ -763,6 +893,24 @@ class Database:
         for tp in shared:
             tp["source"] = tp.get("sharer_email", "shared")
         return own + shared
+
+    def purge_shared_duplicates_from_own(self) -> int:
+        """Remove rows from teaching_points whose sync_id also exists in
+        shared_teaching_points.  These are shared content that was incorrectly
+        merged into the user's own table during sync."""
+        conn = self._get_conn()
+        try:
+            cursor = conn.execute(
+                """DELETE FROM teaching_points
+                   WHERE sync_id IN (
+                       SELECT sync_id FROM shared_teaching_points
+                       WHERE sync_id IS NOT NULL
+                   )"""
+            )
+            conn.commit()
+            return cursor.rowcount
+        finally:
+            conn.close()
 
     # --- Shared Templates ---
 

@@ -16,12 +16,14 @@ class Demographics:
 
 # Age patterns
 _AGE_PATTERNS = [
-    # "Age: 45" or "Age 45"
-    re.compile(r"(?i)\bage\s*[:=]?\s*(\d{1,3})\b"),
+    # "Age: 45" or "Age 45" or "Age/Sex: 45/M"
+    re.compile(r"(?i)\bage\s*(?:/\s*sex)?\s*[:=]?\s*(\d{1,3})\b"),
     # "45 yo" or "45 y/o" or "45 y.o."
     re.compile(r"\b(\d{1,3})\s*(?:yo|y\.?o\.?|y/o)\b", re.IGNORECASE),
     # "45 year old" or "45-year-old" or "45 years old"
     re.compile(r"\b(\d{1,3})\s*[-]?\s*year[s]?\s*[-]?\s*old\b", re.IGNORECASE),
+    # Patient header: "Patient: John Doe, 45M" or "45 M" or "45/M"
+    re.compile(r"\b(\d{1,3})\s*[/]?\s*[MF]\b", re.IGNORECASE),
 ]
 
 # DOB pattern to calculate age
@@ -41,6 +43,10 @@ _GENDER_PATTERNS = [
         r"(?i)\b\d{1,3}\s*(?:yo|y\.?o\.?|y/o|year[s]?\s*[-]?\s*old)\s+"
         r"(male|female|man|woman|m|f)\b"
     ),
+    # "45M" or "45 M" or "45/M" or "45/F" (common report header format)
+    re.compile(r"\b\d{1,3}\s*[/]?\s*(M|F)\b"),
+    # "Age/Sex: 45/M" pattern
+    re.compile(r"(?i)age\s*/\s*sex\s*[:=]?\s*\d{1,3}\s*[/]?\s*(M|F)\b"),
 ]
 
 _GENDER_MAP = {

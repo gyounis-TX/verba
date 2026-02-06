@@ -43,5 +43,33 @@ class TestTypeRegistry:
     def get(self, type_id: str) -> Optional[BaseTestType]:
         return self._handlers.get(type_id)
 
+    def resolve(self, type_id_or_name: str) -> tuple[Optional[str], Optional[BaseTestType]]:
+        """Resolve a type ID or free-text name to a handler.
+
+        1. Exact ID match (existing behavior)
+        2. Keyword match against registered handlers
+        Returns (resolved_id, handler) or (None, None).
+        """
+        # Exact match
+        handler = self._handlers.get(type_id_or_name)
+        if handler is not None:
+            return (type_id_or_name, handler)
+
+        # Keyword match: check if the user string matches any handler's keywords
+        query = type_id_or_name.lower()
+        best_handler = None
+        best_id: Optional[str] = None
+        best_score = 0
+        for tid, h in self._handlers.items():
+            for kw in h.keywords:
+                if kw.lower() in query or query in kw.lower():
+                    score = len(kw)  # longer keyword match = more specific
+                    if score > best_score:
+                        best_score = score
+                        best_handler = h
+                        best_id = tid
+
+        return (best_id, best_handler) if best_handler else (None, None)
+
     def list_types(self) -> list[dict]:
         return [handler.get_metadata() for handler in self._handlers.values()]
