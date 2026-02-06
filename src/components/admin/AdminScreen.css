@@ -55,6 +55,28 @@
   max-width: 200px;
 }
 
+.dashboard-refresh-btn {
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.dashboard-refresh-btn:hover:not(:disabled) {
+  background: var(--color-gray-50);
+  border-color: var(--color-primary-300);
+}
+
+.dashboard-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

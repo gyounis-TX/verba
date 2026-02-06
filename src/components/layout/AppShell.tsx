@@ -26,10 +26,40 @@ export function AppShell() {
 
   // Check existing session and listen for auth changes
   useEffect(() => {
-    getSession().then((session) => {
-      setIsAuthenticated(!!session);
-      setAuthChecked(true);
-    });
+    getSession()
+      .then(async (session) => {
+        if (session) {
+          setIsAuthenticated(true);
+          setAuthChecked(true);
+          return;
+        }
+        // No session — check if Supabase is actually reachable before
+        // requiring login. If it's down, skip auth entirely.
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        if (!supabaseUrl) {
+          setIsAuthenticated(true);
+          setAuthChecked(true);
+          return;
+        }
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 5000);
+          await fetch(`${supabaseUrl}/auth/v1/health`, { signal: ctrl.signal });
+          clearTimeout(timer);
+          // Supabase reachable but no session — require login
+          setIsAuthenticated(false);
+          setAuthChecked(true);
+        } catch {
+          // Supabase unreachable — allow through gracefully
+          setIsAuthenticated(true);
+          setAuthChecked(true);
+        }
+      })
+      .catch(() => {
+        // getSession itself failed — allow through gracefully
+        setIsAuthenticated(true);
+        setAuthChecked(true);
+      });
     const unsubscribe = onAuthStateChange((session) => {
       setIsAuthenticated(!!session);
     });
@@ -75,20 +105,26 @@ export function AppShell() {
       });
   }, [isReady]);
 
-  // Check onboarding status after consent is given
+  // Check onboarding status after consent is given and user is authenticated
   useEffect(() => {
-    if (!isReady || !consentGiven) return;
+    if (!isReady || !consentGiven || !isAuthenticated) return;
+    let cancelled = false;
     sidecarApi
       .getOnboarding()
       .then((res) => {
-        setOnboardingCompleted(res.onboarding_completed);
-        setOnboardingChecked(true);
+        if (!cancelled) {
+          setOnboardingCompleted(res.onboarding_completed);
+          setOnboardingChecked(true);
+        }
       })
       .catch(() => {
-        setOnboardingCompleted(true);
-        setOnboardingChecked(true);
+        if (!cancelled) {
+          setOnboardingCompleted(true);
+          setOnboardingChecked(true);
+        }
       });
-  }, [isReady, consentGiven]);
+    return () => { cancelled = true; };
+  }, [isReady, consentGiven, isAuthenticated]);
 
   const handleConsent = () => {
     sidecarApi.grantConsent().catch(() => {});

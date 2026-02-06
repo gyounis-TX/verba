@@ -38,6 +38,7 @@ export function AdminScreen() {
 
   // Dashboard state
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+  const [refreshKey, setRefreshKey] = useState(0);
   const [usageSummary, setUsageSummary] = useState<UserUsageSummary[]>([]);
   const [allUsers, setAllUsers] = useState<RegisteredUser[]>([]);
   const [dashboardLoading, setDashboardLoading] = useState(true);
@@ -87,7 +88,7 @@ export function AdminScreen() {
     }
     loadDashboard();
     return () => { cancelled = true; };
-  }, [timeRange]);
+  }, [timeRange, refreshKey]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -294,6 +295,13 @@ export function AdminScreen() {
             <option value="30d">Last 30 days</option>
             <option value="all">All time</option>
           </select>
+          <button
+            className="dashboard-refresh-btn"
+            onClick={() => setRefreshKey((k) => k + 1)}
+            disabled={dashboardLoading}
+          >
+            {dashboardLoading ? "Refreshing..." : "Refresh"}
+          </button>
         </div>
 
         {dashboardLoading ? (

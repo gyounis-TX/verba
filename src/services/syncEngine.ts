@@ -9,6 +9,46 @@ import { getSupabase, getSession } from "./supabase";
 import { sidecarApi } from "./sidecarApi";
 import { pullSharedConfig } from "./sharedConfig";
 
+// ---------------------------------------------------------------------------
+// Pull shared content (teaching points + templates from other users)
+// ---------------------------------------------------------------------------
+
+async function pullSharedContent(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const session = await getSession();
+  if (!session?.user) return;
+
+  try {
+    // Pull shared teaching points via RPC
+    const { data: sharedTPs, error: tpError } = await supabase.rpc(
+      "get_shared_teaching_points",
+    );
+    if (tpError) {
+      console.error("Failed to pull shared teaching points:", tpError.message);
+    } else {
+      await sidecarApi.syncSharedTeachingPoints(sharedTPs ?? []);
+    }
+  } catch (err) {
+    console.error("Failed to sync shared teaching points:", err);
+  }
+
+  try {
+    // Pull shared templates via RPC
+    const { data: sharedTemplates, error: tmplError } = await supabase.rpc(
+      "get_shared_templates",
+    );
+    if (tmplError) {
+      console.error("Failed to pull shared templates:", tmplError.message);
+    } else {
+      await sidecarApi.syncSharedTemplates(sharedTemplates ?? []);
+    }
+  } catch (err) {
+    console.error("Failed to sync shared templates:", err);
+  }
+}
+
 type SyncTable = "settings" | "history" | "templates" | "letters" | "teaching_points";
 
 const SYNC_TABLES: SyncTable[] = [
@@ -48,12 +88,24 @@ export async function pullRemoteData(): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
 
+  const session = await getSession();
+  const userId = session?.user?.id;
+
   for (const table of SYNC_TABLES) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from(table)
         .select("*")
         .order("updated_at", { ascending: false });
+
+      // For teaching_points, only pull rows belonging to the current user.
+      // Without this filter, Supabase RLS returns shared rows too, which
+      // would incorrectly merge into the local own-teaching-points table.
+      if (table === "teaching_points" && userId) {
+        query = query.eq("user_id", userId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error(`Sync pull error for ${table}:`, error.message);
@@ -90,6 +142,9 @@ export async function pullRemoteData(): Promise<void> {
   } catch (err) {
     console.error("Failed to pull shared config:", err);
   }
+
+  // Pull shared content (teaching points + templates from other users)
+  await pullSharedContent();
 }
 
 // ---------------------------------------------------------------------------
