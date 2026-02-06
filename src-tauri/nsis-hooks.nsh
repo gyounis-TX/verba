@@ -1,4 +1,8 @@
 !macro NSIS_HOOK_PREINSTALL
-  nsExec::ExecToLog 'taskkill /F /T /IM "sidecar-x86_64-pc-windows-msvc.exe"'
-  Sleep 1000
+  ; Kill the sidecar process (Python backend)
+  nsExec::ExecToLog 'taskkill /F /T /IM "sidecar.exe"'
+  ; Kill the main app process
+  nsExec::ExecToLog 'taskkill /F /T /IM "Explify.exe"'
+  ; Wait for processes to fully terminate
+  Sleep 2000
 !macroend
