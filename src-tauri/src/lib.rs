@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{get_sidecar_port, SidecarState};
+use commands::{get_sidecar_port, kill_sidecar, SidecarState};
 use std::sync::Mutex;
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
@@ -16,7 +16,7 @@ pub fn run() {
             }
         }))
         .manage(Mutex::new(SidecarState { port: None }))
-        .invoke_handler(tauri::generate_handler![get_sidecar_port])
+        .invoke_handler(tauri::generate_handler![get_sidecar_port, kill_sidecar])
         .setup(|app| {
             let app_handle = app.handle().clone();
 

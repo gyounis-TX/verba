@@ -187,6 +187,27 @@ class Database:
             )
             conn.commit()
 
+            # Deduplicate and create unique indexes on sync_id to prevent sync duplicates
+            for tbl in ("history", "letters", "templates", "teaching_points"):
+                try:
+                    # Delete duplicates, keeping the row with the lowest id (oldest)
+                    conn.execute(f"""
+                        DELETE FROM {tbl}
+                        WHERE id NOT IN (
+                            SELECT MIN(id) FROM {tbl}
+                            WHERE sync_id IS NOT NULL
+                            GROUP BY sync_id
+                        ) AND sync_id IS NOT NULL
+                    """)
+                    conn.commit()
+                    # Create unique index
+                    conn.execute(
+                        f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{tbl}_sync_id ON {tbl}(sync_id) WHERE sync_id IS NOT NULL"
+                    )
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass  # Index already exists or other issue
+
             # Seed built-in templates if none exist
             builtin_count = conn.execute(
                 "SELECT COUNT(*) as cnt FROM templates WHERE is_builtin = 1"

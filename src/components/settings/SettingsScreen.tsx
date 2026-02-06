@@ -219,6 +219,14 @@ export function SettingsScreen() {
     if (!updateCheck) return;
     setUpdateStatus("updating");
     try {
+      if (navigator.userAgent.includes("Windows")) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          await invoke("kill_sidecar");
+        } catch {
+          // Non-fatal: NSIS hook will kill sidecar if needed
+        }
+      }
       await updateCheck.downloadAndInstall();
       await relaunch();
     } catch {

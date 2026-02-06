@@ -7,8 +7,7 @@ import "./Sidebar.css";
 
 const baseNavItems = [
   { path: "/", label: "Import" },
-  { path: "/results", label: "Report Explanation" },
-  { path: "/letters", label: "Letters" },
+  { path: "/results", label: "Explanation" },
   { path: "/history", label: "History" },
   { path: "/teaching-points", label: "Teaching Points" },
   { path: "/templates", label: "Templates" },
@@ -93,6 +92,14 @@ export function Sidebar() {
       const { check } = await import("@tauri-apps/plugin-updater");
       const update = await check();
       if (update) {
+        if (navigator.userAgent.includes("Windows")) {
+          try {
+            const { invoke } = await import("@tauri-apps/api/core");
+            await invoke("kill_sidecar");
+          } catch {
+            // Non-fatal: NSIS hook will kill sidecar if needed
+          }
+        }
         await update.downloadAndInstall();
         const { relaunch } = await import("@tauri-apps/plugin-process");
         await relaunch();

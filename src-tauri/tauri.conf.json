@@ -39,7 +39,12 @@
     ],
     "externalBin": [
       "binaries/sidecar"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installerHooks": "nsis-hooks.nsh"
+      }
+    }
   },
   "plugins": {
     "updater": {
