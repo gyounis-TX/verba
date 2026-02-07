@@ -1,6 +1,6 @@
 [package]
 name = "explify"
-version = "0.3.0"
+version = "0.4.0"
 description = "Explify Desktop Application"
 authors = ["you"]
 edition = "2021"
