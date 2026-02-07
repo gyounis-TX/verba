@@ -100,7 +100,7 @@ export function RefinementSidebar({
   setToneSlider,
   detailSlider,
   setDetailSlider,
-  highAnxietyMode,
+  highAnxietyMode: _highAnxietyMode,
   setHighAnxietyMode,
   anxietyLevel,
   setAnxietyLevel,
@@ -474,7 +474,7 @@ export function RefinementSidebar({
               )}
               <button
                 className="extracted-text-toggle"
-                onClick={() => setShowReportType((prev) => !prev)}
+                onClick={() => setShowReportType(!showReportType)}
               >
                 {showReportType ? "Hide Report Type" : "View Report Type"}
               </button>
