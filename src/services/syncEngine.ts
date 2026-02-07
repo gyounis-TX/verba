@@ -93,17 +93,15 @@ export async function pullRemoteData(): Promise<void> {
 
   for (const table of SYNC_TABLES) {
     try {
+      // Always filter by user_id so we only pull the current user's rows.
+      // This is defense-in-depth on top of RLS policies.
+      if (!userId) continue;
+
       let query = supabase
         .from(table)
         .select("*")
+        .eq("user_id", userId)
         .order("updated_at", { ascending: false });
-
-      // For teaching_points, only pull rows belonging to the current user.
-      // Without this filter, Supabase RLS returns shared rows too, which
-      // would incorrectly merge into the local own-teaching-points table.
-      if (table === "teaching_points" && userId) {
-        query = query.eq("user_id", userId);
-      }
 
       const { data, error } = await query;
 

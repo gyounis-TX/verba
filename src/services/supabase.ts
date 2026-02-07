@@ -14,14 +14,33 @@ export function getSupabase(): SupabaseClient | null {
   return supabaseInstance;
 }
 
+export type SignUpResult =
+  | { error: string }
+  | { error: null; confirmed: true }
+  | { error: null; confirmed: false };
+
 export async function signUp(
   email: string,
   password: string,
-): Promise<{ error: string | null }> {
+): Promise<SignUpResult> {
   const supabase = getSupabase();
   if (!supabase) return { error: "Supabase not configured." };
-  const { error } = await supabase.auth.signUp({ email, password });
-  return { error: error?.message ?? null };
+  const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+  if (error) return { error: error.message };
+
+  // Fake signup — Supabase returns a user with no identities to prevent
+  // email enumeration when the address is already registered.
+  if (data.user && data.user.identities?.length === 0) {
+    return { error: "An account with this email already exists." };
+  }
+
+  // Auto-confirmed (email confirm disabled in Supabase dashboard) —
+  // a session is returned immediately, no OTP needed.
+  if (data.session) {
+    return { error: null, confirmed: true };
+  }
+
+  return { error: null, confirmed: false };
 }
 
 export async function signIn(
@@ -31,6 +50,29 @@ export async function signIn(
   const supabase = getSupabase();
   if (!supabase) return { error: "Supabase not configured." };
   const { error } = await supabase.auth.signInWithPassword({ email, password });
+  return { error: error?.message ?? null };
+}
+
+export async function verifyOtp(
+  email: string,
+  token: string,
+): Promise<{ error: string | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: "Supabase not configured." };
+  const { error } = await supabase.auth.verifyOtp({
+    email: email.trim(),
+    token,
+    type: "signup",
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function resendSignupOtp(
+  email: string,
+): Promise<{ error: string | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: "Supabase not configured." };
+  const { error } = await supabase.auth.resend({ type: "signup", email: email.trim() });
   return { error: error?.message ?? null };
 }
 
