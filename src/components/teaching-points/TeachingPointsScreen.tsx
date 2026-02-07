@@ -118,7 +118,7 @@ export function TeachingPointsScreen() {
         map.set(tp.test_type, tp.test_type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()));
       }
     }
-    return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a[1].localeCompare(b[1]));
+    return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   })();
 
   /** Try to match free-text input to a valid registry type ID. */
