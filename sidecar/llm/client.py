@@ -333,19 +333,32 @@ class LLMClient:
         )
 
     def _get_bedrock_client(self):
-        """Create a boto3 Bedrock Runtime client from the stored credentials."""
-        import asyncio
+        """Create a boto3 Bedrock Runtime client from the stored credentials.
+
+        When access_key is "iam_role", creates the client without explicit
+        credentials so boto3 uses the default credential chain (ECS task role,
+        instance profile, etc.).
+        """
         import boto3
 
         creds = self.api_key  # dict with access_key, secret_key, region
         if not isinstance(creds, dict):
             raise ValueError("Bedrock provider requires AWS credentials dict")
 
+        region = creds.get("region", "us-east-1")
+
+        # IAM role mode: let boto3 discover credentials from environment
+        if creds.get("access_key") == "iam_role":
+            return boto3.client(
+                "bedrock-runtime",
+                region_name=region,
+            )
+
         return boto3.client(
             "bedrock-runtime",
             aws_access_key_id=creds["access_key"],
             aws_secret_access_key=creds["secret_key"],
-            region_name=creds.get("region", "us-east-1"),
+            region_name=region,
         )
 
     @staticmethod

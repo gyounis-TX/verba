@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  api:
+    build: ./sidecar
+    ports:
+      - "8000:8000"
+    environment:
+      - REQUIRE_AUTH=true
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - ALLOWED_ORIGINS=http://localhost:5173
+    env_file:
+      - .env.docker

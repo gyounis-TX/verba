@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getVersion } from "@tauri-apps/api/app";
-import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
+import { IS_TAURI, APP_VERSION } from "../../services/platform";
 import { sidecarApi } from "../../services/sidecarApi";
 import { queueSettingsUpsert } from "../../services/syncEngine";
 import { useToast } from "../shared/Toast";
@@ -94,13 +92,17 @@ export function SettingsScreen() {
   const [defaultCommentMode, setDefaultCommentMode] = useState<"short" | "long" | "sms">("short");
 
   // About / Update state
-  const [appVersion, setAppVersion] = useState("");
-  const [updateCheck, setUpdateCheck] = useState<Update | null>(null);
+  const [appVersion, setAppVersion] = useState(APP_VERSION);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [updateCheck, setUpdateCheck] = useState<any>(null);
   const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "updating" | "up-to-date">("idle");
 
-
   useEffect(() => {
-    getVersion().then(setAppVersion).catch(() => {});
+    if (IS_TAURI) {
+      import("@tauri-apps/api/app").then(({ getVersion }) =>
+        getVersion().then(setAppVersion).catch(() => {}),
+      );
+    }
   }, []);
 
   useEffect(() => {
@@ -215,6 +217,7 @@ export function SettingsScreen() {
     setUpdateStatus("checking");
     setUpdateCheck(null);
     try {
+      const { check } = await import("@tauri-apps/plugin-updater");
       const update = await check();
       if (update?.available) {
         setUpdateCheck(update);
@@ -241,6 +244,7 @@ export function SettingsScreen() {
         }
       }
       await updateCheck.downloadAndInstall();
+      const { relaunch } = await import("@tauri-apps/plugin-process");
       await relaunch();
     } catch {
       setUpdateStatus("idle");
@@ -875,30 +879,32 @@ export function SettingsScreen() {
           <p className="settings-description">
             Explify v{appVersion || "..."}
           </p>
-          <div className="about-update-row">
-            {updateCheck ? (
-              <button
-                className="save-btn"
-                onClick={handleApplyUpdate}
-                disabled={updateStatus === "updating"}
-              >
-                {updateStatus === "updating"
-                  ? "Updating..."
-                  : `Update to v${updateCheck.version}`}
-              </button>
-            ) : (
-              <button
-                className="save-btn about-check-btn"
-                onClick={handleCheckForUpdates}
-                disabled={updateStatus === "checking"}
-              >
-                {updateStatus === "checking" ? "Checking..." : "Check for Updates"}
-              </button>
-            )}
-            {updateStatus === "up-to-date" && (
-              <span className="save-success">You're on the latest version.</span>
-            )}
-          </div>
+          {IS_TAURI && (
+            <div className="about-update-row">
+              {updateCheck ? (
+                <button
+                  className="save-btn"
+                  onClick={handleApplyUpdate}
+                  disabled={updateStatus === "updating"}
+                >
+                  {updateStatus === "updating"
+                    ? "Updating..."
+                    : `Update to v${updateCheck.version}`}
+                </button>
+              ) : (
+                <button
+                  className="save-btn about-check-btn"
+                  onClick={handleCheckForUpdates}
+                  disabled={updateStatus === "checking"}
+                >
+                  {updateStatus === "checking" ? "Checking..." : "Check for Updates"}
+                </button>
+              )}
+              {updateStatus === "up-to-date" && (
+                <span className="save-success">You're on the latest version.</span>
+              )}
+            </div>
+          )}
         </section>
       </div>
     </div>

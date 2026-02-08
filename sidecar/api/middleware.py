@@ -1,3 +1,5 @@
+import os
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,10 +17,18 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 
 
 def add_cors_middleware(app):
+    # Read allowed origins from env var (comma-separated) for web mode
+    # If not set, allow all origins (desktop mode)
+    allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+    if allowed_origins_env:
+        origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+    else:
+        origins = ["*"]
+
     app.add_middleware(NoCacheMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

@@ -1,0 +1,59 @@
+name: Deploy Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sidecar/**'
+      - 'src/**'
+      - 'package.json'
+      - '.github/workflows/deploy-web.yml'
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push Docker image
+        run: |
+          docker build -t ${{ secrets.ECR_URI }}:${{ github.sha }} -t ${{ secrets.ECR_URI }}:latest ./sidecar
+          docker push ${{ secrets.ECR_URI }}:${{ github.sha }}
+          docker push ${{ secrets.ECR_URI }}:latest
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service --cluster explify --service explify-api --force-new-deployment
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build web frontend
+        run: npm run build:web
+        env:
+          VITE_API_URL: https://api.explify.app
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Deploy to S3
+        run: aws s3 sync dist/ s3://explify-frontend --delete
+      - name: Invalidate CloudFront
+        run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CF_DIST_ID }} --paths "/*"

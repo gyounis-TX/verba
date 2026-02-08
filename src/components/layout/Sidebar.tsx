@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { getSession, signOut, onAuthStateChange } from "../../services/supabase";
 import { isSupabaseConfigured, fullSync } from "../../services/syncEngine";
 import { isAdmin } from "../../services/adminAuth";
+import { IS_TAURI } from "../../services/platform";
 import "./Sidebar.css";
 
 const baseNavItems = [
@@ -75,6 +76,8 @@ export function Sidebar() {
   }, []);
 
   useEffect(() => {
+    if (!IS_TAURI) return;
+
     let cancelled = false;
 
     const checkUpdate = async () => {
@@ -133,7 +136,7 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        {updateInfo?.available ? (
+        {IS_TAURI && updateInfo?.available ? (
           <>
             <button className="sidebar-title-btn" onClick={handleUpdateClick} disabled={isInstalling}>
               <h1 className="sidebar-title">

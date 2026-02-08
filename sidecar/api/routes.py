@@ -39,6 +39,7 @@ from api.letter_models import (
 )
 from api.models import DetectionResult, ExtractionResult
 from api import settings_store
+from storage import get_active_db
 from storage.database import get_db
 from extraction import ExtractionPipeline, extract_physician_name
 from extraction.demographics import extract_demographics
@@ -50,16 +51,47 @@ from llm.retry import LLMRetryError, with_retry
 from llm.schemas import EXPLANATION_TOOL_NAME, EXPLANATION_TOOL_SCHEMA
 from phi.scrubber import scrub_phi
 from test_types import registry
+from api.rate_limit import limiter, ANALYZE_RATE_LIMIT
+
+REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "").lower() == "true"
+_USE_PG = bool(os.getenv("DATABASE_URL", ""))
 
 router = APIRouter()
 
 pipeline = ExtractionPipeline()
 
 
+def _get_user_id(request: Request) -> str | None:
+    """Extract user_id from request state (set by AuthMiddleware)."""
+    return getattr(request.state, "user_id", None)
+
+
+def _db():
+    """Return the active database instance."""
+    return get_active_db()
+
+
+async def _db_call(method_name: str, *args, user_id=None, **kwargs):
+    """Call a database method, handling both sync (SQLite) and async (PG) databases.
+
+    For PgDatabase, methods are async coroutines.
+    For Database (SQLite), methods are synchronous.
+    """
+    db = _db()
+    method = getattr(db, method_name)
+
+    if _USE_PG:
+        # PgDatabase methods are async and accept user_id
+        return await method(*args, user_id=user_id, **kwargs)
+    else:
+        # SQLite Database methods are sync and ignore user_id
+        return method(*args, **kwargs)
+
+
 @router.get("/health")
 async def health_check():
     try:
-        get_db()
+        get_db() if not _USE_PG else get_active_db()
         return {"status": "ok"}
     except Exception:
         return {"status": "starting"}
@@ -231,12 +263,13 @@ async def scrub_preview(body: dict = Body(...)):
 
 
 @router.post("/analyze/detect-type", response_model=DetectTypeResponse)
-async def detect_test_type(body: DetectTypeRequest = Body(...)):
+@limiter.limit(ANALYZE_RATE_LIMIT)
+async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)):
     """Auto-detect the medical test type from extraction results.
 
     Uses a three-tier strategy:
-    1. Keyword detection (fast, free) — accept if confidence >= 0.4
-    2. LLM fallback — if keywords are low confidence
+    1. Keyword detection (fast, free) -- accept if confidence >= 0.4
+    2. LLM fallback -- if keywords are low confidence
     3. Return best result with detection_method indicating outcome
     """
     import logging
@@ -304,7 +337,8 @@ async def detect_test_type(body: DetectTypeRequest = Body(...)):
 
 
 @router.post("/analyze/classify-input")
-async def classify_input(body: dict = Body(...)):
+@limiter.limit(ANALYZE_RATE_LIMIT)
+async def classify_input(request: Request, body: dict = Body(...)):
     """Classify whether input text is a medical report or a question/request."""
     import re as _re
 
@@ -312,7 +346,7 @@ async def classify_input(body: dict = Body(...)):
     if not text:
         return {"classification": "question", "confidence": 0.5}
 
-    # Heuristic tier — fast, no API call
+    # Heuristic tier -- fast, no API call
     text_lower = text.lower()
     lines = text.strip().split("\n")
 
@@ -357,7 +391,7 @@ async def classify_input(body: dict = Body(...)):
     elif question_signals > report_signals:
         return {"classification": "question", "confidence": 0.9}
 
-    # Ambiguous — use LLM for tiebreak (optional, if API key available)
+    # Ambiguous -- use LLM for tiebreak (optional, if API key available)
     try:
         settings = settings_store.get_settings()
         api_key = settings_store.get_api_key_for_provider(settings.llm_provider.value)
@@ -421,12 +455,14 @@ async def parse_report(request: ParseRequest = Body(...)):
 
 
 @router.post("/analyze/explain", response_model=ExplainResponse)
-async def explain_report(request: ExplainRequest = Body(...)):
+@limiter.limit(ANALYZE_RATE_LIMIT)
+async def explain_report(request: Request, body: ExplainRequest = Body(...)):
     """Full analysis pipeline: detect type -> parse -> PHI scrub -> LLM explain."""
+    user_id = _get_user_id(request)
 
     # 1. Parse extraction result
     try:
-        extraction_result = ExtractionResult.model_validate(request.extraction_result)
+        extraction_result = ExtractionResult.model_validate(body.extraction_result)
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -434,7 +470,7 @@ async def explain_report(request: ExplainRequest = Body(...)):
         )
 
     # 2. Detect test type
-    test_type = request.test_type
+    test_type = body.test_type
     detection_confidence = 0.0
     if not test_type:
         type_id, confidence = registry.detect(extraction_result)
@@ -452,8 +488,8 @@ async def explain_report(request: ExplainRequest = Body(...)):
 
     # 2b. Extract demographics early so they can be used in parsing
     demographics = extract_demographics(extraction_result.full_text)
-    patient_age = request.patient_age if request.patient_age is not None else demographics.age
-    patient_gender = request.patient_gender if request.patient_gender is not None else demographics.gender
+    patient_age = body.patient_age if body.patient_age is not None else demographics.age
+    patient_gender = body.patient_gender if body.patient_gender is not None else demographics.gender
     report_date = demographics.report_date
 
     # 3. Parse report (or build a generic one for unknown types)
@@ -466,13 +502,13 @@ async def explain_report(request: ExplainRequest = Body(...)):
                 detail=f"Failed to parse report: {str(e)}",
             )
     else:
-        # Unknown / user-specified test type — build a minimal parsed report
+        # Unknown / user-specified test type -- build a minimal parsed report
         # and let the LLM interpret the raw text directly.
         from test_types.generic import GenericTestType
         fallback_display = test_type.replace("_", " ").title()
         body_part = GenericTestType._extract_body_part(extraction_result.full_text, test_type)
         if body_part:
-            fallback_display = f"{fallback_display} — {body_part}"
+            fallback_display = f"{fallback_display} -- {body_part}"
         parsed_report = ParsedReport(
             test_type=test_type,
             test_type_display=fallback_display,
@@ -481,8 +517,8 @@ async def explain_report(request: ExplainRequest = Body(...)):
 
     # 4. Resolve API key
     settings = settings_store.get_settings()
-    provider_str = request.provider.value if request.provider else settings.llm_provider.value
-    api_key = request.api_key or settings_store.get_api_key_for_provider(
+    provider_str = body.provider.value if body.provider else settings.llm_provider.value
+    api_key = body.api_key or settings_store.get_api_key_for_provider(
         provider_str
     )
     if not api_key:
@@ -499,8 +535,8 @@ async def explain_report(request: ExplainRequest = Body(...)):
 
     # 5a. PHI scrub clinical context if provided
     scrubbed_clinical_context = (
-        scrub_phi(request.clinical_context).scrubbed_text
-        if request.clinical_context
+        scrub_phi(body.clinical_context).scrubbed_text
+        if body.clinical_context
         else None
     )
 
@@ -510,8 +546,8 @@ async def explain_report(request: ExplainRequest = Body(...)):
     extracted_physician = extract_physician_name(extraction_result.full_text)
 
     # Resolve which physician name to use in the LLM prompt
-    if request.physician_name_override is not None:
-        active_physician = request.physician_name_override or None
+    if body.physician_name_override is not None:
+        active_physician = body.physician_name_override or None
     else:
         source = settings.physician_name_source.value
         if source == "auto_extract":
@@ -521,12 +557,12 @@ async def explain_report(request: ExplainRequest = Body(...)):
         else:
             active_physician = None
 
-    # 5c. Resolve voice & name_drop — request override takes priority
-    voice = request.explanation_voice.value if request.explanation_voice is not None else settings.explanation_voice.value
-    name_drop = request.name_drop if request.name_drop is not None else settings.name_drop
+    # 5c. Resolve voice & name_drop -- request override takes priority
+    voice = body.explanation_voice.value if body.explanation_voice is not None else settings.explanation_voice.value
+    name_drop = body.name_drop if body.name_drop is not None else settings.name_drop
 
     # 6. Build prompts
-    literacy_level = LiteracyLevel(request.literacy_level.value)
+    literacy_level = LiteracyLevel(body.literacy_level.value)
     prompt_engine = PromptEngine()
     prompt_context = handler.get_prompt_context(extraction_result) if handler else {}
     if not handler:
@@ -534,20 +570,20 @@ async def explain_report(request: ExplainRequest = Body(...)):
         prompt_context["test_type_hint"] = test_type
     if settings.specialty and "specialty" not in prompt_context:
         prompt_context["specialty"] = settings.specialty
-    tone_pref = request.tone_preference if request.tone_preference is not None else settings.tone_preference
-    detail_pref = request.detail_preference if request.detail_preference is not None else settings.detail_preference
-    inc_findings = request.include_key_findings if request.include_key_findings is not None else settings.include_key_findings
-    inc_measurements = request.include_measurements if request.include_measurements is not None else settings.include_measurements
-    is_sms = bool(request.sms_summary)
-    use_analogies = request.use_analogies if request.use_analogies is not None else settings.use_analogies
-    include_lifestyle = request.include_lifestyle_recommendations if request.include_lifestyle_recommendations is not None else settings.include_lifestyle_recommendations
+    tone_pref = body.tone_preference if body.tone_preference is not None else settings.tone_preference
+    detail_pref = body.detail_preference if body.detail_preference is not None else settings.detail_preference
+    inc_findings = body.include_key_findings if body.include_key_findings is not None else settings.include_key_findings
+    inc_measurements = body.include_measurements if body.include_measurements is not None else settings.include_measurements
+    is_sms = bool(body.sms_summary)
+    use_analogies = body.use_analogies if body.use_analogies is not None else settings.use_analogies
+    include_lifestyle = body.include_lifestyle_recommendations if body.include_lifestyle_recommendations is not None else settings.include_lifestyle_recommendations
     system_prompt = prompt_engine.build_system_prompt(
         literacy_level=literacy_level,
         prompt_context=prompt_context,
         tone_preference=tone_pref,
         detail_preference=detail_pref,
         physician_name=active_physician,
-        short_comment=bool(request.short_comment),
+        short_comment=bool(body.short_comment),
         explanation_voice=voice,
         name_drop=name_drop,
         short_comment_char_limit=settings.short_comment_char_limit,
@@ -557,8 +593,8 @@ async def explain_report(request: ExplainRequest = Body(...)):
         patient_gender=patient_gender,
         sms_summary=is_sms,
         sms_summary_char_limit=settings.sms_summary_char_limit,
-        high_anxiety_mode=bool(request.high_anxiety_mode),
-        anxiety_level=request.anxiety_level or 0,
+        high_anxiety_mode=bool(body.high_anxiety_mode),
+        anxiety_level=body.anxiety_level or 0,
         use_analogies=use_analogies,
         include_lifestyle_recommendations=include_lifestyle,
     )
@@ -566,18 +602,16 @@ async def explain_report(request: ExplainRequest = Body(...)):
     template_tone = None
     template_instructions = None
     template_closing = None
-    if request.template_id is not None:
-        db = get_db()
-        tpl = db.get_template(request.template_id)
+    if body.template_id is not None:
+        tpl = await _db_call("get_template", body.template_id, user_id=user_id)
         if tpl:
             template_tone = tpl.get("tone")
             template_instructions = tpl.get("structure_instructions")
             template_closing = tpl.get("closing_text")
             if template_tone:
                 prompt_context["tone"] = template_tone
-    elif request.shared_template_sync_id:
-        db = get_db()
-        tpl = db.get_shared_template_by_sync_id(request.shared_template_sync_id)
+    elif body.shared_template_sync_id:
+        tpl = await _db_call("get_shared_template_by_sync_id", body.shared_template_sync_id, user_id=user_id)
         if tpl:
             template_tone = tpl.get("tone")
             template_instructions = tpl.get("structure_instructions")
@@ -586,22 +620,24 @@ async def explain_report(request: ExplainRequest = Body(...)):
                 prompt_context["tone"] = template_tone
 
     # 6c. Fetch liked examples for style guidance
-    liked_examples = get_db().get_liked_examples(
+    liked_examples = await _db_call(
+        "get_liked_examples",
         limit=2, test_type=test_type,
         tone_preference=tone_pref, detail_preference=detail_pref,
+        user_id=user_id,
     )
 
     # 6d. Fetch teaching points (global + type-specific, including shared)
-    teaching_points = get_db().list_all_teaching_points_for_prompt(test_type=test_type)
+    teaching_points = await _db_call("list_all_teaching_points_for_prompt", test_type=test_type, user_id=user_id)
 
     # 6e. Fetch prior results for longitudinal trend comparison
-    prior_results = get_db().get_prior_measurements(test_type=test_type, limit=3)
+    prior_results = await _db_call("get_prior_measurements", test_type, limit=3, user_id=user_id)
 
     # 6f. Fetch recent doctor edits for style learning
-    recent_edits = get_db().get_recent_edits(test_type=test_type, limit=3)
+    recent_edits = await _db_call("get_recent_edits", test_type, limit=3, user_id=user_id)
 
     # 6g. Fetch learned phrases from doctor edits
-    learned_phrases = get_db().get_learned_phrases(test_type=test_type, limit=5)
+    learned_phrases = await _db_call("get_learned_phrases", test_type=test_type, limit=5, user_id=user_id)
 
     # Combine custom phrases (from settings) with learned phrases (from edits)
     all_custom_phrases = list(settings.custom_phrases) if hasattr(settings, 'custom_phrases') else []
@@ -617,16 +653,16 @@ async def explain_report(request: ExplainRequest = Body(...)):
         clinical_context=scrubbed_clinical_context,
         template_instructions=template_instructions,
         closing_text=template_closing,
-        refinement_instruction=request.refinement_instruction,
+        refinement_instruction=body.refinement_instruction,
         liked_examples=liked_examples,
-        next_steps=request.next_steps,
+        next_steps=body.next_steps,
         teaching_points=teaching_points,
-        short_comment=bool(request.short_comment) or is_sms,
+        short_comment=bool(body.short_comment) or is_sms,
         prior_results=prior_results,
         recent_edits=recent_edits,
         patient_age=patient_age,
         patient_gender=patient_gender,
-        quick_reasons=request.quick_reasons,
+        quick_reasons=body.quick_reasons,
         custom_phrases=all_custom_phrases,
         report_date=report_date,
     )
@@ -635,8 +671,8 @@ async def explain_report(request: ExplainRequest = Body(...)):
     import logging
     _logger = logging.getLogger(__name__)
     _logger.warning(
-        "Prompt sizes — system: %d chars, user: %d chars, short_comment: %s, sms: %s",
-        len(system_prompt), len(user_prompt), bool(request.short_comment), is_sms,
+        "Prompt sizes -- system: %d chars, user: %d chars, short_comment: %s, sms: %s",
+        len(system_prompt), len(user_prompt), bool(body.short_comment), is_sms,
     )
 
     # 7. Call LLM with retry
@@ -646,7 +682,7 @@ async def explain_report(request: ExplainRequest = Body(...)):
         if provider_str in ("claude", "bedrock")
         else settings.openai_model
     )
-    if request.deep_analysis and provider_str in ("claude", "bedrock"):
+    if body.deep_analysis and provider_str in ("claude", "bedrock"):
         from llm.client import CLAUDE_DEEP_MODEL
         model_override = CLAUDE_DEEP_MODEL
     client = LLMClient(
@@ -656,11 +692,11 @@ async def explain_report(request: ExplainRequest = Body(...)):
     )
 
     # SMS/short comments need far fewer output tokens
-    if request.deep_analysis:
+    if body.deep_analysis:
         max_tokens = 8192
     elif is_sms:
         max_tokens = 512
-    elif request.short_comment:
+    elif body.short_comment:
         max_tokens = 1024
     else:
         max_tokens = 4096
@@ -715,7 +751,7 @@ def _sse_event(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
-async def _explain_stream_gen(request: ExplainRequest):
+async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | None = None):
     """Async generator that runs the explain pipeline, yielding SSE progress events."""
     import logging
     _logger = logging.getLogger(__name__)
@@ -725,12 +761,12 @@ async def _explain_stream_gen(request: ExplainRequest):
         yield _sse_event({"stage": "detecting", "message": "Identifying report type..."})
 
         try:
-            extraction_result = ExtractionResult.model_validate(request.extraction_result)
+            extraction_result = ExtractionResult.model_validate(explain_request.extraction_result)
         except Exception as e:
             yield _sse_event({"stage": "error", "message": f"Invalid extraction result: {str(e)}"})
             return
 
-        test_type = request.test_type
+        test_type = explain_request.test_type
         detection_confidence = 0.0
         if not test_type:
             type_id, confidence = registry.detect(extraction_result)
@@ -755,8 +791,8 @@ async def _explain_stream_gen(request: ExplainRequest):
         yield _sse_event({"stage": "parsing", "message": f"Parsing {display_name} report..."})
 
         demographics = extract_demographics(extraction_result.full_text)
-        patient_age = request.patient_age if request.patient_age is not None else demographics.age
-        patient_gender = request.patient_gender if request.patient_gender is not None else demographics.gender
+        patient_age = explain_request.patient_age if explain_request.patient_age is not None else demographics.age
+        patient_gender = explain_request.patient_gender if explain_request.patient_gender is not None else demographics.gender
         report_date = demographics.report_date
 
         if handler is not None:
@@ -770,7 +806,7 @@ async def _explain_stream_gen(request: ExplainRequest):
             fallback_display = test_type.replace("_", " ").title()
             body_part = GenericTestType._extract_body_part(extraction_result.full_text, test_type)
             if body_part:
-                fallback_display = f"{fallback_display} — {body_part}"
+                fallback_display = f"{fallback_display} -- {body_part}"
             parsed_report = ParsedReport(
                 test_type=test_type,
                 test_type_display=fallback_display,
@@ -788,22 +824,22 @@ async def _explain_stream_gen(request: ExplainRequest):
         yield _sse_event({"stage": "explaining", "message": "Preparing prompt..."})
 
         settings = settings_store.get_settings()
-        provider_str = request.provider.value if request.provider else settings.llm_provider.value
-        api_key = request.api_key or settings_store.get_api_key_for_provider(provider_str)
+        provider_str = explain_request.provider.value if explain_request.provider else settings.llm_provider.value
+        api_key = explain_request.api_key or settings_store.get_api_key_for_provider(provider_str)
         if not api_key:
             yield _sse_event({"stage": "error", "message": f"No API key configured for provider '{provider_str}'. Set it in Settings."})
             return
 
         scrub_result = scrub_phi(extraction_result.full_text)
         scrubbed_clinical_context = (
-            scrub_phi(request.clinical_context).scrubbed_text
-            if request.clinical_context
+            scrub_phi(explain_request.clinical_context).scrubbed_text
+            if explain_request.clinical_context
             else None
         )
         extracted_physician = extract_physician_name(extraction_result.full_text)
 
-        if request.physician_name_override is not None:
-            active_physician = request.physician_name_override or None
+        if explain_request.physician_name_override is not None:
+            active_physician = explain_request.physician_name_override or None
         else:
             source = settings.physician_name_source.value
             if source == "auto_extract":
@@ -813,23 +849,23 @@ async def _explain_stream_gen(request: ExplainRequest):
             else:
                 active_physician = None
 
-        voice = request.explanation_voice.value if request.explanation_voice is not None else settings.explanation_voice.value
-        name_drop = request.name_drop if request.name_drop is not None else settings.name_drop
+        voice = explain_request.explanation_voice.value if explain_request.explanation_voice is not None else settings.explanation_voice.value
+        name_drop = explain_request.name_drop if explain_request.name_drop is not None else settings.name_drop
 
-        literacy_level = LiteracyLevel(request.literacy_level.value)
+        literacy_level = LiteracyLevel(explain_request.literacy_level.value)
         prompt_engine = PromptEngine()
         prompt_context = handler.get_prompt_context(extraction_result) if handler else {}
         if not handler:
             prompt_context["test_type_hint"] = test_type
         if settings.specialty and "specialty" not in prompt_context:
             prompt_context["specialty"] = settings.specialty
-        tone_pref = request.tone_preference if request.tone_preference is not None else settings.tone_preference
-        detail_pref = request.detail_preference if request.detail_preference is not None else settings.detail_preference
-        inc_findings = request.include_key_findings if request.include_key_findings is not None else settings.include_key_findings
-        inc_measurements = request.include_measurements if request.include_measurements is not None else settings.include_measurements
-        is_sms = bool(request.sms_summary)
-        use_analogies = request.use_analogies if request.use_analogies is not None else settings.use_analogies
-        include_lifestyle = request.include_lifestyle_recommendations if request.include_lifestyle_recommendations is not None else settings.include_lifestyle_recommendations
+        tone_pref = explain_request.tone_preference if explain_request.tone_preference is not None else settings.tone_preference
+        detail_pref = explain_request.detail_preference if explain_request.detail_preference is not None else settings.detail_preference
+        inc_findings = explain_request.include_key_findings if explain_request.include_key_findings is not None else settings.include_key_findings
+        inc_measurements = explain_request.include_measurements if explain_request.include_measurements is not None else settings.include_measurements
+        is_sms = bool(explain_request.sms_summary)
+        use_analogies = explain_request.use_analogies if explain_request.use_analogies is not None else settings.use_analogies
+        include_lifestyle = explain_request.include_lifestyle_recommendations if explain_request.include_lifestyle_recommendations is not None else settings.include_lifestyle_recommendations
 
         system_prompt = prompt_engine.build_system_prompt(
             literacy_level=literacy_level,
@@ -837,7 +873,7 @@ async def _explain_stream_gen(request: ExplainRequest):
             tone_preference=tone_pref,
             detail_preference=detail_pref,
             physician_name=active_physician,
-            short_comment=bool(request.short_comment),
+            short_comment=bool(explain_request.short_comment),
             explanation_voice=voice,
             name_drop=name_drop,
             short_comment_char_limit=settings.short_comment_char_limit,
@@ -847,28 +883,26 @@ async def _explain_stream_gen(request: ExplainRequest):
             patient_gender=patient_gender,
             sms_summary=is_sms,
             sms_summary_char_limit=settings.sms_summary_char_limit,
-            high_anxiety_mode=bool(request.high_anxiety_mode),
-            anxiety_level=request.anxiety_level or 0,
+            high_anxiety_mode=bool(explain_request.high_anxiety_mode),
+            anxiety_level=explain_request.anxiety_level or 0,
             use_analogies=use_analogies,
             include_lifestyle_recommendations=include_lifestyle,
-            avoid_openings=request.avoid_openings or None,
+            avoid_openings=explain_request.avoid_openings or None,
         )
 
         template_tone = None
         template_instructions = None
         template_closing = None
-        if request.template_id is not None:
-            db = get_db()
-            tpl = db.get_template(request.template_id)
+        if explain_request.template_id is not None:
+            tpl = await _db_call("get_template", explain_request.template_id, user_id=user_id)
             if tpl:
                 template_tone = tpl.get("tone")
                 template_instructions = tpl.get("structure_instructions")
                 template_closing = tpl.get("closing_text")
                 if template_tone:
                     prompt_context["tone"] = template_tone
-        elif request.shared_template_sync_id:
-            db = get_db()
-            tpl = db.get_shared_template_by_sync_id(request.shared_template_sync_id)
+        elif explain_request.shared_template_sync_id:
+            tpl = await _db_call("get_shared_template_by_sync_id", explain_request.shared_template_sync_id, user_id=user_id)
             if tpl:
                 template_tone = tpl.get("tone")
                 template_instructions = tpl.get("structure_instructions")
@@ -876,14 +910,16 @@ async def _explain_stream_gen(request: ExplainRequest):
                 if template_tone:
                     prompt_context["tone"] = template_tone
 
-        liked_examples = get_db().get_liked_examples(
+        liked_examples = await _db_call(
+            "get_liked_examples",
             limit=2, test_type=test_type,
             tone_preference=tone_pref, detail_preference=detail_pref,
+            user_id=user_id,
         )
-        teaching_points = get_db().list_all_teaching_points_for_prompt(test_type=test_type)
-        prior_results = get_db().get_prior_measurements(test_type=test_type, limit=3)
-        recent_edits = get_db().get_recent_edits(test_type=test_type, limit=3)
-        learned_phrases = get_db().get_learned_phrases(test_type=test_type, limit=5)
+        teaching_points = await _db_call("list_all_teaching_points_for_prompt", test_type=test_type, user_id=user_id)
+        prior_results = await _db_call("get_prior_measurements", test_type, limit=3, user_id=user_id)
+        recent_edits = await _db_call("get_recent_edits", test_type, limit=3, user_id=user_id)
+        learned_phrases = await _db_call("get_learned_phrases", test_type=test_type, limit=5, user_id=user_id)
 
         all_custom_phrases = list(settings.custom_phrases) if hasattr(settings, 'custom_phrases') else []
         for lp in learned_phrases:
@@ -898,16 +934,16 @@ async def _explain_stream_gen(request: ExplainRequest):
             clinical_context=scrubbed_clinical_context,
             template_instructions=template_instructions,
             closing_text=template_closing,
-            refinement_instruction=request.refinement_instruction,
+            refinement_instruction=explain_request.refinement_instruction,
             liked_examples=liked_examples,
-            next_steps=request.next_steps,
+            next_steps=explain_request.next_steps,
             teaching_points=teaching_points,
-            short_comment=bool(request.short_comment) or is_sms,
+            short_comment=bool(explain_request.short_comment) or is_sms,
             prior_results=prior_results,
             recent_edits=recent_edits,
             patient_age=patient_age,
             patient_gender=patient_gender,
-            quick_reasons=request.quick_reasons,
+            quick_reasons=explain_request.quick_reasons,
             custom_phrases=all_custom_phrases,
             report_date=report_date,
         )
@@ -918,7 +954,7 @@ async def _explain_stream_gen(request: ExplainRequest):
             if provider_str in ("claude", "bedrock")
             else settings.openai_model
         )
-        if request.deep_analysis and provider_str in ("claude", "bedrock"):
+        if explain_request.deep_analysis and provider_str in ("claude", "bedrock"):
             from llm.client import CLAUDE_DEEP_MODEL
             model_override = CLAUDE_DEEP_MODEL
 
@@ -931,11 +967,11 @@ async def _explain_stream_gen(request: ExplainRequest):
             model=model_override,
         )
 
-        if request.deep_analysis:
+        if explain_request.deep_analysis:
             max_tokens = 8192
         elif is_sms:
             max_tokens = 512
-        elif request.short_comment:
+        elif explain_request.short_comment:
             max_tokens = 1024
         else:
             max_tokens = 4096
@@ -989,10 +1025,12 @@ async def _explain_stream_gen(request: ExplainRequest):
 
 
 @router.post("/analyze/explain-stream")
-async def explain_report_stream(request: ExplainRequest = Body(...)):
+@limiter.limit(ANALYZE_RATE_LIMIT)
+async def explain_report_stream(request: Request, body: ExplainRequest = Body(...)):
     """Full analysis pipeline with SSE progress events."""
+    user_id = _get_user_id(request)
     return StreamingResponse(
-        _explain_stream_gen(request),
+        _explain_stream_gen(body, user_id=user_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -1002,7 +1040,8 @@ async def explain_report_stream(request: ExplainRequest = Body(...)):
 
 
 @router.post("/analyze/compare")
-async def compare_reports(body: dict = Body(...)):
+@limiter.limit(ANALYZE_RATE_LIMIT)
+async def compare_reports(request: Request, body: dict = Body(...)):
     """Generate a trend summary comparing two reports of the same type."""
     newer_response = body.get("newer_response")
     older_response = body.get("older_response")
@@ -1099,7 +1138,8 @@ async def compare_reports(body: dict = Body(...)):
 
 
 @router.post("/analyze/synthesize")
-async def synthesize_reports(body: dict = Body(...)):
+@limiter.limit(ANALYZE_RATE_LIMIT)
+async def synthesize_reports(request: Request, body: dict = Body(...)):
     """Generate a unified summary synthesizing multiple reports."""
     responses = body.get("responses", [])
     labels = body.get("labels", [])
@@ -1123,7 +1163,7 @@ async def synthesize_reports(body: dict = Body(...)):
         for m in measurements:
             m_lines.append(
                 f"- {m.get('abbreviation', '?')}: {m.get('value', '?')} "
-                f"{m.get('unit', '')} ({m.get('status', 'undetermined')}) — "
+                f"{m.get('unit', '')} ({m.get('status', 'undetermined')}) -- "
                 f"{m.get('plain_language', '')}"
             )
 
@@ -1302,10 +1342,10 @@ async def update_settings(update: SettingsUpdate = Body(...)):
 
 
 @router.get("/templates", response_model=TemplateListResponse)
-async def list_templates():
+async def list_templates(request: Request):
     """Return all templates."""
-    db = get_db()
-    items, total = db.list_templates()
+    user_id = _get_user_id(request)
+    items, total = await _db_call("list_templates", user_id=user_id)
     return TemplateListResponse(
         items=[TemplateResponse(**item) for item in items],
         total=total,
@@ -1313,78 +1353,82 @@ async def list_templates():
 
 
 @router.post("/templates", response_model=TemplateResponse, status_code=201)
-async def create_template(request: TemplateCreateRequest = Body(...)):
+async def create_template(request: Request, body: TemplateCreateRequest = Body(...)):
     """Create a new template."""
-    db = get_db()
+    user_id = _get_user_id(request)
     # If setting as default, clear other defaults for same test_type
-    if request.is_default and request.test_type:
-        from storage.database import get_db as _get_db
-        conn = _get_db()._get_conn()
-        try:
-            conn.execute(
-                "UPDATE templates SET is_default = 0 WHERE test_type = ?",
-                (request.test_type,),
-            )
-            conn.commit()
-        finally:
-            conn.close()
-    record = db.create_template(
-        name=request.name,
-        test_type=request.test_type,
-        tone=request.tone,
-        structure_instructions=request.structure_instructions,
-        closing_text=request.closing_text,
+    if body.is_default and body.test_type:
+        # For SQLite mode, use direct SQL. For PG mode, handled in update_template.
+        if not _USE_PG:
+            from storage.database import get_db as _get_db
+            conn = _get_db()._get_conn()
+            try:
+                conn.execute(
+                    "UPDATE templates SET is_default = 0 WHERE test_type = ?",
+                    (body.test_type,),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+    record = await _db_call(
+        "create_template",
+        name=body.name,
+        test_type=body.test_type,
+        tone=body.tone,
+        structure_instructions=body.structure_instructions,
+        closing_text=body.closing_text,
+        user_id=user_id,
     )
     # Set is_default after creation if requested
-    if request.is_default and request.test_type:
-        record = db.update_template(record["id"], is_default=1)
+    if body.is_default and body.test_type:
+        record = await _db_call("update_template", record["id"], is_default=1, user_id=user_id)
     return TemplateResponse(**record)
 
 
 @router.post("/templates/shared/sync")
-async def sync_shared_templates(body: dict = Body(...)):
+async def sync_shared_templates(request: Request, body: dict = Body(...)):
     """Full-replace local shared templates cache."""
+    user_id = _get_user_id(request)
     rows = body.get("rows", [])
     if not isinstance(rows, list):
         raise HTTPException(status_code=400, detail="rows must be a list.")
-    db = get_db()
-    count = db.replace_shared_templates(rows)
+    count = await _db_call("replace_shared_templates", rows, user_id=user_id)
     return {"replaced": count}
 
 
 @router.get("/templates/shared")
-async def list_shared_templates():
+async def list_shared_templates(request: Request):
     """Return cached shared templates."""
-    db = get_db()
-    return db.list_shared_templates()
+    user_id = _get_user_id(request)
+    return await _db_call("list_shared_templates", user_id=user_id)
 
 
 @router.get("/templates/default/{test_type}")
-async def get_default_template(test_type: str):
+async def get_default_template(request: Request, test_type: str):
     """Return the default template for a given test type, or null."""
-    db = get_db()
-    record = db.get_default_template_for_type(test_type)
+    user_id = _get_user_id(request)
+    record = await _db_call("get_default_template_for_type", test_type, user_id=user_id)
     if not record:
         return {"template": None}
     return {"template": TemplateResponse(**record)}
 
 
 @router.patch("/templates/{template_id}", response_model=TemplateResponse)
-async def update_template(template_id: int, request: TemplateUpdateRequest = Body(...)):
+async def update_template(request: Request, template_id: int, body: TemplateUpdateRequest = Body(...)):
     """Update an existing template."""
-    db = get_db()
-    update_data = request.model_dump(exclude_unset=True)
-    record = db.update_template(template_id, **update_data)
+    user_id = _get_user_id(request)
+    update_data = body.model_dump(exclude_unset=True)
+    record = await _db_call("update_template", template_id, user_id=user_id, **update_data)
     if not record:
         raise HTTPException(status_code=404, detail="Template not found.")
     return TemplateResponse(**record)
 
 
 @router.delete("/templates/{template_id}")
-async def delete_template(template_id: int):
+async def delete_template(request: Request, template_id: int):
     """Delete a template."""
-    db = get_db()
-    deleted = db.delete_template(template_id)
+    user_id = _get_user_id(request)
+    deleted = await _db_call("delete_template", template_id, user_id=user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Template not found.")
     return {"deleted": True, "id": template_id}
@@ -1394,23 +1438,26 @@ async def delete_template(template_id: int):
 
 
 @router.get("/history/test-types")
-async def list_history_test_types():
+async def list_history_test_types(request: Request):
     """Return distinct test types from user's history."""
-    db = get_db()
-    return db.list_history_test_types()
+    user_id = _get_user_id(request)
+    return await _db_call("list_history_test_types", user_id=user_id)
 
 
 @router.get("/history", response_model=HistoryListResponse)
 async def list_history(
+    request: Request,
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     search: str | None = Query(None),
     liked_only: bool = Query(False),
 ):
     """Return paginated history list, newest first."""
-    db = get_db()
-    items, total = db.list_history(
+    user_id = _get_user_id(request)
+    items, total = await _db_call(
+        "list_history",
         offset=offset, limit=limit, search=search, liked_only=liked_only,
+        user_id=user_id,
     )
     for item in items:
         item["liked"] = bool(item.get("liked", 0))
@@ -1423,10 +1470,10 @@ async def list_history(
 
 
 @router.get("/history/{history_id}", response_model=HistoryDetailResponse)
-async def get_history_detail(history_id: int):
+async def get_history_detail(request: Request, history_id: int):
     """Return single history record with full_response."""
-    db = get_db()
-    record = db.get_history(history_id)
+    user_id = _get_user_id(request)
+    record = await _db_call("get_history", history_id, user_id=user_id)
     if not record:
         raise HTTPException(status_code=404, detail="History record not found.")
     record["liked"] = bool(record.get("liked", 0))
@@ -1434,27 +1481,29 @@ async def get_history_detail(history_id: int):
 
 
 @router.post("/history", response_model=HistoryDetailResponse, status_code=201)
-async def create_history(request: HistoryCreateRequest = Body(...)):
+async def create_history(request: Request, body: HistoryCreateRequest = Body(...)):
     """Save a new analysis history record."""
-    db = get_db()
-    record = db.save_history(
-        test_type=request.test_type,
-        test_type_display=request.test_type_display,
-        summary=request.summary,
-        full_response=request.full_response,
-        filename=request.filename,
-        tone_preference=request.tone_preference,
-        detail_preference=request.detail_preference,
+    user_id = _get_user_id(request)
+    record = await _db_call(
+        "save_history",
+        test_type=body.test_type,
+        test_type_display=body.test_type_display,
+        summary=body.summary,
+        full_response=body.full_response,
+        filename=body.filename,
+        tone_preference=body.tone_preference,
+        detail_preference=body.detail_preference,
+        user_id=user_id,
     )
     record["liked"] = bool(record.get("liked", 0))
     return HistoryDetailResponse(**record)
 
 
 @router.delete("/history/{history_id}", response_model=HistoryDeleteResponse)
-async def delete_history(history_id: int):
+async def delete_history(request: Request, history_id: int):
     """Hard-delete a history record."""
-    db = get_db()
-    deleted = db.delete_history(history_id)
+    user_id = _get_user_id(request)
+    deleted = await _db_call("delete_history", history_id, user_id=user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="History record not found.")
     return HistoryDeleteResponse(deleted=True, id=history_id)
@@ -1462,22 +1511,23 @@ async def delete_history(history_id: int):
 
 @router.patch("/history/{history_id}/like", response_model=HistoryLikeResponse)
 async def toggle_history_liked(
+    request: Request,
     history_id: int,
-    request: HistoryLikeRequest = Body(...),
+    body: HistoryLikeRequest = Body(...),
 ):
     """Toggle the liked status of a history record."""
-    db = get_db()
-    updated = db.update_history_liked(history_id, request.liked)
+    user_id = _get_user_id(request)
+    updated = await _db_call("update_history_liked", history_id, body.liked, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
-    return HistoryLikeResponse(id=history_id, liked=request.liked)
+    return HistoryLikeResponse(id=history_id, liked=body.liked)
 
 
 @router.put("/history/{history_id}/copied")
-async def mark_history_copied(history_id: int):
+async def mark_history_copied(request: Request, history_id: int):
     """Mark a history record as copied (lightweight positive signal)."""
-    db = get_db()
-    updated = db.mark_copied(history_id)
+    user_id = _get_user_id(request)
+    updated = await _db_call("mark_copied", history_id, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
     return {"id": history_id, "copied": True}
@@ -1488,10 +1538,10 @@ class EditedTextRequest(BaseModel):
 
 
 @router.patch("/history/{history_id}/edited_text")
-async def save_edited_text(history_id: int, request: EditedTextRequest = Body(...)):
+async def save_edited_text(request: Request, history_id: int, body: EditedTextRequest = Body(...)):
     """Save the doctor's edited version of the explanation text."""
-    db = get_db()
-    updated = db.save_edited_text(history_id, request.edited_text)
+    user_id = _get_user_id(request)
+    updated = await _db_call("save_edited_text", history_id, body.edited_text, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
     return {"id": history_id, "edited_text_saved": True}
@@ -1502,7 +1552,15 @@ async def save_edited_text(history_id: int, request: EditedTextRequest = Body(..
 
 @router.get("/settings/raw-key/{provider}")
 async def get_raw_key(provider: str):
-    """Return the unmasked API key for a provider. Safe because sidecar is local-only."""
+    """Return the unmasked API key for a provider. Safe because sidecar is local-only.
+
+    Disabled in web mode (REQUIRE_AUTH) for security.
+    """
+    if REQUIRE_AUTH:
+        raise HTTPException(
+            status_code=403,
+            detail="Raw API key access is not available in web mode.",
+        )
     key = settings_store.get_api_key_for_provider(provider)
     if not key:
         raise HTTPException(status_code=404, detail=f"No key configured for {provider}")
@@ -1513,18 +1571,18 @@ async def get_raw_key(provider: str):
 
 
 @router.get("/consent", response_model=ConsentStatusResponse)
-async def get_consent():
+async def get_consent(request: Request):
     """Check whether the user has given privacy consent."""
-    db = get_db()
-    value = db.get_setting("privacy_consent_given")
+    user_id = _get_user_id(request)
+    value = await _db_call("get_setting", "privacy_consent_given", user_id=user_id)
     return ConsentStatusResponse(consent_given=value == "true")
 
 
 @router.post("/consent", response_model=ConsentStatusResponse)
-async def grant_consent():
+async def grant_consent(request: Request):
     """Record that the user has given privacy consent."""
-    db = get_db()
-    db.set_setting("privacy_consent_given", "true")
+    user_id = _get_user_id(request)
+    await _db_call("set_setting", "privacy_consent_given", "true", user_id=user_id)
     return ConsentStatusResponse(consent_given=True)
 
 
@@ -1532,18 +1590,18 @@ async def grant_consent():
 
 
 @router.get("/onboarding")
-async def get_onboarding():
+async def get_onboarding(request: Request):
     """Check whether the user has completed onboarding."""
-    db = get_db()
-    value = db.get_setting("onboarding_completed")
+    user_id = _get_user_id(request)
+    value = await _db_call("get_setting", "onboarding_completed", user_id=user_id)
     return {"onboarding_completed": value == "true"}
 
 
 @router.post("/onboarding")
-async def complete_onboarding():
+async def complete_onboarding(request: Request):
     """Record that the user has completed onboarding."""
-    db = get_db()
-    db.set_setting("onboarding_completed", "true")
+    user_id = _get_user_id(request)
+    await _db_call("set_setting", "onboarding_completed", "true", user_id=user_id)
     return {"onboarding_completed": True}
 
 
@@ -1565,63 +1623,65 @@ async def list_test_types():
 
 
 @router.get("/teaching-points")
-async def list_teaching_points(test_type: str | None = Query(None)):
+async def list_teaching_points(request: Request, test_type: str | None = Query(None)):
     """Return teaching points (global + test-type-specific)."""
-    db = get_db()
-    points = db.list_teaching_points(test_type=test_type)
+    user_id = _get_user_id(request)
+    points = await _db_call("list_teaching_points", test_type=test_type, user_id=user_id)
     return points
 
 
 @router.post("/teaching-points", status_code=201)
-async def create_teaching_point(body: dict = Body(...)):
+async def create_teaching_point(request: Request, body: dict = Body(...)):
     """Create a new teaching point."""
+    user_id = _get_user_id(request)
     text = body.get("text", "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Teaching point text is required.")
     test_type = body.get("test_type")
-    db = get_db()
-    return db.create_teaching_point(text=text, test_type=test_type)
+    return await _db_call("create_teaching_point", text=text, test_type=test_type, user_id=user_id)
 
 
 @router.post("/teaching-points/shared/sync")
-async def sync_shared_teaching_points(body: dict = Body(...)):
+async def sync_shared_teaching_points(request: Request, body: dict = Body(...)):
     """Full-replace local shared teaching points cache."""
+    user_id = _get_user_id(request)
     rows = body.get("rows", [])
     if not isinstance(rows, list):
         raise HTTPException(status_code=400, detail="rows must be a list.")
-    db = get_db()
-    count = db.replace_shared_teaching_points(rows)
+    count = await _db_call("replace_shared_teaching_points", rows, user_id=user_id)
     # Remove any shared content that was incorrectly merged into the user's
     # own teaching_points table during earlier syncs.
-    purged = db.purge_shared_duplicates_from_own()
+    purged = await _db_call("purge_shared_duplicates_from_own", user_id=user_id)
     return {"replaced": count, "purged_duplicates": purged}
 
 
 @router.get("/teaching-points/shared")
-async def list_shared_teaching_points(test_type: str | None = Query(None)):
+async def list_shared_teaching_points(request: Request, test_type: str | None = Query(None)):
     """Return cached shared teaching points."""
-    db = get_db()
-    return db.list_shared_teaching_points(test_type=test_type)
+    user_id = _get_user_id(request)
+    return await _db_call("list_shared_teaching_points", test_type=test_type, user_id=user_id)
 
 
 @router.delete("/teaching-points/{point_id}")
-async def delete_teaching_point(point_id: int):
+async def delete_teaching_point(request: Request, point_id: int):
     """Delete a teaching point."""
-    db = get_db()
-    deleted = db.delete_teaching_point(point_id)
+    user_id = _get_user_id(request)
+    deleted = await _db_call("delete_teaching_point", point_id, user_id=user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Teaching point not found.")
     return {"deleted": True, "id": point_id}
 
 
 @router.put("/teaching-points/{point_id}")
-async def update_teaching_point(point_id: int, body: dict = Body(...)):
+async def update_teaching_point(request: Request, point_id: int, body: dict = Body(...)):
     """Update a teaching point's text and/or test_type."""
-    db = get_db()
-    updated = db.update_teaching_point(
+    user_id = _get_user_id(request)
+    updated = await _db_call(
+        "update_teaching_point",
         point_id,
         text=body.get("text"),
         test_type=body.get("test_type", "UNSET"),
+        user_id=user_id,
     )
     if updated is None:
         raise HTTPException(status_code=404, detail="Teaching point not found.")
@@ -1629,8 +1689,9 @@ async def update_teaching_point(point_id: int, body: dict = Body(...)):
 
 
 @router.post("/letters/generate", response_model=LetterResponse, status_code=201)
-async def generate_letter(request: LetterGenerateRequest = Body(...)):
+async def generate_letter(request: Request, body: LetterGenerateRequest = Body(...)):
     """Generate a patient-facing letter/explanation from free-text input."""
+    user_id = _get_user_id(request)
     settings = settings_store.get_settings()
     provider_str = settings.llm_provider.value
     api_key = settings_store.get_api_key_for_provider(provider_str)
@@ -1654,7 +1715,7 @@ async def generate_letter(request: LetterGenerateRequest = Body(...)):
     physician_section = ""
     if voice == "first_person":
         physician_section = (
-            "\n## Physician Voice — First Person\n"
+            "\n## Physician Voice -- First Person\n"
             "You ARE the physician. Write in first person. "
             'Use first-person language: "I have reviewed your results", '
             '"In my assessment". '
@@ -1669,19 +1730,20 @@ async def generate_letter(request: LetterGenerateRequest = Body(...)):
                 f'"{physician_name} has reviewed your results".'
             )
         physician_section = (
-            f"\n## Physician Voice — Third Person (Care Team)\n"
+            f"\n## Physician Voice -- Third Person (Care Team)\n"
             f"You are writing on behalf of the physician. "
             f'When referring to the physician, use "{physician_name}" '
             f'instead of generic phrases like "your doctor" or "your physician".{attribution}\n'
         )
 
     # Fetch teaching points (including shared) and liked examples for style guidance
-    db = get_db()
-    teaching_points = db.list_all_teaching_points_for_prompt(test_type=None)
-    liked_examples = db.get_liked_examples(
+    teaching_points = await _db_call("list_all_teaching_points_for_prompt", test_type=None, user_id=user_id)
+    liked_examples = await _db_call(
+        "get_liked_examples",
         limit=2, test_type=None,
         tone_preference=settings.tone_preference,
         detail_preference=settings.detail_preference,
+        user_id=user_id,
     )
 
     teaching_section = ""
@@ -1693,11 +1755,11 @@ async def generate_letter(request: LetterGenerateRequest = Body(...)):
             "so the output matches how this physician communicates:\n"
         )
         for tp in teaching_points:
-            source = tp.get("source", "own")
-            if source == "own":
+            tp_source = tp.get("source", "own")
+            if tp_source == "own":
                 teaching_section += f"- {tp['text']}\n"
             else:
-                teaching_section += f"- [From {source}] {tp['text']}\n"
+                teaching_section += f"- [From {tp_source}] {tp['text']}\n"
 
     style_section = ""
     if liked_examples:
@@ -1726,7 +1788,7 @@ async def generate_letter(request: LetterGenerateRequest = Body(...)):
         f"## Rules\n"
         f"1. Write in plain, compassionate language appropriate for patients.\n"
         f"2. Do NOT include any patient-identifying information.\n"
-        f"3. Interpret findings — explain WHAT results mean for the patient. "
+        f"3. Interpret findings -- explain WHAT results mean for the patient. "
         f"The patient already has their results; do NOT simply recite values "
         f"they can already read. Synthesize findings into meaningful clinical "
         f"statements that help the patient understand their health.\n"
@@ -1756,7 +1818,7 @@ async def generate_letter(request: LetterGenerateRequest = Body(...)):
     try:
         llm_response = await client.call(
             system_prompt=system_prompt,
-            user_prompt=request.prompt,
+            user_prompt=body.prompt,
         )
     except Exception as e:
         raise HTTPException(
@@ -1766,33 +1828,37 @@ async def generate_letter(request: LetterGenerateRequest = Body(...)):
 
     content = llm_response.text_content
 
-    db = get_db()
-    letter_id = db.save_letter(
-        prompt=request.prompt,
+    letter_id = await _db_call(
+        "save_letter",
+        prompt=body.prompt,
         content=content,
-        letter_type=request.letter_type,
+        letter_type=body.letter_type,
         model_used=getattr(llm_response, "model", None),
         input_tokens=getattr(llm_response, "input_tokens", None),
         output_tokens=getattr(llm_response, "output_tokens", None),
+        user_id=user_id,
     )
-    record = db.get_letter(letter_id)
+    record = await _db_call("get_letter", letter_id, user_id=user_id)
     return LetterResponse(**record)  # type: ignore[arg-type]
 
 
 @router.get("/letters", response_model=LetterListResponse)
 async def list_letters(
+    request: Request,
     offset: int = 0,
     limit: int = 50,
     search: str | None = None,
     liked_only: bool = False,
 ):
     """Return generated letters with pagination, newest first."""
-    db = get_db()
-    items, total = db.list_letters(
+    user_id = _get_user_id(request)
+    items, total = await _db_call(
+        "list_letters",
         offset=offset,
         limit=limit,
         search=search,
         liked_only=liked_only,
+        user_id=user_id,
     )
     return LetterListResponse(
         items=[LetterResponse(**item) for item in items],
@@ -1801,79 +1867,79 @@ async def list_letters(
 
 
 @router.get("/letters/{letter_id}", response_model=LetterResponse)
-async def get_letter(letter_id: int):
+async def get_letter(request: Request, letter_id: int):
     """Return a single letter."""
-    db = get_db()
-    record = db.get_letter(letter_id)
+    user_id = _get_user_id(request)
+    record = await _db_call("get_letter", letter_id, user_id=user_id)
     if not record:
         raise HTTPException(status_code=404, detail="Letter not found.")
     return LetterResponse(**record)
 
 
 @router.delete("/letters/{letter_id}", response_model=LetterDeleteResponse)
-async def delete_letter(letter_id: int):
+async def delete_letter(request: Request, letter_id: int):
     """Delete a letter."""
-    db = get_db()
-    deleted = db.delete_letter(letter_id)
+    user_id = _get_user_id(request)
+    deleted = await _db_call("delete_letter", letter_id, user_id=user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Letter not found.")
     return LetterDeleteResponse(deleted=True, id=letter_id)
 
 
 @router.put("/letters/{letter_id}", response_model=LetterResponse)
-async def update_letter(letter_id: int, request: LetterUpdateRequest = Body(...)):
+async def update_letter(request: Request, letter_id: int, body: LetterUpdateRequest = Body(...)):
     """Update a letter's content."""
-    db = get_db()
-    record = db.update_letter(letter_id, request.content)
+    user_id = _get_user_id(request)
+    record = await _db_call("update_letter", letter_id, body.content, user_id=user_id)
     if not record:
         raise HTTPException(status_code=404, detail="Letter not found.")
     return LetterResponse(**record)
 
 
 @router.put("/letters/{letter_id}/like")
-async def toggle_letter_liked(letter_id: int, request: LetterLikeRequest = Body(...)):
+async def toggle_letter_liked(request: Request, letter_id: int, body: LetterLikeRequest = Body(...)):
     """Toggle the liked status of a letter."""
-    db = get_db()
-    updated = db.toggle_letter_liked(letter_id, request.liked)
+    user_id = _get_user_id(request)
+    updated = await _db_call("toggle_letter_liked", letter_id, body.liked, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Letter not found.")
-    return {"id": letter_id, "liked": request.liked}
+    return {"id": letter_id, "liked": body.liked}
 
 
 # --- Sync Endpoints ---
 
 
 @router.get("/sync/export/{table}")
-async def sync_export_all(table: str):
+async def sync_export_all(request: Request, table: str):
     """Return all local rows for a table (for sync push)."""
-    db = get_db()
-    rows = db.export_table(table)
+    user_id = _get_user_id(request)
+    rows = await _db_call("export_table", table, user_id=user_id)
     return rows
 
 
 @router.get("/sync/export/{table}/{record_id}")
-async def sync_export_record(table: str, record_id: int):
+async def sync_export_record(request: Request, table: str, record_id: int):
     """Return a single row by local id (with sync_id)."""
-    db = get_db()
-    record = db.export_record(table, record_id)
+    user_id = _get_user_id(request)
+    record = await _db_call("export_record", table, record_id, user_id=user_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Record not found.")
     return record
 
 
 @router.post("/sync/merge")
-async def sync_merge(body: dict = Body(...)):
+async def sync_merge(request: Request, body: dict = Body(...)):
     """Merge remote rows into local DB.
 
     Expects: { "table": str, "rows": list[dict] }
     Settings rows are matched by key, others by sync_id.
     """
+    user_id = _get_user_id(request)
     table = body.get("table", "")
     rows = body.get("rows", [])
     if not table or not isinstance(rows, list):
         raise HTTPException(status_code=400, detail="table and rows are required.")
 
-    db = get_db()
     merged = 0
     skipped = 0
 
@@ -1884,12 +1950,12 @@ async def sync_merge(body: dict = Body(...)):
                 value = row.get("value")
                 updated_at = row.get("updated_at", "")
                 if key and value is not None:
-                    if db.merge_settings_row(key, str(value), updated_at):
+                    if await _db_call("merge_settings_row", key, str(value), updated_at, user_id=user_id):
                         merged += 1
                     else:
                         skipped += 1
             else:
-                if db.merge_record(table, row):
+                if await _db_call("merge_record", table, row, user_id=user_id):
                     merged += 1
                 else:
                     skipped += 1

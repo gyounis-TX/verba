@@ -1,16 +1,20 @@
 """
-Persistent settings store backed by SQLite + OS keychain.
+Persistent settings store backed by SQLite + OS keychain (desktop)
+or PostgreSQL + env vars (web).
 
-Same public API as Phase 4: get_settings, update_settings, get_api_key_for_provider.
+Same public API: get_settings, update_settings, get_api_key_for_provider.
 """
 
 from __future__ import annotations
 
 import json
+import os
 
 from api.explain_models import AppSettings, ExplanationVoiceEnum, FooterTypeEnum, LiteracyLevelEnum, LLMProviderEnum, PhysicianNameSourceEnum, SettingsUpdate
 from storage.database import get_db
 from storage.keychain import get_keychain
+
+REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "").lower() == "true"
 
 # Non-secret settings stored in SQLite
 _DB_KEYS = ("llm_provider", "claude_model", "openai_model", "literacy_level", "specialty", "practice_name", "include_key_findings", "include_measurements", "tone_preference", "detail_preference", "quick_reasons", "next_steps_options", "explanation_voice", "name_drop", "physician_name_source", "custom_physician_name", "practice_providers", "short_comment_char_limit", "sms_summary_enabled", "sms_summary_char_limit", "default_comment_mode", "footer_type", "custom_footer_text", "aws_region")
@@ -23,8 +27,6 @@ _SECRET_KEYS = ("claude_api_key", "openai_api_key", "aws_access_key_id", "aws_se
 def get_settings() -> AppSettings:
     """Return current settings (loaded fresh from SQLite + keychain)."""
     db = get_db()
-    keychain = get_keychain()
-
     all_db = db.get_all_settings()
 
     def _load_json_list(key: str) -> list[str]:
@@ -36,14 +38,27 @@ def get_settings() -> AppSettings:
         except (json.JSONDecodeError, TypeError):
             return []
 
+    # In web mode, skip keychain entirely — API keys come from env vars / IAM
+    if REQUIRE_AUTH:
+        claude_key = None
+        openai_key = None
+        aws_access = None
+        aws_secret = None
+    else:
+        keychain = get_keychain()
+        claude_key = keychain.get_claude_key()
+        openai_key = keychain.get_openai_key()
+        aws_access = keychain.get_aws_access_key()
+        aws_secret = keychain.get_aws_secret_key()
+
     return AppSettings(
         llm_provider=LLMProviderEnum(all_db["llm_provider"])
         if "llm_provider" in all_db
         else LLMProviderEnum.CLAUDE,
-        claude_api_key=keychain.get_claude_key(),
-        openai_api_key=keychain.get_openai_key(),
-        aws_access_key_id=keychain.get_aws_access_key(),
-        aws_secret_access_key=keychain.get_aws_secret_key(),
+        claude_api_key=claude_key,
+        openai_api_key=openai_key,
+        aws_access_key_id=aws_access,
+        aws_secret_access_key=aws_secret,
         aws_region=all_db.get("aws_region", "us-east-1"),
         claude_model=all_db.get("claude_model"),
         openai_model=all_db.get("openai_model"),
@@ -90,35 +105,40 @@ def get_settings() -> AppSettings:
 def update_settings(update: SettingsUpdate) -> AppSettings:
     """Apply partial update and return new settings."""
     db = get_db()
-    keychain = get_keychain()
 
     update_data = update.model_dump(exclude_unset=True)
 
-    # Persist API keys in keychain
-    if "claude_api_key" in update_data:
-        val = update_data.pop("claude_api_key")
-        if val is None:
-            keychain.delete_key("claude_api_key")
-        else:
-            keychain.set_claude_key(val)
-    if "openai_api_key" in update_data:
-        val = update_data.pop("openai_api_key")
-        if val is None:
-            keychain.delete_key("openai_api_key")
-        else:
-            keychain.set_openai_key(val)
-    if "aws_access_key_id" in update_data:
-        val = update_data.pop("aws_access_key_id")
-        if val is None:
-            keychain.delete_key("aws_access_key_id")
-        else:
-            keychain.set_aws_access_key(val)
-    if "aws_secret_access_key" in update_data:
-        val = update_data.pop("aws_secret_access_key")
-        if val is None:
-            keychain.delete_key("aws_secret_access_key")
-        else:
-            keychain.set_aws_secret_key(val)
+    # Persist API keys in keychain (desktop mode only)
+    if not REQUIRE_AUTH:
+        keychain = get_keychain()
+        if "claude_api_key" in update_data:
+            val = update_data.pop("claude_api_key")
+            if val is None:
+                keychain.delete_key("claude_api_key")
+            else:
+                keychain.set_claude_key(val)
+        if "openai_api_key" in update_data:
+            val = update_data.pop("openai_api_key")
+            if val is None:
+                keychain.delete_key("openai_api_key")
+            else:
+                keychain.set_openai_key(val)
+        if "aws_access_key_id" in update_data:
+            val = update_data.pop("aws_access_key_id")
+            if val is None:
+                keychain.delete_key("aws_access_key_id")
+            else:
+                keychain.set_aws_access_key(val)
+        if "aws_secret_access_key" in update_data:
+            val = update_data.pop("aws_secret_access_key")
+            if val is None:
+                keychain.delete_key("aws_secret_access_key")
+            else:
+                keychain.set_aws_secret_key(val)
+    else:
+        # In web mode, ignore API key updates (they come from env/IAM)
+        for secret_key in _SECRET_KEYS:
+            update_data.pop(secret_key, None)
 
     # Persist non-secret settings in SQLite
     for key in _DB_KEYS:
@@ -133,7 +153,7 @@ def update_settings(update: SettingsUpdate) -> AppSettings:
             elif isinstance(val, bool):
                 db.set_setting(key, "true" if val else "false")
             else:
-                # Enums → store their value string
+                # Enums -> store their value string
                 db.set_setting(key, val.value if hasattr(val, "value") else str(val))
 
     return get_settings()
@@ -142,9 +162,25 @@ def update_settings(update: SettingsUpdate) -> AppSettings:
 def get_api_key_for_provider(provider: str) -> str | dict | None:
     """Get the API key for the given provider.
 
-    For Bedrock, returns a dict with access_key, secret_key, and region.
-    For other providers, returns a string API key or None.
+    In web mode (REQUIRE_AUTH), Bedrock uses IAM role (no explicit credentials).
+    In desktop mode, keys come from the OS keychain.
     """
+    if REQUIRE_AUTH:
+        # Web mode: API keys come from environment / IAM role
+        if provider == "bedrock":
+            return {
+                "access_key": "iam_role",
+                "secret_key": "",
+                "region": os.getenv("AWS_REGION", "us-east-1"),
+            }
+        elif provider == "claude":
+            # In web mode, Claude API key could come from env var
+            return os.getenv("ANTHROPIC_API_KEY")
+        elif provider == "openai":
+            return os.getenv("OPENAI_API_KEY")
+        return None
+
+    # Desktop mode: keys from OS keychain
     keychain = get_keychain()
     if provider == "claude":
         return keychain.get_claude_key()

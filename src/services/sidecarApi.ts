@@ -1,4 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
+import { IS_TAURI, API_BASE_URL } from "./platform";
+import { getSession } from "./supabase";
 import type {
   HealthResponse,
   ExtractionResult,
@@ -33,8 +34,18 @@ class SidecarApi {
   private baseUrl: string | null = null;
 
   async initialize(): Promise<void> {
-    const port = await invoke<number>("get_sidecar_port");
-    this.baseUrl = `http://127.0.0.1:${port}`;
+    if (IS_TAURI) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const port = await invoke<number>("get_sidecar_port");
+      this.baseUrl = `http://127.0.0.1:${port}`;
+    } else {
+      if (!API_BASE_URL) {
+        throw new Error(
+          "VITE_API_URL is not configured. Set it in your .env file.",
+        );
+      }
+      this.baseUrl = API_BASE_URL;
+    }
   }
 
   async waitForReady(maxRetries = 30, intervalMs = 500): Promise<boolean> {
@@ -89,9 +100,25 @@ class SidecarApi {
     throw new Error(detail);
   }
 
+  private async fetchWithAuth(
+    url: string,
+    init?: RequestInit,
+  ): Promise<Response> {
+    if (!IS_TAURI) {
+      const session = await getSession();
+      const token = session?.access_token;
+      if (token) {
+        const headers = new Headers(init?.headers);
+        headers.set("Authorization", `Bearer ${token}`);
+        return fetch(url, { ...init, headers });
+      }
+    }
+    return fetch(url, init);
+  }
+
   async healthCheck(): Promise<HealthResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/health`, { cache: "no-store" });
+    const response = await this.fetchWithAuth(`${baseUrl}/health`, { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`Health check failed: ${response.status}`);
     }
@@ -103,7 +130,7 @@ class SidecarApi {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`${baseUrl}/extract/pdf`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/extract/pdf`, {
       method: "POST",
       body: formData,
     });
@@ -120,7 +147,7 @@ class SidecarApi {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`${baseUrl}/extract/file`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/extract/file`, {
       method: "POST",
       body: formData,
     });
@@ -135,7 +162,7 @@ class SidecarApi {
   async extractText(text: string): Promise<ExtractionResult> {
     const baseUrl = await this.ensureInitialized();
 
-    const response = await fetch(`${baseUrl}/extract/text`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/extract/text`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
@@ -152,7 +179,7 @@ class SidecarApi {
     text: string,
   ): Promise<{ classification: "report" | "question"; confidence: number }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/analyze/classify-input`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/analyze/classify-input`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
@@ -168,7 +195,7 @@ class SidecarApi {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`${baseUrl}/detect`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/detect`, {
       method: "POST",
       body: formData,
     });
@@ -190,7 +217,7 @@ class SidecarApi {
     redaction_count: number;
   }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/extraction/scrub-preview`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/extraction/scrub-preview`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -210,7 +237,7 @@ class SidecarApi {
   ): Promise<DetectTypeResponse> {
     const baseUrl = await this.ensureInitialized();
 
-    const response = await fetch(`${baseUrl}/analyze/detect-type`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/analyze/detect-type`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -232,7 +259,7 @@ class SidecarApi {
   ): Promise<ParsedReport> {
     const baseUrl = await this.ensureInitialized();
 
-    const response = await fetch(`${baseUrl}/analyze/parse`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/analyze/parse`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -294,7 +321,7 @@ class SidecarApi {
     if (request.use_analogies != null)
       body.use_analogies = request.use_analogies;
 
-    const response = await fetch(`${baseUrl}/analyze/explain`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/analyze/explain`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -361,7 +388,7 @@ class SidecarApi {
     if (request.avoid_openings != null)
       body.avoid_openings = request.avoid_openings;
 
-    const response = await fetch(`${baseUrl}/analyze/explain-stream`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/analyze/explain-stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -398,7 +425,7 @@ class SidecarApi {
 
   async getGlossary(testType: string): Promise<GlossaryResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/glossary/${testType}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/glossary/${testType}`, {
       cache: "no-store",
     });
     if (!response.ok) {
@@ -409,7 +436,7 @@ class SidecarApi {
 
   async exportPdf(explainResponse: ExplainResponse): Promise<Blob> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/export/pdf`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/export/pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(explainResponse),
@@ -422,7 +449,7 @@ class SidecarApi {
 
   async getSettings(): Promise<AppSettings> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/settings`, { cache: "no-store" });
+    const response = await this.fetchWithAuth(`${baseUrl}/settings`, { cache: "no-store" });
     if (!response.ok) {
       await this.handleErrorResponse(response);
     }
@@ -431,7 +458,7 @@ class SidecarApi {
 
   async updateSettings(update: SettingsUpdate): Promise<AppSettings> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/settings`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/settings`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(update),
@@ -446,7 +473,7 @@ class SidecarApi {
 
   async listTemplates(): Promise<TemplateListResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/templates`, { cache: "no-store" });
+    const response = await this.fetchWithAuth(`${baseUrl}/templates`, { cache: "no-store" });
     if (!response.ok) {
       await this.handleErrorResponse(response);
     }
@@ -455,7 +482,7 @@ class SidecarApi {
 
   async createTemplate(request: TemplateCreateRequest): Promise<Template> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/templates`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/templates`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -471,7 +498,7 @@ class SidecarApi {
     request: TemplateUpdateRequest,
   ): Promise<Template> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/templates/${id}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/templates/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -484,7 +511,7 @@ class SidecarApi {
 
   async deleteTemplate(id: number): Promise<{ deleted: boolean; id: number }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/templates/${id}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/templates/${id}`, {
       method: "DELETE",
     });
     if (!response.ok) {
@@ -495,7 +522,7 @@ class SidecarApi {
 
   async listTestTypes(): Promise<{ id: string; name: string }[]> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/test-types`);
+    const response = await this.fetchWithAuth(`${baseUrl}/test-types`);
     if (!response.ok) return [];
     return response.json();
   }
@@ -504,7 +531,7 @@ class SidecarApi {
     { test_type: string; test_type_display: string }[]
   > {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/history/test-types`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/history/test-types`, {
       cache: "no-store",
     });
     if (!response.ok) return [];
@@ -513,7 +540,7 @@ class SidecarApi {
 
   async getDefaultTemplate(testType: string): Promise<Template | null> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(
+    const response = await this.fetchWithAuth(
       `${baseUrl}/templates/default/${encodeURIComponent(testType)}`,
     );
     if (!response.ok) return null;
@@ -540,7 +567,7 @@ class SidecarApi {
     if (likedOnly) {
       params.set("liked_only", "true");
     }
-    const response = await fetch(`${baseUrl}/history?${params}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/history?${params}`, {
       cache: "no-store",
     });
     if (!response.ok) {
@@ -551,7 +578,7 @@ class SidecarApi {
 
   async getHistoryDetail(id: number): Promise<HistoryDetailResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/history/${id}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/history/${id}`, {
       cache: "no-store",
     });
     if (!response.ok) {
@@ -564,7 +591,7 @@ class SidecarApi {
     request: HistoryCreateRequest,
   ): Promise<HistoryDetailResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/history`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/history`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -577,7 +604,7 @@ class SidecarApi {
 
   async deleteHistory(id: number): Promise<HistoryDeleteResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/history/${id}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/history/${id}`, {
       method: "DELETE",
     });
     if (!response.ok) {
@@ -591,7 +618,7 @@ class SidecarApi {
     liked: boolean,
   ): Promise<HistoryLikeResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/history/${id}/like`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/history/${id}/like`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ liked }),
@@ -604,7 +631,7 @@ class SidecarApi {
 
   async markHistoryCopied(id: number): Promise<void> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/history/${id}/copied`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/history/${id}/copied`, {
       method: "PUT",
     });
     if (!response.ok) {
@@ -614,7 +641,7 @@ class SidecarApi {
 
   async saveEditedText(id: number, editedText: string): Promise<void> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/history/${id}/edited_text`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/history/${id}/edited_text`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ edited_text: editedText }),
@@ -628,7 +655,7 @@ class SidecarApi {
 
   async getConsent(): Promise<ConsentStatusResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/consent`, { cache: "no-store" });
+    const response = await this.fetchWithAuth(`${baseUrl}/consent`, { cache: "no-store" });
     if (!response.ok) {
       await this.handleErrorResponse(response);
     }
@@ -637,7 +664,7 @@ class SidecarApi {
 
   async grantConsent(): Promise<ConsentStatusResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/consent`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/consent`, {
       method: "POST",
     });
     if (!response.ok) {
@@ -650,7 +677,7 @@ class SidecarApi {
     provider: string,
   ): Promise<{ provider: string; key?: string; credentials?: { access_key: string; secret_key: string; region: string } }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/settings/raw-key/${provider}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/settings/raw-key/${provider}`, {
       cache: "no-store",
     });
     if (!response.ok) {
@@ -661,7 +688,7 @@ class SidecarApi {
 
   async getOnboarding(): Promise<{ onboarding_completed: boolean }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/onboarding`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/onboarding`, {
       cache: "no-store",
     });
     if (!response.ok) {
@@ -672,7 +699,7 @@ class SidecarApi {
 
   async completeOnboarding(): Promise<{ onboarding_completed: boolean }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/onboarding`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/onboarding`, {
       method: "POST",
     });
     if (!response.ok) {
@@ -687,7 +714,7 @@ class SidecarApi {
     request: LetterGenerateRequest,
   ): Promise<LetterResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/letters/generate`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/letters/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -711,7 +738,7 @@ class SidecarApi {
     if (search) params.set("search", search);
     if (likedOnly) params.set("liked_only", "true");
     const qs = params.toString();
-    const response = await fetch(
+    const response = await this.fetchWithAuth(
       `${baseUrl}/letters${qs ? `?${qs}` : ""}`,
       { cache: "no-store" },
     );
@@ -723,7 +750,7 @@ class SidecarApi {
 
   async getLetter(id: number): Promise<LetterResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/letters/${id}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/letters/${id}`, {
       cache: "no-store",
     });
     if (!response.ok) {
@@ -734,7 +761,7 @@ class SidecarApi {
 
   async updateLetter(id: number, content: string): Promise<LetterResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/letters/${id}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/letters/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
@@ -750,7 +777,7 @@ class SidecarApi {
     liked: boolean,
   ): Promise<{ id: number; liked: boolean }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/letters/${id}/like`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/letters/${id}/like`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ liked }),
@@ -763,7 +790,7 @@ class SidecarApi {
 
   async deleteLetter(id: number): Promise<LetterDeleteResponse> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/letters/${id}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/letters/${id}`, {
       method: "DELETE",
     });
     if (!response.ok) {
@@ -781,7 +808,7 @@ class SidecarApi {
       params.set("test_type", testType);
     }
     const qs = params.toString();
-    const response = await fetch(
+    const response = await this.fetchWithAuth(
       `${baseUrl}/teaching-points${qs ? `?${qs}` : ""}`,
       { cache: "no-store" },
     );
@@ -796,7 +823,7 @@ class SidecarApi {
     test_type?: string;
   }): Promise<TeachingPoint> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/teaching-points`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/teaching-points`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -812,7 +839,7 @@ class SidecarApi {
     test_type?: string | null;
   }): Promise<TeachingPoint> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/teaching-points/${id}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/teaching-points/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -825,7 +852,7 @@ class SidecarApi {
 
   async deleteTeachingPoint(id: number): Promise<void> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/teaching-points/${id}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/teaching-points/${id}`, {
       method: "DELETE",
     });
     if (!response.ok) {
@@ -844,7 +871,7 @@ class SidecarApi {
       params.set("test_type", testType);
     }
     const qs = params.toString();
-    const response = await fetch(
+    const response = await this.fetchWithAuth(
       `${baseUrl}/teaching-points/shared${qs ? `?${qs}` : ""}`,
       { cache: "no-store" },
     );
@@ -858,7 +885,7 @@ class SidecarApi {
     rows: Record<string, unknown>[],
   ): Promise<{ replaced: number }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/teaching-points/shared/sync`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/teaching-points/shared/sync`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rows }),
@@ -871,7 +898,7 @@ class SidecarApi {
 
   async listSharedTemplates(): Promise<SharedTemplate[]> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/templates/shared`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/templates/shared`, {
       cache: "no-store",
     });
     if (!response.ok) {
@@ -884,7 +911,7 @@ class SidecarApi {
     rows: Record<string, unknown>[],
   ): Promise<{ replaced: number }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/templates/shared/sync`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/templates/shared/sync`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rows }),
@@ -899,7 +926,7 @@ class SidecarApi {
 
   async syncExportAll(table: string): Promise<Record<string, unknown>[]> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/sync/export/${table}`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/sync/export/${table}`, {
       cache: "no-store",
     });
     if (!response.ok) {
@@ -913,7 +940,7 @@ class SidecarApi {
     recordId: number,
   ): Promise<Record<string, unknown>> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(
+    const response = await this.fetchWithAuth(
       `${baseUrl}/sync/export/${table}/${recordId}`,
       { cache: "no-store" },
     );
@@ -928,7 +955,7 @@ class SidecarApi {
     rows: Record<string, unknown>[],
   ): Promise<{ merged: number; skipped: number }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/sync/merge`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/sync/merge`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ table, rows }),
@@ -953,7 +980,7 @@ class SidecarApi {
     output_tokens: number;
   }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/analyze/compare`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/analyze/compare`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -981,7 +1008,7 @@ class SidecarApi {
     output_tokens: number;
   }> {
     const baseUrl = await this.ensureInitialized();
-    const response = await fetch(`${baseUrl}/analyze/synthesize`, {
+    const response = await this.fetchWithAuth(`${baseUrl}/analyze/synthesize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

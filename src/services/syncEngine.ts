@@ -8,6 +8,7 @@
 import { getSupabase, getSession } from "./supabase";
 import { sidecarApi } from "./sidecarApi";
 import { pullSharedConfig } from "./sharedConfig";
+import { IS_TAURI, APP_VERSION } from "./platform";
 
 // ---------------------------------------------------------------------------
 // Pull shared content (teaching points + templates from other users)
@@ -284,6 +285,7 @@ async function pushQueuedChanges(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function pushAllLocal(): Promise<void> {
+  if (!IS_TAURI) return; // Web mode: backend writes directly to Supabase
   const supabase = getSupabase();
   if (!supabase) return;
 
@@ -346,6 +348,7 @@ export async function queueUpsertAfterMutation(
   table: SyncTable,
   recordId: number,
 ): Promise<void> {
+  if (!IS_TAURI) return; // Web mode: backend writes directly to Supabase
   if (!isSupabaseConfigured()) return;
   try {
     const row = await sidecarApi.syncExportRecord(table, recordId);
@@ -375,6 +378,7 @@ export async function deleteFromSupabase(
   table: SyncTable,
   syncId: string,
 ): Promise<void> {
+  if (!IS_TAURI) return; // Web mode: backend writes directly to Supabase
   const supabase = getSupabase();
   if (!supabase || !syncId) return;
   try {
@@ -395,6 +399,7 @@ export async function deleteFromSupabase(
 // ---------------------------------------------------------------------------
 
 export async function fullSync(): Promise<void> {
+  if (!IS_TAURI) return; // Web mode: backend writes directly to Supabase
   await pushAllLocal();
   await pullRemoteData();
   await pushQueuedChanges();
@@ -409,13 +414,11 @@ async function reportAppVersion(): Promise<void> {
   if (!session?.user?.id) return;
 
   try {
-    const { getVersion } = await import("@tauri-apps/api/app");
-    const version = await getVersion();
     await supabase.from("settings").upsert(
       {
         user_id: session.user.id,
         key: "app_version",
-        value: version,
+        value: APP_VERSION,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,key" },
