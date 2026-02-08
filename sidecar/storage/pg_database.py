@@ -59,11 +59,26 @@ async def _get_pool():
     global _pool
     if _pool is None:
         import asyncpg
+        import ssl as _ssl
 
         params = _parse_database_url(DATABASE_URL)
+        # Supabase requires SSL for direct connections
+        ssl_ctx = _ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = _ssl.CERT_NONE
+
+        # Resolve hostname to IPv4 explicitly to avoid IPv6 unreachable errors
+        import socket as _socket
+        host = params.pop("host")
+        ipv4 = _socket.getaddrinfo(host, None, _socket.AF_INET)[0][4][0]
+        logger.info("Resolved %s -> %s", host, ipv4)
+
         _pool = await asyncpg.create_pool(
             min_size=2,
             max_size=10,
+            ssl=ssl_ctx,
+            host=ipv4,
+            server_settings={"search_path": "public"},
             **params,
         )
         logger.info("PostgreSQL connection pool initialized")
