@@ -33,9 +33,10 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Explify Sidecar", version="0.4.0", lifespan=lifespan)
-    add_cors_middleware(app)
-    # Auth middleware must be added after CORS (middleware executes in reverse order)
+    # Auth middleware added first (inner); CORS added last (outer) so CORS
+    # headers appear on all responses including auth errors.
     app.add_middleware(AuthMiddleware)
+    add_cors_middleware(app)
     # Audit logging and rate limiting (web mode only)
     if REQUIRE_AUTH:
         from api.audit import AuditMiddleware
