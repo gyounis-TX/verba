@@ -18,7 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 def _normalize_row(row: dict[str, Any]) -> dict[str, Any]:
-    """Convert native PostgreSQL types (datetime, UUID) to JSON-compatible primitives."""
+    """Convert native PostgreSQL types (datetime, UUID) to JSON-compatible primitives.
+
+    Also ensures an 'id' field exists — Supabase rows synced from desktop may
+    only have 'sync_id', while Pydantic models require 'id'.
+    """
     out: dict[str, Any] = {}
     for k, v in row.items():
         if isinstance(v, datetime):
@@ -27,6 +31,9 @@ def _normalize_row(row: dict[str, Any]) -> dict[str, Any]:
             out[k] = str(v)
         else:
             out[k] = v
+    # Ensure 'id' exists — fall back to sync_id for rows synced from desktop
+    if out.get("id") is None and out.get("sync_id"):
+        out["id"] = out["sync_id"]
     return out
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
