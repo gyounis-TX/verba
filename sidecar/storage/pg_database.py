@@ -31,16 +31,40 @@ from storage.database import _extract_stylistic_patterns
 _pool = None
 
 
+def _parse_database_url(url: str) -> dict:
+    """Parse DATABASE_URL into asyncpg-compatible connection parameters.
+
+    Python 3.12's urllib has strict URL parsing that chokes on passwords
+    with special characters. Parse manually to avoid this.
+    """
+    # postgresql://user:password@host:port/dbname
+    import re as _re
+
+    m = _re.match(
+        r"^postgres(?:ql)?://([^:]+):(.+)@([^:/@]+):(\d+)/(.+)$", url
+    )
+    if not m:
+        raise ValueError(f"Cannot parse DATABASE_URL: {url[:30]}...")
+    return {
+        "user": m.group(1),
+        "password": m.group(2),
+        "host": m.group(3),
+        "port": int(m.group(4)),
+        "database": m.group(5),
+    }
+
+
 async def _get_pool():
     """Return the asyncpg connection pool, creating it on first call."""
     global _pool
     if _pool is None:
         import asyncpg
 
+        params = _parse_database_url(DATABASE_URL)
         _pool = await asyncpg.create_pool(
-            DATABASE_URL,
             min_size=2,
             max_size=10,
+            **params,
         )
         logger.info("PostgreSQL connection pool initialized")
     return _pool
