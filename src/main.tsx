@@ -62,7 +62,7 @@ if (isAuthRedirect) {
       </div>
     </div>
   `;
-} else if (!isTauri && !window.location.hostname.match(/^(localhost|127\.0\.0\.1)$/)) {
+} else if (!isTauri && !import.meta.env.VITE_API_URL && !window.location.hostname.match(/^(localhost|127\.0\.0\.1)$/)) {
   // Opened in a browser without Tauri (e.g. from a stale bookmark or
   // a Supabase redirect that didn't include tokens). Show a message
   // instead of a blank page.
