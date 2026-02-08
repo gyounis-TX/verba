@@ -30,7 +30,7 @@ jobs:
           docker push ${{ secrets.ECR_URI }}:latest
       - name: Deploy to ECS
         run: |
-          aws ecs update-service --cluster explify --service explify-api --force-new-deployment
+          aws ecs update-service --cluster explify --service explify-api-service-cifg1mjg --force-new-deployment
 
   deploy-frontend:
     runs-on: ubuntu-latest
