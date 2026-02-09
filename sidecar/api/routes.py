@@ -28,6 +28,8 @@ from api.history_models import (
     HistoryLikeResponse,
     HistoryListItem,
     HistoryListResponse,
+    HistoryRateRequest,
+    HistoryRateResponse,
 )
 from api.letter_models import (
     LetterDeleteResponse,
@@ -456,6 +458,25 @@ async def parse_report(request: ParseRequest = Body(...)):
         )
 
 
+class PatientFingerprintRequest(BaseModel):
+    texts: list[str]
+
+
+@router.post("/analyze/patient-fingerprints")
+async def compute_patient_fingerprints(request: PatientFingerprintRequest = Body(...)):
+    """Compute patient identity fingerprints for a list of report texts.
+
+    Used during batch upload to detect when reports may belong to different
+    patients.  Returns a list of fingerprint hashes (empty string when no
+    patient identity is found).  The frontend compares the hashes — if they
+    don't all match, it shows a warning modal.
+    """
+    from phi.scrubber import compute_patient_fingerprint
+
+    fingerprints = [compute_patient_fingerprint(t) for t in request.texts]
+    return {"fingerprints": fingerprints}
+
+
 @router.post("/analyze/explain", response_model=ExplainResponse)
 @limiter.limit(ANALYZE_RATE_LIMIT)
 async def explain_report(request: Request, body: ExplainRequest = Body(...)):
@@ -517,6 +538,33 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
             detection_confidence=detection_confidence,
         )
 
+    # 3b. Multi-type detection: find secondary test types and merge their data
+    try:
+        multi_results = registry.detect_multi(extraction_result, threshold=0.3)
+        secondary_types = [
+            tid for tid, _conf in multi_results
+            if tid != test_type and _conf >= 0.3
+        ]
+        if secondary_types:
+            parsed_report.secondary_test_types = secondary_types
+            # Merge secondary measurements and glossary entries
+            for sec_type in secondary_types[:2]:  # Limit to 2 secondary types
+                sec_handler = registry.get(sec_type)
+                if sec_handler:
+                    try:
+                        sec_parsed = sec_handler.parse(extraction_result, gender=patient_gender, age=patient_age)
+                        for m in sec_parsed.measurements:
+                            existing_abbrs = {em.abbreviation for em in parsed_report.measurements}
+                            if m.abbreviation not in existing_abbrs:
+                                parsed_report.measurements.append(m)
+                        for f in sec_parsed.findings:
+                            if f not in parsed_report.findings:
+                                parsed_report.findings.append(f)
+                    except Exception:
+                        pass  # Non-critical: secondary parsing failures are OK
+    except Exception:
+        pass
+
     # 4. Resolve API key
     settings = await settings_store.get_settings(user_id=user_id)
     provider_str = body.provider.value if body.provider else settings.llm_provider.value
@@ -574,6 +622,22 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
         prompt_context["specialty"] = settings.specialty
     tone_pref = body.tone_preference if body.tone_preference is not None else settings.tone_preference
     detail_pref = body.detail_preference if body.detail_preference is not None else settings.detail_preference
+
+    # Severity-adaptive defaults: adjust tone/detail when findings are severe
+    from llm.prompt_engine import compute_severity_score
+    severity_score = compute_severity_score(parsed_report)
+    tone_auto_adjusted = False
+    # Only auto-adjust if physician hasn't explicitly set per-request overrides
+    if settings.severity_adaptive_tone and body.tone_preference is None and body.detail_preference is None:
+        if severity_score > 0.8:
+            tone_pref = min(tone_pref + 2, 5)
+            detail_pref = min(detail_pref + 1, 5)
+            tone_auto_adjusted = True
+        elif severity_score > 0.5:
+            tone_pref = min(tone_pref + 1, 5)
+            detail_pref = min(detail_pref + 1, 5)
+            tone_auto_adjusted = True
+
     inc_findings = body.include_key_findings if body.include_key_findings is not None else settings.include_key_findings
     inc_measurements = body.include_measurements if body.include_measurements is not None else settings.include_measurements
     is_sms = bool(body.sms_summary)
@@ -641,16 +705,77 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
     # 6g. Fetch learned phrases from doctor edits
     learned_phrases = await _db_call("get_learned_phrases", test_type=test_type, limit=5, user_id=user_id)
 
+    # 6h. Fetch no-edit ratio for positive signal
+    no_edit_ratio = await _db_call("get_no_edit_ratio", test_type, limit=10, user_id=user_id)
+
+    # 6i. Fetch word-level edit corrections
+    try:
+        from storage.edit_analyzer import get_edit_corrections
+        edit_corrections = get_edit_corrections(_db(), test_type, user_id=user_id, is_pg=_USE_PG)
+        if _USE_PG:
+            edit_corrections = await edit_corrections
+    except (ImportError, Exception):
+        edit_corrections = None
+
+    # 6j. Fetch quality feedback adjustments
+    try:
+        from storage.feedback_analyzer import get_feedback_adjustments
+        quality_feedback = get_feedback_adjustments(_db(), test_type, user_id=user_id, is_pg=_USE_PG)
+        if _USE_PG:
+            quality_feedback = await quality_feedback
+    except (ImportError, Exception):
+        quality_feedback = None
+
+    # 6k. Extract lab-printed reference ranges
+    lab_ref_section = ""
+    try:
+        from extraction.reference_range_extractor import extract_reference_ranges, merge_reference_ranges
+        lab_ranges = extract_reference_ranges(scrub_result.scrubbed_text)
+        if lab_ranges:
+            builtin_ranges = handler.get_reference_ranges() if handler else {}
+            lab_ref_section = merge_reference_ranges(lab_ranges, builtin_ranges, parsed_report.measurements or [])
+    except (ImportError, Exception):
+        lab_ref_section = ""
+
+    # 6l. Fetch vocabulary preferences from edit patterns
+    try:
+        from storage.edit_analyzer import get_vocabulary_preferences
+        vocab_prefs = get_vocabulary_preferences(_db(), test_type, user_id=user_id, is_pg=_USE_PG)
+        if _USE_PG:
+            vocab_prefs = await vocab_prefs
+    except (ImportError, Exception):
+        vocab_prefs = None
+
+    # 6m. Fetch persistent style profile
+    try:
+        style_profile = await _db_call("get_style_profile", test_type, user_id=user_id)
+    except Exception:
+        style_profile = None
+
     # Combine custom phrases (from settings) with learned phrases (from edits)
     all_custom_phrases = list(settings.custom_phrases) if hasattr(settings, 'custom_phrases') else []
     for lp in learned_phrases:
         if lp not in all_custom_phrases:
             all_custom_phrases.append(lp)
 
+    # Merge reference ranges and glossary from secondary types
+    merged_ref_ranges = handler.get_reference_ranges() if handler else {}
+    merged_glossary = handler.get_glossary() if handler else {}
+    if parsed_report.secondary_test_types:
+        for sec_type in parsed_report.secondary_test_types[:2]:
+            sec_handler = registry.get(sec_type)
+            if sec_handler:
+                for k, v in sec_handler.get_reference_ranges().items():
+                    if k not in merged_ref_ranges:
+                        merged_ref_ranges[k] = v
+                for k, v in sec_handler.get_glossary().items():
+                    if k not in merged_glossary:
+                        merged_glossary[k] = v
+
     user_prompt = prompt_engine.build_user_prompt(
         parsed_report=parsed_report,
-        reference_ranges=handler.get_reference_ranges() if handler else {},
-        glossary=handler.get_glossary() if handler else {},
+        reference_ranges=merged_ref_ranges,
+        glossary=merged_glossary,
         scrubbed_text=scrub_result.scrubbed_text,
         clinical_context=scrubbed_clinical_context,
         template_instructions=template_instructions,
@@ -667,6 +792,13 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
         quick_reasons=body.quick_reasons,
         custom_phrases=all_custom_phrases,
         report_date=report_date,
+        no_edit_ratio=no_edit_ratio,
+        edit_corrections=edit_corrections,
+        quality_feedback=quality_feedback,
+        lab_reference_ranges_section=lab_ref_section or None,
+        vocabulary_preferences=vocab_prefs,
+        style_profile=style_profile,
+        batch_prior_summaries=body.batch_prior_summaries,
     )
 
     # Log prompt sizes for debugging token issues
@@ -747,7 +879,44 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
         model_used=llm_response.model,
         input_tokens=llm_response.input_tokens,
         output_tokens=llm_response.output_tokens,
+        severity_score=severity_score if severity_score > 0 else None,
+        tone_auto_adjusted=tone_auto_adjusted,
     )
+
+
+async def _update_style_profile_from_history(history_id: str, user_id: str | None) -> None:
+    """Extract style data from a history record and update the persistent profile."""
+    record = await _db_call("get_history", history_id, user_id=user_id)
+    if not record:
+        return
+    test_type = record.get("test_type", "")
+    full_response = record.get("full_response", {})
+    if isinstance(full_response, str):
+        full_response = json.loads(full_response)
+
+    explanation = full_response.get("explanation", {})
+    text = explanation.get("overall_summary", "")
+    if not text:
+        return
+
+    from storage.database import _extract_stylistic_patterns
+    patterns = _extract_stylistic_patterns(text)
+
+    # Build profile data from the patterns
+    profile_data: dict = {}
+    if "avg_sentence_length" in patterns:
+        profile_data["avg_sentence_length"] = patterns["avg_sentence_length"]
+    if "paragraph_count" in patterns:
+        profile_data["avg_paragraph_count"] = patterns["paragraph_count"]
+    if "contraction_rate" in patterns:
+        profile_data["contraction_rate"] = patterns["contraction_rate"]
+    if patterns.get("openings"):
+        profile_data["preferred_openings"] = patterns["openings"]
+    if patterns.get("closings"):
+        profile_data["preferred_closings"] = patterns["closings"]
+
+    if profile_data:
+        await _db_call("update_style_profile", test_type, profile_data, 0.3, user_id=user_id)
 
 
 def _sse_event(data: dict) -> str:
@@ -817,6 +986,33 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
                 detection_confidence=detection_confidence,
             )
 
+        # Multi-type detection: merge secondary type data
+        try:
+            multi_results = registry.detect_multi(extraction_result, threshold=0.3)
+            secondary_types = [
+                tid for tid, _conf in multi_results
+                if tid != test_type and _conf >= 0.3
+            ]
+            if secondary_types:
+                parsed_report.secondary_test_types = secondary_types
+                for sec_type in secondary_types[:2]:
+                    sec_handler = registry.get(sec_type)
+                    if sec_handler:
+                        try:
+                            sec_parsed = sec_handler.parse(extraction_result, gender=patient_gender, age=patient_age)
+                            existing_abbrs = {em.abbreviation for em in parsed_report.measurements}
+                            for m in sec_parsed.measurements:
+                                if m.abbreviation not in existing_abbrs:
+                                    parsed_report.measurements.append(m)
+                                    existing_abbrs.add(m.abbreviation)
+                            for f in sec_parsed.findings:
+                                if f not in parsed_report.findings:
+                                    parsed_report.findings.append(f)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
         m_count = len(parsed_report.measurements) if parsed_report.measurements else 0
         f_count = len(parsed_report.findings) if parsed_report.findings else 0
         parse_msg = f"Found {m_count} measurement{'s' if m_count != 1 else ''}"
@@ -865,6 +1061,21 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             prompt_context["specialty"] = settings.specialty
         tone_pref = explain_request.tone_preference if explain_request.tone_preference is not None else settings.tone_preference
         detail_pref = explain_request.detail_preference if explain_request.detail_preference is not None else settings.detail_preference
+
+        # Severity-adaptive defaults
+        from llm.prompt_engine import compute_severity_score
+        severity_score = compute_severity_score(parsed_report)
+        tone_auto_adjusted = False
+        if settings.severity_adaptive_tone and explain_request.tone_preference is None and explain_request.detail_preference is None:
+            if severity_score > 0.8:
+                tone_pref = min(tone_pref + 2, 5)
+                detail_pref = min(detail_pref + 1, 5)
+                tone_auto_adjusted = True
+            elif severity_score > 0.5:
+                tone_pref = min(tone_pref + 1, 5)
+                detail_pref = min(detail_pref + 1, 5)
+                tone_auto_adjusted = True
+
         inc_findings = explain_request.include_key_findings if explain_request.include_key_findings is not None else settings.include_key_findings
         inc_measurements = explain_request.include_measurements if explain_request.include_measurements is not None else settings.include_measurements
         is_sms = bool(explain_request.sms_summary)
@@ -925,15 +1136,76 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
         recent_edits = await _db_call("get_recent_edits", test_type, limit=3, user_id=user_id)
         learned_phrases = await _db_call("get_learned_phrases", test_type=test_type, limit=5, user_id=user_id)
 
+        # Fetch no-edit ratio for positive signal
+        no_edit_ratio = await _db_call("get_no_edit_ratio", test_type, limit=10, user_id=user_id)
+
+        # Fetch word-level edit corrections
+        try:
+            from storage.edit_analyzer import get_edit_corrections
+            edit_corrections = get_edit_corrections(_db(), test_type, user_id=user_id, is_pg=_USE_PG)
+            if _USE_PG:
+                edit_corrections = await edit_corrections
+        except (ImportError, Exception):
+            edit_corrections = None
+
+        # Fetch quality feedback adjustments
+        try:
+            from storage.feedback_analyzer import get_feedback_adjustments
+            quality_feedback = get_feedback_adjustments(_db(), test_type, user_id=user_id, is_pg=_USE_PG)
+            if _USE_PG:
+                quality_feedback = await quality_feedback
+        except (ImportError, Exception):
+            quality_feedback = None
+
+        # Extract lab-printed reference ranges
+        lab_ref_section = ""
+        try:
+            from extraction.reference_range_extractor import extract_reference_ranges, merge_reference_ranges
+            lab_ranges = extract_reference_ranges(scrub_result.scrubbed_text)
+            if lab_ranges:
+                builtin_ranges = handler.get_reference_ranges() if handler else {}
+                lab_ref_section = merge_reference_ranges(lab_ranges, builtin_ranges, parsed_report.measurements or [])
+        except (ImportError, Exception):
+            lab_ref_section = ""
+
+        # Fetch vocabulary preferences from edit patterns
+        try:
+            from storage.edit_analyzer import get_vocabulary_preferences
+            vocab_prefs = get_vocabulary_preferences(_db(), test_type, user_id=user_id, is_pg=_USE_PG)
+            if _USE_PG:
+                vocab_prefs = await vocab_prefs
+        except (ImportError, Exception):
+            vocab_prefs = None
+
+        # Fetch persistent style profile
+        try:
+            style_profile = await _db_call("get_style_profile", test_type, user_id=user_id)
+        except Exception:
+            style_profile = None
+
         all_custom_phrases = list(settings.custom_phrases) if hasattr(settings, 'custom_phrases') else []
         for lp in learned_phrases:
             if lp not in all_custom_phrases:
                 all_custom_phrases.append(lp)
 
+        # Merge reference ranges and glossary from secondary types
+        merged_ref_ranges = handler.get_reference_ranges() if handler else {}
+        merged_glossary = handler.get_glossary() if handler else {}
+        if parsed_report.secondary_test_types:
+            for sec_type in parsed_report.secondary_test_types[:2]:
+                sec_handler = registry.get(sec_type)
+                if sec_handler:
+                    for k, v in sec_handler.get_reference_ranges().items():
+                        if k not in merged_ref_ranges:
+                            merged_ref_ranges[k] = v
+                    for k, v in sec_handler.get_glossary().items():
+                        if k not in merged_glossary:
+                            merged_glossary[k] = v
+
         user_prompt = prompt_engine.build_user_prompt(
             parsed_report=parsed_report,
-            reference_ranges=handler.get_reference_ranges() if handler else {},
-            glossary=handler.get_glossary() if handler else {},
+            reference_ranges=merged_ref_ranges,
+            glossary=merged_glossary,
             scrubbed_text=scrub_result.scrubbed_text,
             clinical_context=scrubbed_clinical_context,
             template_instructions=template_instructions,
@@ -950,6 +1222,13 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             quick_reasons=explain_request.quick_reasons,
             custom_phrases=all_custom_phrases,
             report_date=report_date,
+            no_edit_ratio=no_edit_ratio,
+            edit_corrections=edit_corrections,
+            quality_feedback=quality_feedback,
+            lab_reference_ranges_section=lab_ref_section or None,
+            vocabulary_preferences=vocab_prefs,
+            style_profile=style_profile,
+            batch_prior_summaries=explain_request.batch_prior_summaries,
         )
 
         llm_provider = LLMProvider(provider_str)
@@ -1019,6 +1298,8 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             model_used=llm_response.model,
             input_tokens=llm_response.input_tokens,
             output_tokens=llm_response.output_tokens,
+            severity_score=severity_score if severity_score > 0 else None,
+            tone_auto_adjusted=tone_auto_adjusted,
         )
 
         yield _sse_event({"stage": "done", "data": response.model_dump(mode="json")})
@@ -1529,6 +1810,20 @@ async def create_history(request: Request, body: HistoryCreateRequest = Body(...
         detail_preference=body.detail_preference,
         user_id=user_id,
     )
+    # Record which settings were used for edit-parameter correlation
+    if body.tone_preference is not None or body.detail_preference is not None:
+        try:
+            await _db_call(
+                "save_history_settings_used",
+                record["id"],
+                tone=body.tone_preference,
+                detail=body.detail_preference,
+                literacy=body.literacy_level,
+                was_edited=False,
+                user_id=user_id,
+            )
+        except Exception:
+            pass  # Non-critical
     record["liked"] = bool(record.get("liked", 0))
     return HistoryDetailResponse(**record)
 
@@ -1554,6 +1849,12 @@ async def toggle_history_liked(
     updated = await _db_call("update_history_liked", history_id, body.liked, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
+    # Update style profile when liked
+    if body.liked:
+        try:
+            await _update_style_profile_from_history(history_id, user_id)
+        except Exception:
+            pass
     return HistoryLikeResponse(id=history_id, liked=body.liked)
 
 
@@ -1578,7 +1879,48 @@ async def save_edited_text(request: Request, history_id: str, body: EditedTextRe
     updated = await _db_call("save_edited_text", history_id, body.edited_text, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
+    # Mark this report as edited for edit-parameter correlation
+    try:
+        await _db_call("save_history_settings_used", history_id, tone=None, detail=None, literacy=None, was_edited=True, user_id=user_id)
+    except Exception:
+        pass  # Non-critical
     return {"id": history_id, "edited_text_saved": True}
+
+
+@router.post("/history/{history_id}/rate", response_model=HistoryRateResponse)
+async def rate_history(request: Request, history_id: str, body: HistoryRateRequest = Body(...)):
+    """Rate the quality of a history record (1-5 stars) with optional note."""
+    user_id = _get_user_id(request)
+    updated = await _db_call("rate_history", history_id, body.rating, body.note, user_id=user_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="History record not found.")
+    # Update style profile for highly-rated reports (4+)
+    if body.rating >= 4:
+        try:
+            await _update_style_profile_from_history(history_id, user_id)
+        except Exception:
+            pass
+    return HistoryRateResponse(id=history_id, quality_rating=body.rating, quality_note=body.note)
+
+
+@router.get("/history/{history_id}/optimal-settings")
+async def get_optimal_settings(request: Request, history_id: str):
+    """Return optimal tone/detail settings based on edit patterns for a test type."""
+    user_id = _get_user_id(request)
+    record = await _db_call("get_history", history_id, user_id=user_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="History record not found.")
+    test_type = record.get("test_type", "")
+    optimal = await _db_call("get_optimal_settings", test_type, min_samples=5, user_id=user_id)
+    return {"test_type": test_type, "optimal_settings": optimal}
+
+
+@router.get("/settings/optimal-for/{test_type}")
+async def get_optimal_settings_by_type(request: Request, test_type: str):
+    """Get optimal tone/detail settings for a given test type based on edit history."""
+    user_id = _get_user_id(request)
+    optimal = await _db_call("get_optimal_settings", test_type, min_samples=5, user_id=user_id)
+    return {"test_type": test_type, "optimal_settings": optimal}
 
 
 # --- Consent Endpoints ---

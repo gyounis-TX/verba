@@ -153,6 +153,10 @@ export function ImportScreen() {
   // Single-report preview collapse state
   const [singlePreviewExpanded, setSinglePreviewExpanded] = useState(false);
 
+  // Patient mismatch warning state
+  const [showMismatchModal, setShowMismatchModal] = useState(false);
+  const [pendingProceedState, setPendingProceedState] = useState<Record<string, unknown> | null>(null);
+
   // Track whether we've applied location state (to avoid re-applying on re-renders)
   const [appliedLocationState, setAppliedLocationState] = useState(false);
 
@@ -596,7 +600,11 @@ export function ImportScreen() {
     }
   }, [selectedFiles, pastedText, textEntries, showToast, navigate]);
 
-  const handleProceed = useCallback(() => {
+  const doProceed = useCallback((state: Record<string, unknown>) => {
+    navigate("/processing", { state });
+  }, [navigate]);
+
+  const handleProceed = useCallback(async () => {
     // Collect all successful extraction results
     const successfulResults: Array<{ key: string; result: ExtractionResult }> = [];
     const testTypes: Record<string, string> = {};
@@ -632,10 +640,28 @@ export function ImportScreen() {
       if (isBatch) {
         state.batchExtractionResults = successfulResults;
         state.testTypes = testTypes;
+
+        // Patient mismatch check: compare fingerprints across batch entries
+        try {
+          const texts = successfulResults.map(r => r.result.full_text);
+          const fingerprints = await sidecarApi.computePatientFingerprints(texts);
+          const nonEmpty = fingerprints.filter(f => f !== "");
+          if (nonEmpty.length >= 2) {
+            const unique = new Set(nonEmpty);
+            if (unique.size > 1) {
+              // Fingerprints differ — show warning modal
+              setPendingProceedState(state);
+              setShowMismatchModal(true);
+              return;
+            }
+          }
+        } catch {
+          // Fingerprint check is non-critical — proceed anyway
+        }
       }
-      navigate("/processing", { state });
+      doProceed(state);
     }
-  }, [navigate, result, selectedTemplateValue, clinicalContext, selectedReasons, resolvedTestType, extractionResults, resolveEntryTestType]);
+  }, [doProceed, result, selectedTemplateValue, clinicalContext, selectedReasons, resolvedTestType, extractionResults, resolveEntryTestType]);
 
   const canExtract =
     status !== "extracting" &&
@@ -1444,6 +1470,43 @@ export function ImportScreen() {
         </div>
         );
       })()}
+
+      {/* Patient Mismatch Warning Modal */}
+      {showMismatchModal && (
+        <div className="type-modal-backdrop" onClick={() => setShowMismatchModal(false)}>
+          <div className="type-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="type-modal-title">Patient Mismatch Detected</h3>
+            <p className="type-modal-subtitle">
+              These reports may belong to different patients based on the patient
+              identifiers found in the text. Processing reports from different
+              patients together may produce inaccurate cross-references.
+            </p>
+            <div className="type-modal-actions">
+              <button
+                className="type-modal-cancel"
+                onClick={() => {
+                  setShowMismatchModal(false);
+                  setPendingProceedState(null);
+                }}
+              >
+                Go Back
+              </button>
+              <button
+                className="type-modal-confirm"
+                onClick={() => {
+                  setShowMismatchModal(false);
+                  if (pendingProceedState) {
+                    doProceed(pendingProceedState);
+                    setPendingProceedState(null);
+                  }
+                }}
+              >
+                Continue Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

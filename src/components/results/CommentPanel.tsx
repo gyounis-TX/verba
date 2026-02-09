@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 interface CommentPanelProps {
   commentMode: "long" | "short" | "sms";
   setCommentMode: (mode: "long" | "short" | "sms") => void;
@@ -17,6 +19,8 @@ interface CommentPanelProps {
   smsEnabled: boolean;
   testTypeDisplay?: string;
   onChangeType?: () => void;
+  qualityRating?: number | null;
+  onRate?: (rating: number, note?: string) => void;
 }
 
 export function CommentPanel({
@@ -38,7 +42,31 @@ export function CommentPanel({
   smsEnabled,
   testTypeDisplay,
   onChangeType,
+  qualityRating,
+  onRate,
 }: CommentPanelProps) {
+  const [hoverRating, setHoverRating] = useState(0);
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
+  const [feedbackNote, setFeedbackNote] = useState("");
+  const [pendingRating, setPendingRating] = useState(0);
+
+  const handleStarClick = (star: number) => {
+    if (star <= 3) {
+      setPendingRating(star);
+      setShowFeedbackInput(true);
+    } else {
+      onRate?.(star);
+      setShowFeedbackInput(false);
+    }
+  };
+
+  const submitFeedback = () => {
+    onRate?.(pendingRating, feedbackNote || undefined);
+    setShowFeedbackInput(false);
+    setFeedbackNote("");
+    setPendingRating(0);
+  };
+
   const isLoading =
     (isGeneratingComment && commentMode === "short") ||
     (isGeneratingLong && commentMode === "long") ||
@@ -48,13 +76,52 @@ export function CommentPanel({
     <div className="results-comment-panel">
       <div className="comment-panel-header">
         <h3>Result Comment</h3>
-        <button
-          className={`like-btn${isLiked ? " like-btn--active" : ""}`}
-          onClick={onToggleLike}
-        >
-          {isLiked ? "\u2665 Liked" : "\u2661 Like"}
-        </button>
+        <div className="comment-panel-actions">
+          <button
+            className={`like-btn${isLiked ? " like-btn--active" : ""}`}
+            onClick={onToggleLike}
+          >
+            {isLiked ? "\u2665 Liked" : "\u2661 Like"}
+          </button>
+          {onRate && (
+            <div className="star-rating" onMouseLeave={() => setHoverRating(0)}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  className={`star-btn${(hoverRating || qualityRating || 0) >= star ? " star-btn--filled" : ""}`}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onClick={() => handleStarClick(star)}
+                  title={`Rate ${star}/5`}
+                >
+                  {(hoverRating || qualityRating || 0) >= star ? "\u2605" : "\u2606"}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+      {showFeedbackInput && (
+        <div className="feedback-input-row">
+          <input
+            className="feedback-input"
+            type="text"
+            placeholder="What could be improved?"
+            value={feedbackNote}
+            onChange={(e) => setFeedbackNote(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitFeedback()}
+            autoFocus
+          />
+          <button className="feedback-submit-btn" onClick={submitFeedback}>
+            Submit
+          </button>
+          <button
+            className="feedback-cancel-btn"
+            onClick={() => { setShowFeedbackInput(false); setPendingRating(0); }}
+          >
+            Skip
+          </button>
+        </div>
+      )}
       <div className="comment-type-toggle">
         <button
           className={`comment-type-btn${commentMode === "short" ? " comment-type-btn--active" : ""}`}

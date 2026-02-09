@@ -387,6 +387,8 @@ class SidecarApi {
       body.use_analogies = request.use_analogies;
     if (request.avoid_openings != null)
       body.avoid_openings = request.avoid_openings;
+    if (request.batch_prior_summaries != null)
+      body.batch_prior_summaries = request.batch_prior_summaries;
 
     const response = await this.fetchWithAuth(`${baseUrl}/analyze/explain-stream`, {
       method: "POST",
@@ -649,6 +651,32 @@ class SidecarApi {
     if (!response.ok) {
       await this.handleErrorResponse(response);
     }
+  }
+
+  async rateHistory(id: number, rating: number, note?: string): Promise<void> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(`${baseUrl}/history/${id}/rate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rating, note: note || null }),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+  }
+
+  async computePatientFingerprints(texts: string[]): Promise<string[]> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(`${baseUrl}/analyze/patient-fingerprints`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texts }),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    const data = await response.json();
+    return data.fingerprints;
   }
 
   // --- Consent ---

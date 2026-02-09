@@ -53,6 +53,7 @@ class ParsedReport(BaseModel):
     sections: list[ReportSection] = Field(default_factory=list)
     findings: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    secondary_test_types: list[str] = Field(default_factory=list)
 
 
 class DetectTypeResponse(BaseModel):

@@ -173,6 +173,7 @@ export interface ExplainRequest {
   use_analogies?: boolean;
   include_lifestyle_recommendations?: boolean;
   avoid_openings?: string[];
+  batch_prior_summaries?: Array<{ label: string; test_type_display: string; measurements_summary: string }>;
 }
 
 export interface ExplainResponse {

@@ -17,6 +17,7 @@ class HistoryCreateRequest(BaseModel):
     full_response: dict[str, Any]
     tone_preference: Optional[int] = None
     detail_preference: Optional[int] = None
+    literacy_level: Optional[str] = None
 
 
 class HistoryListItem(BaseModel):
@@ -56,6 +57,8 @@ class HistoryDetailResponse(BaseModel):
     sync_id: Optional[str] = None
     updated_at: Optional[str] = None
     edited_text: Optional[str] = None
+    quality_rating: Optional[int] = None
+    quality_note: Optional[str] = None
 
 
 class HistoryDeleteResponse(BaseModel):
@@ -76,6 +79,21 @@ class HistoryLikeResponse(BaseModel):
 
     id: str | int
     liked: bool
+
+
+class HistoryRateRequest(BaseModel):
+    """Request body for POST /history/{id}/rate."""
+
+    rating: int = Field(..., ge=1, le=5)
+    note: Optional[str] = None
+
+
+class HistoryRateResponse(BaseModel):
+    """Response for POST /history/{id}/rate."""
+
+    id: str | int
+    quality_rating: int
+    quality_note: Optional[str] = None
 
 
 class ConsentStatusResponse(BaseModel):

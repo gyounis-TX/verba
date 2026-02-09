@@ -58,6 +58,31 @@ class TestTypeRegistry:
 
         return (best_id, best_confidence)
 
+    def detect_multi(
+        self, extraction_result: ExtractionResult, threshold: float = 0.3,
+    ) -> list[tuple[str, float]]:
+        """Detect all test types above *threshold*.
+
+        Returns list of (type_id, confidence) sorted descending by confidence.
+        The first entry is the primary type.
+        """
+        results: list[tuple[str, float]] = []
+        for type_id, handler in self._handlers.items():
+            try:
+                confidence = handler.detect(extraction_result)
+                if confidence >= threshold:
+                    # Resolve subtypes
+                    resolved_id = type_id
+                    subtype = handler.resolve_subtype(extraction_result)
+                    if subtype is not None:
+                        resolved_id = subtype[0]
+                    results.append((resolved_id, confidence))
+            except Exception as e:
+                logger.error(f"Multi-detection failed for '{type_id}': {e}")
+
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results
+
     def get(self, type_id: str) -> Optional[BaseTestType]:
         # Prefer specialized family handler for subtype IDs
         parent = self._subtype_parents.get(type_id)

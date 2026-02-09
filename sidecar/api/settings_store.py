@@ -17,7 +17,7 @@ REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "").lower() == "true"
 _USE_PG = bool(os.getenv("DATABASE_URL", ""))
 
 # Non-secret settings stored in DB
-_DB_KEYS = ("llm_provider", "claude_model", "openai_model", "literacy_level", "specialty", "practice_name", "include_key_findings", "include_measurements", "tone_preference", "detail_preference", "quick_reasons", "next_steps_options", "explanation_voice", "name_drop", "physician_name_source", "custom_physician_name", "practice_providers", "short_comment_char_limit", "sms_summary_enabled", "sms_summary_char_limit", "default_comment_mode", "footer_type", "custom_footer_text", "aws_region")
+_DB_KEYS = ("llm_provider", "claude_model", "openai_model", "literacy_level", "specialty", "practice_name", "include_key_findings", "include_measurements", "tone_preference", "detail_preference", "quick_reasons", "next_steps_options", "explanation_voice", "name_drop", "physician_name_source", "custom_physician_name", "practice_providers", "short_comment_char_limit", "sms_summary_enabled", "sms_summary_char_limit", "default_comment_mode", "footer_type", "custom_footer_text", "aws_region", "severity_adaptive_tone")
 # Keys that store JSON-encoded lists
 _JSON_LIST_KEYS = {"quick_reasons", "next_steps_options", "practice_providers"}
 # Secret keys stored in OS keychain
@@ -132,6 +132,7 @@ async def get_settings(user_id: str | None = None) -> AppSettings:
         if "footer_type" in all_db
         else FooterTypeEnum.EXPLIFY_BRANDING,
         custom_footer_text=all_db.get("custom_footer_text"),
+        severity_adaptive_tone=all_db.get("severity_adaptive_tone", "true") != "false",
     )
 
 

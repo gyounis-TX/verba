@@ -149,6 +149,7 @@ export function ResultsScreen() {
   const [historyId, setHistoryId] = useState<number | null>(
     locationState?.historyId ?? (session?.historyId as number | undefined) ?? null,
   );
+  const [qualityRating, setQualityRating] = useState<number | null>(null);
   const [sectionSettings, setSectionSettings] = useState({
     include_key_findings: true,
     include_measurements: true,
@@ -626,6 +627,20 @@ export function ResultsScreen() {
       showToast("error", `Failed to update like status: ${msg}`);
     }
   }, [currentResponse, historyId, isLiked, effectiveTestType, toneSlider, detailSlider, showToast]);
+
+  const handleRate = useCallback(async (rating: number, note?: string) => {
+    if (!historyId) {
+      showToast("error", "Save the report first to rate it.");
+      return;
+    }
+    try {
+      await sidecarApi.rateHistory(historyId, rating, note);
+      setQualityRating(rating);
+      showToast("success", `Rated ${rating}/5. ${rating >= 4 ? "Thanks!" : "Thanks for the feedback."}`);
+    } catch {
+      showToast("error", "Failed to save rating.");
+    }
+  }, [historyId, showToast]);
 
   const markDirty = () => { if (!isDirty) setIsDirty(true); };
 
@@ -1125,6 +1140,8 @@ export function ResultsScreen() {
               smsEnabled={smsEnabled}
               testTypeDisplay={effectiveTestTypeDisplay}
               onChangeType={canRefine ? handleOpenChangeType : undefined}
+              qualityRating={qualityRating}
+              onRate={handleRate}
             />
 
             {sectionSettings.include_key_findings && (

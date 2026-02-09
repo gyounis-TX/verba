@@ -218,3 +218,51 @@ def scrub_phi(text: str) -> ScrubResult:
         phi_found=sorted(categories_found),
         redaction_count=total_redactions,
     )
+
+
+def compute_patient_fingerprint(text: str) -> str:
+    """Compute a deterministic hash of patient identity hints from raw text.
+
+    Extracts patient name, DOB, and MRN patterns, normalises them, and
+    returns a SHA-256 hex digest.  Two reports belonging to the same patient
+    will produce the same fingerprint.  The actual PHI values are never
+    stored — only the hash.
+
+    Returns an empty string if no patient identifiers are found.
+    """
+    import hashlib
+
+    tokens: list[str] = []
+
+    # Patient name (from label patterns)
+    name_pat = re.compile(
+        r"(?i)(?:patient(?:\s*name)?|name)\s*[:\-]\s*"
+        r"([A-Za-z][A-Za-z\s.\-']{2,40}?)(?=\s*(?:\n|$|,|\s{2}))",
+    )
+    m = name_pat.search(text)
+    if m:
+        tokens.append("name:" + re.sub(r"\s+", " ", m.group(1).strip().upper()))
+
+    # DOB
+    dob_pat = re.compile(
+        r"(?i)(?:DOB|Date\s+of\s+Birth|Birth\s*Date)\s*[:\-]\s*"
+        r"(\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4})",
+    )
+    m = dob_pat.search(text)
+    if m:
+        tokens.append("dob:" + m.group(1).strip())
+
+    # MRN / account
+    mrn_pat = re.compile(
+        r"(?i)(?:MRN|Medical\s+Record|Account|Accession)\s*(?:#|No\.?|Number)?\s*[:\-]?\s*"
+        r"([A-Z0-9]{4,20})",
+    )
+    m = mrn_pat.search(text)
+    if m:
+        tokens.append("mrn:" + m.group(1).strip().upper())
+
+    if not tokens:
+        return ""
+
+    combined = "|".join(sorted(tokens))
+    return hashlib.sha256(combined.encode()).hexdigest()

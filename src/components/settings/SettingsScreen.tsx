@@ -90,6 +90,7 @@ export function SettingsScreen() {
   const [useAnalogies, setUseAnalogies] = useState(true);
   const [includeLifestyleRecommendations, setIncludeLifestyleRecommendations] = useState(true);
   const [defaultCommentMode, setDefaultCommentMode] = useState<"short" | "long" | "sms">("short");
+  const [severityAdaptiveTone, setSeverityAdaptiveTone] = useState(true);
 
 
   useEffect(() => {
@@ -121,6 +122,7 @@ export function SettingsScreen() {
         setUseAnalogies(s.use_analogies ?? true);
         setIncludeLifestyleRecommendations(s.include_lifestyle_recommendations ?? true);
         setDefaultCommentMode(s.default_comment_mode ?? "short");
+        setSeverityAdaptiveTone(s.severity_adaptive_tone ?? true);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to load settings";
         setError(msg);
@@ -163,6 +165,7 @@ export function SettingsScreen() {
         use_analogies: useAnalogies,
         include_lifestyle_recommendations: includeLifestyleRecommendations,
         default_comment_mode: defaultCommentMode,
+        severity_adaptive_tone: severityAdaptiveTone,
       };
 
       await sidecarApi.updateSettings(update);
@@ -184,7 +187,7 @@ export function SettingsScreen() {
     } finally {
       setSaving(false);
     }
-  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, quickReasons, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, smsEnabled, smsCharLimit, footerType, customFooterText, useAnalogies, includeLifestyleRecommendations, defaultCommentMode, showToast]);
+  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, quickReasons, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, smsEnabled, smsCharLimit, footerType, customFooterText, useAnalogies, includeLifestyleRecommendations, defaultCommentMode, severityAdaptiveTone, showToast]);
 
   // Auto-save: debounce 800ms after any setting changes
   const handleSaveRef = useRef(handleSave);
@@ -198,7 +201,7 @@ export function SettingsScreen() {
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, quickReasons, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, smsEnabled, smsCharLimit, footerType, customFooterText, useAnalogies, includeLifestyleRecommendations, defaultCommentMode]);
+  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, quickReasons, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, smsEnabled, smsCharLimit, footerType, customFooterText, useAnalogies, includeLifestyleRecommendations, defaultCommentMode, severityAdaptiveTone]);
 
 
   if (loading) {
@@ -348,6 +351,21 @@ export function SettingsScreen() {
                   Lifestyle Recommendations
                   <span className="checkbox-label-hint">
                     Include diet, exercise, and lifestyle suggestions relevant to the findings
+                  </span>
+                </span>
+              </label>
+            </div>
+            <div className="form-group">
+              <label className="form-label checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={severityAdaptiveTone}
+                  onChange={(e) => setSeverityAdaptiveTone(e.target.checked)}
+                />
+                <span className="checkbox-label-text">
+                  Severity-Adaptive Tone
+                  <span className="checkbox-label-hint">
+                    Automatically adjust tone and detail level when severe or critical findings are detected
                   </span>
                 </span>
               </label>

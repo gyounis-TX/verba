@@ -287,6 +287,7 @@ export function ProcessingScreen() {
       const responses: ExplainResponse[] = [];
       const labels: string[] = [];
       const usedOpenings: string[] = [];
+      const batchSummaries: Array<{ label: string; test_type_display: string; measurements_summary: string }> = [];
 
       for (let i = 0; i < batchExtractionResults!.length; i++) {
         const br = batchExtractionResults![i];
@@ -308,6 +309,7 @@ export function ProcessingScreen() {
             short_comment: true,
             quick_reasons: quickReasons,
             avoid_openings: usedOpenings.length > 0 ? usedOpenings : undefined,
+            batch_prior_summaries: batchSummaries.length > 0 ? batchSummaries : undefined,
           });
 
           let fileResponse: ExplainResponse | null = null;
@@ -355,6 +357,21 @@ export function ProcessingScreen() {
             const summary = fileResponse.explanation.overall_summary;
             const firstSentence = summary.split(/[.!?]\s/)[0]?.trim();
             if (firstSentence) usedOpenings.push(firstSentence);
+
+            // Build cross-type summary for subsequent entries
+            const measurements = fileResponse.explanation.measurements || [];
+            const mSummary = measurements
+              .slice(0, 5)
+              .map((m: { abbreviation: string; value: number; unit: string; status: string }) =>
+                `${m.abbreviation}: ${m.value} ${m.unit} [${m.status}]`)
+              .join("; ");
+            if (mSummary) {
+              batchSummaries.push({
+                label: filename,
+                test_type_display: fileResponse.parsed_report.test_type_display || "Unknown",
+                measurements_summary: mSummary,
+              });
+            }
 
             responses.push(fileResponse);
             labels.push(fileResponse.parsed_report.test_type_display || filename);

@@ -111,6 +111,34 @@ def _extract_stylistic_patterns(text: str) -> dict[str, list[str]]:
     return patterns
 
 
+def _merge_profile(
+    existing: dict[str, Any], new_data: dict[str, Any], alpha: float,
+) -> dict[str, Any]:
+    """Merge new style data into existing profile using EMA for numeric fields
+    and union for list fields."""
+    merged = dict(existing)
+    for key, new_val in new_data.items():
+        if key not in merged:
+            merged[key] = new_val
+            continue
+        old_val = merged[key]
+        if isinstance(new_val, (int, float)) and isinstance(old_val, (int, float)):
+            # Exponential moving average
+            merged[key] = round(old_val * (1 - alpha) + new_val * alpha, 3)
+        elif isinstance(new_val, list) and isinstance(old_val, list):
+            # Union, keeping order, max 20 items
+            seen = set(old_val)
+            combined = list(old_val)
+            for item in new_val:
+                if item not in seen:
+                    combined.append(item)
+                    seen.add(item)
+            merged[key] = combined[:20]
+        else:
+            merged[key] = new_val
+    return merged
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
@@ -237,6 +265,13 @@ class Database:
                 "ALTER TABLE templates ADD COLUMN sync_id TEXT",
                 "ALTER TABLE history ADD COLUMN edited_text TEXT",
                 "ALTER TABLE templates ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE history ADD COLUMN quality_rating INTEGER",
+                "ALTER TABLE history ADD COLUMN quality_note TEXT",
+                "ALTER TABLE history ADD COLUMN tone_used INTEGER",
+                "ALTER TABLE history ADD COLUMN detail_used INTEGER",
+                "ALTER TABLE history ADD COLUMN literacy_used TEXT",
+                "ALTER TABLE history ADD COLUMN was_edited INTEGER NOT NULL DEFAULT 0",
+                "CREATE TABLE IF NOT EXISTS style_profiles (test_type TEXT PRIMARY KEY, profile TEXT NOT NULL, sample_count INTEGER NOT NULL DEFAULT 0, updated_at TEXT)",
             ]
             for migration in migrations:
                 try:
@@ -495,6 +530,146 @@ class Database:
         finally:
             conn.close()
 
+    def rate_history(self, history_id: int, rating: int, note: str | None = None) -> bool:
+        """Save a quality rating (1-5) and optional note for a history entry."""
+        conn = self._get_conn()
+        try:
+            cursor = conn.execute(
+                "UPDATE history SET quality_rating = ?, quality_note = ?, updated_at = ? WHERE id = ?",
+                (rating, note, _now(), history_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    def get_recent_feedback(
+        self, test_type: str, limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Fetch recent quality notes with rating <= 3 for feedback analysis."""
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT quality_rating, quality_note FROM history
+                   WHERE test_type = ? AND quality_rating IS NOT NULL
+                     AND quality_rating <= 3 AND quality_note IS NOT NULL
+                     AND quality_note != ''
+                   ORDER BY updated_at DESC LIMIT ?""",
+                (test_type, limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+    def save_history_settings_used(
+        self, history_id: int, tone: int | None, detail: int | None,
+        literacy: str | None, was_edited: bool = False,
+    ) -> bool:
+        """Record which settings were used to generate this report.
+
+        When tone/detail/literacy are None, only was_edited is updated
+        (avoids overwriting previously stored values).
+        """
+        conn = self._get_conn()
+        try:
+            if tone is None and detail is None and literacy is None:
+                # Only update was_edited flag
+                cursor = conn.execute(
+                    "UPDATE history SET was_edited = ?, updated_at = ? WHERE id = ?",
+                    (1 if was_edited else 0, _now(), history_id),
+                )
+            else:
+                cursor = conn.execute(
+                    """UPDATE history SET tone_used = ?, detail_used = ?,
+                       literacy_used = ?, was_edited = ?, updated_at = ?
+                       WHERE id = ?""",
+                    (tone, detail, literacy, 1 if was_edited else 0, _now(), history_id),
+                )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    def get_optimal_settings(self, test_type: str, min_samples: int = 5) -> dict[str, Any] | None:
+        """Find tone/detail settings with the lowest edit rate for a test type."""
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT tone_used, detail_used, COUNT(*) as cnt,
+                          SUM(CASE WHEN was_edited = 1 THEN 1 ELSE 0 END) as edit_count
+                   FROM history
+                   WHERE test_type = ? AND tone_used IS NOT NULL AND detail_used IS NOT NULL
+                   GROUP BY tone_used, detail_used
+                   HAVING COUNT(*) >= ?
+                   ORDER BY (CAST(SUM(CASE WHEN was_edited = 1 THEN 1 ELSE 0 END) AS REAL) / COUNT(*))
+                   LIMIT 1""",
+                (test_type, min_samples),
+            ).fetchall()
+            if not rows:
+                return None
+            r = dict(rows[0])
+            return {
+                "tone": r["tone_used"],
+                "detail": r["detail_used"],
+                "sample_count": r["cnt"],
+                "edit_rate": round(r["edit_count"] / r["cnt"], 2),
+            }
+        finally:
+            conn.close()
+
+    def get_style_profile(self, test_type: str) -> dict[str, Any] | None:
+        """Get the persistent style profile for a test type."""
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT profile, sample_count FROM style_profiles WHERE test_type = ?",
+                (test_type,),
+            ).fetchone()
+            if not row:
+                return None
+            return {
+                "profile": json.loads(row["profile"]),
+                "sample_count": row["sample_count"],
+            }
+        except Exception:
+            return None
+        finally:
+            conn.close()
+
+    def update_style_profile(
+        self, test_type: str, new_data: dict[str, Any], alpha: float = 0.3,
+    ) -> None:
+        """Update the style profile using exponential moving average.
+
+        *alpha* controls how quickly the profile adapts (0 = never, 1 = replace).
+        """
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT profile, sample_count FROM style_profiles WHERE test_type = ?",
+                (test_type,),
+            ).fetchone()
+
+            if row:
+                existing = json.loads(row["profile"])
+                sample_count = row["sample_count"] + 1
+                merged = _merge_profile(existing, new_data, alpha)
+            else:
+                merged = new_data
+                sample_count = 1
+
+            conn.execute(
+                """INSERT INTO style_profiles (test_type, profile, sample_count, updated_at)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(test_type) DO UPDATE SET
+                   profile = excluded.profile, sample_count = excluded.sample_count,
+                   updated_at = excluded.updated_at""",
+                (test_type, json.dumps(merged), sample_count, _now()),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
     def save_edited_text(self, history_id: int, edited_text: str) -> bool:
         """Save the doctor's edited version of the explanation text."""
         conn = self._get_conn()
@@ -558,6 +733,27 @@ class Database:
                     continue
 
             return edits
+        finally:
+            conn.close()
+
+    def get_no_edit_ratio(self, test_type: str, limit: int = 10) -> float:
+        """Return the fraction of recent copied reports that needed no edits.
+
+        Looks at the most recent `limit` reports that were copied. Returns the
+        ratio of those that have no edited_text (i.e., physician accepted as-is).
+        """
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT edited_text FROM history
+                   WHERE test_type = ? AND copied = 1
+                   ORDER BY updated_at DESC LIMIT ?""",
+                (test_type, limit),
+            ).fetchall()
+            if not rows:
+                return 0.0
+            no_edit = sum(1 for r in rows if not r["edited_text"])
+            return no_edit / len(rows)
         finally:
             conn.close()
 
@@ -709,9 +905,12 @@ class Database:
                 params.append(detail_preference)
             where_clause = " WHERE " + " AND ".join(conditions)
             params.append(limit)
+            # Prioritize: copied-without-editing (strongest signal) > high-rated > liked > copied-with-edits
             rows = conn.execute(
                 f"""SELECT full_response FROM history{where_clause}
-                    ORDER BY liked DESC, copied DESC, created_at DESC LIMIT ?""",
+                    ORDER BY (CASE WHEN copied = 1 AND edited_text IS NULL THEN 0 ELSE 1 END),
+                             COALESCE(quality_rating, 0) DESC,
+                             liked DESC, copied DESC, created_at DESC LIMIT ?""",
                 params,
             ).fetchall()
 

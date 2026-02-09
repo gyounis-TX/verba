@@ -2628,6 +2628,42 @@ It should sound exactly like the physician wrote it themselves. This means:
 """
 
 
+_SEVERITY_WEIGHTS = {
+    "normal": 0.0,
+    "mild": 0.1,
+    "moderate": 0.3,
+    "severe": 0.6,
+    "critical": 1.0,
+}
+
+
+def compute_severity_score(parsed_report: ParsedReport) -> float:
+    """Compute an overall severity score from parsed report measurements.
+
+    Returns a float 0.0-1.0 where:
+    - 0.0 = all normal
+    - 0.5+ = at least moderate severity present
+    - 0.8+ = critical or multiple severe findings
+    """
+    if not parsed_report.measurements:
+        return 0.0
+
+    scores = []
+    for m in parsed_report.measurements:
+        status = m.status.value if hasattr(m.status, "value") else str(m.status)
+        weight = _SEVERITY_WEIGHTS.get(status, 0.0)
+        scores.append(weight)
+
+    if not scores:
+        return 0.0
+
+    # Use a weighted approach: max severity matters more than average
+    max_score = max(scores)
+    avg_score = sum(scores) / len(scores)
+    # Blend: 60% max, 40% average (catches both single-critical and multi-moderate)
+    return round(min(max_score * 0.6 + avg_score * 0.4, 1.0), 2)
+
+
 class PromptEngine:
     """Constructs system and user prompts for report explanation."""
 
@@ -3016,6 +3052,15 @@ class PromptEngine:
         quick_reasons: list[str] | None = None,
         custom_phrases: list[str] | None = None,
         report_date: str | None = None,
+        no_edit_ratio: float | None = None,
+        edit_corrections: dict | None = None,
+        quality_feedback: list[dict] | None = None,
+        severity_score: float | None = None,
+        severity_tone_adjusted: bool = False,
+        batch_prior_summaries: list[dict] | None = None,
+        lab_reference_ranges_section: str | None = None,
+        vocabulary_preferences: dict | None = None,
+        style_profile: dict | None = None,
     ) -> str:
         """Build the user prompt with report data, ranges, and glossary.
 
@@ -3330,6 +3375,116 @@ class PromptEngine:
                 for g in guidance:
                     sections.append(f"- {g}")
 
+        # 1h2. No-edit positive signal
+        if no_edit_ratio is not None and no_edit_ratio >= 0.7:
+            sections.append("\n## Style Confidence Signal")
+            pct = int(no_edit_ratio * 100)
+            sections.append(
+                f"The physician has accepted {pct}% of recent outputs for this test type "
+                f"without any edits. This indicates strong alignment with their preferred style. "
+                f"Maintain the current approach — same level of detail, tone, structure, and phrasing."
+            )
+
+        # 1h3. Word-level edit corrections (banned/preferred phrases, replacements)
+        if edit_corrections and not short_comment:
+            has_content = any(edit_corrections.get(k) for k in ("banned", "preferred", "replacements"))
+            if has_content:
+                sections.append("\n## Doctor's Style Corrections")
+                sections.append(
+                    "The physician consistently makes these word-level corrections. "
+                    "Apply them proactively:"
+                )
+                if edit_corrections.get("banned"):
+                    sections.append("\n**Phrases to AVOID** (physician consistently removes these):")
+                    for phrase in edit_corrections["banned"][:10]:
+                        sections.append(f'- Do NOT use: "{phrase}"')
+                if edit_corrections.get("preferred"):
+                    sections.append("\n**Phrases to USE** (physician consistently adds these):")
+                    for phrase in edit_corrections["preferred"][:10]:
+                        sections.append(f'- Use: "{phrase}"')
+                if edit_corrections.get("replacements"):
+                    sections.append("\n**Replacements** (physician consistently changes A to B):")
+                    for old, new in edit_corrections["replacements"][:10]:
+                        sections.append(f'- Instead of "{old}", use "{new}"')
+
+        # 1h3b. Vocabulary preferences (word-level swaps from edits)
+        if vocabulary_preferences and not short_comment:
+            has_vocab = vocabulary_preferences.get("preferred") or vocabulary_preferences.get("avoided")
+            if has_vocab:
+                sections.append("\n## Physician Vocabulary Preferences")
+                sections.append(
+                    "The physician prefers specific word choices. "
+                    "Use these preferences consistently:"
+                )
+                if vocabulary_preferences.get("avoided") and vocabulary_preferences.get("preferred"):
+                    avoided = vocabulary_preferences["avoided"]
+                    preferred = vocabulary_preferences["preferred"]
+                    for i in range(min(len(avoided), len(preferred))):
+                        sections.append(f'- Use "{preferred[i]}" instead of "{avoided[i]}"')
+                elif vocabulary_preferences.get("preferred"):
+                    sections.append("**Preferred words**: " + ", ".join(f'"{w}"' for w in vocabulary_preferences["preferred"]))
+
+        # 1h3c. Persistent style profile (consolidated learning)
+        if style_profile and not short_comment:
+            profile = style_profile.get("profile", {})
+            sample_count = style_profile.get("sample_count", 0)
+            if sample_count >= 3 and profile:
+                sections.append(f"\n## Learned Style Profile ({sample_count} samples)")
+                if "avg_paragraph_count" in profile:
+                    sections.append(f"- Target paragraph count: ~{profile['avg_paragraph_count']}")
+                if "avg_sentence_length" in profile:
+                    sections.append(f"- Average sentence length: ~{profile['avg_sentence_length']} words")
+                if "contraction_rate" in profile:
+                    rate = profile["contraction_rate"]
+                    if rate > 0.02:
+                        sections.append("- Use contractions naturally (physician style uses them)")
+                    else:
+                        sections.append("- Avoid contractions (physician style is more formal)")
+                if profile.get("preferred_openings"):
+                    openings = profile["preferred_openings"][:3]
+                    sections.append("- Preferred opening styles: " + "; ".join(f'"{o}"' for o in openings))
+                if profile.get("preferred_closings"):
+                    closings = profile["preferred_closings"][:3]
+                    sections.append("- Preferred closing styles: " + "; ".join(f'"{c}"' for c in closings))
+
+        # 1h4. Quality feedback adjustments (from low-rated reports)
+        if quality_feedback and not short_comment:
+            sections.append("\n## Quality Feedback Adjustments")
+            sections.append(
+                "Based on the physician's recent feedback on output quality, "
+                "make these adjustments:"
+            )
+            for adjustment in quality_feedback:
+                sections.append(f"- {adjustment}")
+
+        # 1h5. Cross-type batch context (summaries from other reports in this batch)
+        if batch_prior_summaries and not short_comment:
+            sections.append("\n## Other Reports in This Batch")
+            sections.append(
+                "The following reports were processed in the same batch and likely belong "
+                "to the same patient. Reference relevant cross-type findings when interpreting "
+                "this report:"
+            )
+            for summary in batch_prior_summaries:
+                label = summary.get("label", "Report")
+                test_type_display = summary.get("test_type_display", "Unknown")
+                m_summary = summary.get("measurements_summary", "")
+                sections.append(f"\n### {label} ({test_type_display})")
+                if m_summary:
+                    sections.append(m_summary)
+
+        # 1h6. Secondary test types detected in this report
+        if parsed_report.secondary_test_types and not short_comment:
+            secondary_display = ", ".join(
+                t.replace("_", " ").title() for t in parsed_report.secondary_test_types[:3]
+            )
+            sections.append(f"\n## Multi-Type Report")
+            sections.append(
+                f"This report also contains findings from: {secondary_display}. "
+                f"Measurements from these secondary test types have been merged into the "
+                f"parsed data below. Address all relevant findings in your interpretation."
+            )
+
         # 2. Parsed measurements with reference ranges
         sections.append("\n## Parsed Measurements")
         critical_values_found: list[str] = []
@@ -3386,6 +3541,10 @@ class PromptEngine:
                 "Extract key values (e.g., percentages, dimensions, velocities, pressures, "
                 "lab values) and explain what they mean for the patient."
             )
+
+        # 2a-extra. Lab-printed reference ranges (when available)
+        if lab_reference_ranges_section:
+            sections.append(lab_reference_ranges_section)
 
         # 2b. Prior results for trend comparison (if available)
         if prior_results and not short_comment:

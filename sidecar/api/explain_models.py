@@ -76,6 +76,7 @@ class ExplainRequest(BaseModel):
     use_analogies: Optional[bool] = None
     include_lifestyle_recommendations: Optional[bool] = None
     avoid_openings: Optional[list[str]] = None
+    batch_prior_summaries: Optional[list[dict]] = None
 
 
 # --- Response sub-models ---
@@ -117,6 +118,8 @@ class ExplainResponse(BaseModel):
     model_used: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
+    severity_score: Optional[float] = None
+    tone_auto_adjusted: bool = False
 
 
 # --- Settings ---
@@ -161,6 +164,7 @@ class AppSettings(BaseModel):
     use_analogies: bool = True
     include_lifestyle_recommendations: bool = True
     custom_phrases: list[str] = Field(default_factory=list)
+    severity_adaptive_tone: bool = True
 
 
 class SettingsUpdate(BaseModel):
@@ -197,3 +201,4 @@ class SettingsUpdate(BaseModel):
     use_analogies: Optional[bool] = None
     include_lifestyle_recommendations: Optional[bool] = None
     custom_phrases: Optional[list[str]] = None
+    severity_adaptive_tone: Optional[bool] = None

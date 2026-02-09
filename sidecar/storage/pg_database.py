@@ -294,6 +294,117 @@ class PgDatabase:
             )
         return result.endswith("1")
 
+    async def rate_history(self, history_id: int | str, rating: int, note: str | None = None, user_id: str | None = None) -> bool:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            result = await conn.execute(
+                "UPDATE history SET quality_rating = $1, quality_note = $2, updated_at = $3 WHERE sync_id = $4 AND user_id = $5",
+                rating, note, _now(), str(history_id), user_id,
+            )
+        return result.endswith("1")
+
+    async def get_recent_feedback(
+        self, test_type: str, limit: int = 5, user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT quality_rating, quality_note FROM history
+                   WHERE user_id = $1 AND test_type = $2
+                     AND quality_rating IS NOT NULL AND quality_rating <= 3
+                     AND quality_note IS NOT NULL AND quality_note != ''
+                   ORDER BY updated_at DESC LIMIT $3""",
+                user_id, test_type, limit,
+            )
+        return [dict(row) for row in rows]
+
+    async def save_history_settings_used(
+        self, history_id: int | str, tone: int | None, detail: int | None,
+        literacy: str | None, was_edited: bool = False, user_id: str | None = None,
+    ) -> bool:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            if tone is None and detail is None and literacy is None:
+                result = await conn.execute(
+                    "UPDATE history SET was_edited = $1, updated_at = $2 WHERE sync_id = $3 AND user_id = $4",
+                    was_edited, _now(), str(history_id), user_id,
+                )
+            else:
+                result = await conn.execute(
+                    """UPDATE history SET tone_used = $1, detail_used = $2,
+                       literacy_used = $3, was_edited = $4, updated_at = $5
+                       WHERE sync_id = $6 AND user_id = $7""",
+                    tone, detail, literacy, was_edited, _now(), str(history_id), user_id,
+                )
+        return result.endswith("1")
+
+    async def get_optimal_settings(self, test_type: str, min_samples: int = 5, user_id: str | None = None) -> dict[str, Any] | None:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT tone_used, detail_used, COUNT(*) as cnt,
+                          SUM(CASE WHEN was_edited THEN 1 ELSE 0 END) as edit_count
+                   FROM history
+                   WHERE user_id = $1 AND test_type = $2 AND tone_used IS NOT NULL AND detail_used IS NOT NULL
+                   GROUP BY tone_used, detail_used
+                   HAVING COUNT(*) >= $3
+                   ORDER BY (CAST(SUM(CASE WHEN was_edited THEN 1 ELSE 0 END) AS REAL) / COUNT(*))
+                   LIMIT 1""",
+                user_id, test_type, min_samples,
+            )
+        if not rows:
+            return None
+        r = dict(rows[0])
+        return {
+            "tone": r["tone_used"],
+            "detail": r["detail_used"],
+            "sample_count": r["cnt"],
+            "edit_rate": round(r["edit_count"] / r["cnt"], 2),
+        }
+
+    async def get_style_profile(self, test_type: str, user_id: str | None = None) -> dict[str, Any] | None:
+        pool = await _get_pool()
+        try:
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT profile, sample_count FROM style_profiles WHERE test_type = $1 AND user_id = $2",
+                    test_type, user_id,
+                )
+            if not row:
+                return None
+            profile_raw = row["profile"]
+            profile = json.loads(profile_raw) if isinstance(profile_raw, str) else profile_raw
+            return {"profile": profile, "sample_count": row["sample_count"]}
+        except Exception:
+            return None
+
+    async def update_style_profile(
+        self, test_type: str, new_data: dict[str, Any], alpha: float = 0.3,
+        user_id: str | None = None,
+    ) -> None:
+        from storage.database import _merge_profile
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT profile, sample_count FROM style_profiles WHERE test_type = $1 AND user_id = $2",
+                test_type, user_id,
+            )
+            if row:
+                profile_raw = row["profile"]
+                existing = json.loads(profile_raw) if isinstance(profile_raw, str) else profile_raw
+                sample_count = row["sample_count"] + 1
+                merged = _merge_profile(existing, new_data, alpha)
+            else:
+                merged = new_data
+                sample_count = 1
+            await conn.execute(
+                """INSERT INTO style_profiles (test_type, user_id, profile, sample_count, updated_at)
+                   VALUES ($1, $2, $3, $4, $5)
+                   ON CONFLICT(test_type, user_id) DO UPDATE SET
+                   profile = $3, sample_count = $4, updated_at = $5""",
+                test_type, user_id, json.dumps(merged), sample_count, _now(),
+            )
+
     async def save_edited_text(self, history_id: int | str, edited_text: str, user_id: str | None = None) -> bool:
         pool = await _get_pool()
         async with pool.acquire() as conn:
@@ -342,6 +453,23 @@ class PgDatabase:
             except (json.JSONDecodeError, TypeError, KeyError):
                 continue
         return edits
+
+    async def get_no_edit_ratio(
+        self, test_type: str, limit: int = 10, user_id: str | None = None,
+    ) -> float:
+        """Return the fraction of recent copied reports that needed no edits."""
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT edited_text FROM history
+                   WHERE user_id = $1 AND test_type = $2 AND copied = true
+                   ORDER BY updated_at DESC LIMIT $3""",
+                user_id, test_type, limit,
+            )
+        if not rows:
+            return 0.0
+        no_edit = sum(1 for r in rows if not r["edited_text"])
+        return no_edit / len(rows)
 
     async def get_learned_phrases(
         self, test_type: str | None = None, limit: int = 10, user_id: str | None = None,
@@ -469,9 +597,12 @@ class PgDatabase:
         params.append(limit)
 
         async with pool.acquire() as conn:
+            # Prioritize: copied-without-editing (strongest signal) > high-rated > liked > copied-with-edits
             rows = await conn.fetch(
                 f"""SELECT full_response FROM history{where}
-                    ORDER BY liked DESC, copied DESC, created_at DESC LIMIT ${idx}""",
+                    ORDER BY (CASE WHEN copied = true AND edited_text IS NULL THEN 0 ELSE 1 END),
+                             COALESCE(quality_rating, 0) DESC,
+                             liked DESC, copied DESC, created_at DESC LIMIT ${idx}""",
                 *params,
             )
 
