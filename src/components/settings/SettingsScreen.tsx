@@ -68,6 +68,7 @@ export function SettingsScreen() {
   const [includeMeasurements, setIncludeMeasurements] = useState(true);
   const [tonePreference, setTonePreference] = useState(3);
   const [detailPreference, setDetailPreference] = useState(3);
+  const [humanizationLevel, setHumanizationLevel] = useState(3);
   const [quickReasons, setQuickReasons] = useState<string[]>([]);
   const [newReason, setNewReason] = useState("");
   const [customPhrases, setCustomPhrases] = useState<string[]>([]);
@@ -104,6 +105,7 @@ export function SettingsScreen() {
         setIncludeMeasurements(s.include_measurements);
         setTonePreference(s.tone_preference);
         setDetailPreference(s.detail_preference);
+        setHumanizationLevel(s.humanization_level ?? 3);
         setQuickReasons(s.quick_reasons ?? []);
         setCustomPhrases(s.custom_phrases ?? []);
         setNextStepsOptions(s.next_steps_options ?? [
@@ -149,6 +151,7 @@ export function SettingsScreen() {
         include_measurements: includeMeasurements,
         tone_preference: tonePreference,
         detail_preference: detailPreference,
+        humanization_level: humanizationLevel,
         quick_reasons: quickReasons,
         custom_phrases: customPhrases,
         next_steps_options: nextStepsOptions,
@@ -322,6 +325,32 @@ export function SettingsScreen() {
               <div className="slider-ticks">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <span key={n} className={`slider-tick${detailPreference === n ? " slider-tick--active" : ""}`}>{n}</span>
+                ))}
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                Voice Style
+                <span className="slider-value-label">
+                  {["", "Clinical", "Polished", "Balanced", "Natural", "Very Natural"][humanizationLevel]}
+                </span>
+              </label>
+              <div className="slider-container">
+                <span className="slider-label-left">Clinical</span>
+                <input
+                  type="range"
+                  className="preference-slider"
+                  min={1}
+                  max={5}
+                  step={1}
+                  value={humanizationLevel}
+                  onChange={(e) => setHumanizationLevel(Number(e.target.value))}
+                />
+                <span className="slider-label-right">Very Natural</span>
+              </div>
+              <div className="slider-ticks">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <span key={n} className={`slider-tick${humanizationLevel === n ? " slider-tick--active" : ""}`}>{n}</span>
                 ))}
               </div>
             </div>

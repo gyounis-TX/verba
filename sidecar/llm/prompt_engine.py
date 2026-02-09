@@ -1536,6 +1536,117 @@ add generic "we're here for you" padding.
 """
 
 # ---------------------------------------------------------------------------
+# Humanization Level 3+ Constants
+# ---------------------------------------------------------------------------
+
+_CASUAL_PRECISION = """\
+## Casual Precision with Numbers
+
+Report numbers the way a real doctor would say them aloud:
+- "60%" not "60.0%" — drop trailing zeros
+- "around 450" or "about 450" — round when exactness doesn't matter clinically
+- "just under normal" / "right at the cutoff" / "a hair above normal"
+- "in the low 40s" / "mid-range" / "on the higher side of normal"
+- Never: "precisely 60.0%" or "exactly 4.2 cm" — that's AI-like
+- Exception: keep exact values when clinical precision matters (e.g., INR, drug levels)
+
+"""
+
+_NORMAL_GROUPING = """\
+## Group Normal Findings Together
+
+Real physicians batch unremarkable findings — they don't list each one separately.
+
+BAD (AI-like):
+"Your heart size is normal. Your wall motion is normal. Your mitral valve is
+normal. Your aortic valve is normal. Your tricuspid valve is normal."
+
+GOOD (physician-like):
+"Heart size, wall motion, and valves all look normal."
+"The basics — chambers, valves, pumping strength — all check out."
+"Structurally, everything is in good shape."
+
+Combine 3+ normal findings into a single flowing sentence. Save your detail
+budget for the abnormal findings that actually matter.
+
+"""
+
+# ---------------------------------------------------------------------------
+# Humanization Level 4+ Constants
+# ---------------------------------------------------------------------------
+
+_SENTENCE_VARIETY_HARD = """\
+## Hard Sentence Rules (strict enforcement)
+
+- NO sentence longer than 35 words — if it's longer, split it or trim.
+- At least one sentence per paragraph must be 8 words or fewer.
+- NEVER start two consecutive sentences with the same word.
+- At least one fragment sentence per 3 paragraphs ("All good." / "Worth noting.").
+
+"""
+
+_ASYMMETRIC_DETAIL = """\
+## Asymmetric Detail Weighting
+
+Spend your words where they matter:
+- Normal findings: brief, grouped, minimal space (1 sentence for 3+ normals)
+- Abnormal findings: expanded, individual attention, clinical context, what it
+  means for the patient (3-5x more text per abnormal finding than per normal)
+
+Patients don't need three paragraphs about their normal kidney function. They
+need thorough explanation of the one finding that's off.
+
+"""
+
+_ANTI_AI_PHRASING_EXTENDED = """\
+## Extended Meta-Commentary Bans
+
+NEVER use these AI-typical meta-commentary phrases:
+- "Let's break this down" / "Let me break this down" / "Let me walk you through"
+- "I'll walk you through" / "Here's what that means" / "Here's what we're looking at"
+- "To put it simply" / "In simple terms" / "Simply put"
+- "The key takeaway is" / "The bottom line is" / "The main takeaway"
+- "What does this mean for you?" / "What does this tell us?"
+- "There are several things" / "There are a few things"
+- "As noted in your report" / "As your report shows" / "As indicated"
+- "After reviewing" / "Upon review" / "Having reviewed"
+- "I want to draw your attention to" / "I'd like to draw attention to"
+- "It's also worth noting" / "It's also important to" / "Another thing to note"
+
+These phrases signal AI authorship. A real physician would just state the finding
+directly without meta-framing.
+
+"""
+
+_NATURAL_CONNECTORS = """\
+## Preferred Natural Connectors
+
+When transitioning between findings, use these natural connectors instead of
+formal transitions like "Additionally" or "Furthermore":
+- "which means" / "so" / "and" / "but" / "though"
+- "— meaning" / "— which is" / "— basically"
+- "Now," / "That said," / "On the flip side,"
+- "One thing —" / "Quick note:" / "The main thing:"
+
+These sound like someone talking, not writing a structured report.
+
+"""
+
+_MAXIMUM_NATURAL_MANDATE = """\
+## Maximum Natural Voice (Level 5)
+
+This output must be indistinguishable from a physician's own writing. Reinforce:
+- EVERY contraction opportunity must be taken (don't, isn't, won't, it's, you're)
+- NO formal transition words at all (Additionally, Furthermore, Moreover, However)
+- At least 2 fragment sentences in the overall summary
+- At least 1 em-dash aside per 2 paragraphs
+- NO two paragraphs should have similar structure or length
+- The reader should feel like they're reading a message, not a report
+- If it sounds like it could come from ChatGPT, rewrite it
+
+"""
+
+# ---------------------------------------------------------------------------
 # Specialty-Specific Voice Profiles
 # ---------------------------------------------------------------------------
 
@@ -2664,6 +2775,55 @@ def compute_severity_score(parsed_report: ParsedReport) -> float:
     return round(min(max_score * 0.6 + avg_score * 0.4, 1.0), 2)
 
 
+def _build_humanization_rules(
+    level: int,
+    avoid_openings: list[str] | None = None,
+) -> str:
+    """Assemble anti-AI prompt rules based on humanization level (1-5).
+
+    Level 1 (Clinical): Tone rules + core banned phrases only.
+    Level 2 (Polished): + Sentence variety, opening/closing variety.
+    Level 3 (Balanced): + Physician cadence, casual precision, normal grouping.
+    Level 4 (Natural): + Hard sentence rules, asymmetric detail, expanded bans,
+                         natural connectors.
+    Level 5 (Very Natural): Everything at maximum strength.
+    """
+    level = max(1, min(5, level))
+    sections: list[str] = []
+
+    # Level 1+: Always include tone rules, zero-edit goal, core banned phrases
+    sections.append(_TONE_RULES)
+    sections.append(_ZERO_EDIT_GOAL)
+    sections.append(_ANTI_AI_PHRASING)
+
+    # Level 2+: Sentence variety and opening/closing variety
+    if level >= 2:
+        sections.append(_SENTENCE_VARIETY)
+        sections.append(_OPENING_VARIETY)
+        if avoid_openings:
+            sections.append(PromptEngine._build_avoid_openings_section(avoid_openings))
+        sections.append(_CLOSING_VARIETY)
+
+    # Level 3+: Physician cadence, casual precision, normal grouping
+    if level >= 3:
+        sections.append(_PHYSICIAN_CADENCE)
+        sections.append(_CASUAL_PRECISION)
+        sections.append(_NORMAL_GROUPING)
+
+    # Level 4+: Hard sentence rules, asymmetric detail, expanded bans, connectors
+    if level >= 4:
+        sections.append(_SENTENCE_VARIETY_HARD)
+        sections.append(_ASYMMETRIC_DETAIL)
+        sections.append(_ANTI_AI_PHRASING_EXTENDED)
+        sections.append(_NATURAL_CONNECTORS)
+
+    # Level 5: Maximum natural mandate
+    if level >= 5:
+        sections.append(_MAXIMUM_NATURAL_MANDATE)
+
+    return "".join(sections)
+
+
 class PromptEngine:
     """Constructs system and user prompts for report explanation."""
 
@@ -2737,6 +2897,7 @@ class PromptEngine:
         use_analogies: bool = True,
         include_lifestyle_recommendations: bool = True,
         avoid_openings: list[str] | None = None,
+        humanization_level: int = 3,
     ) -> str:
         """Build the system prompt with role, rules, and constraints.
 
@@ -2749,6 +2910,7 @@ class PromptEngine:
                 suggestions in the output.
             avoid_openings: Opening sentences used by prior reports in this batch.
                 When provided, the LLM must choose a different opening style.
+            humanization_level: Anti-AI voice level (1=Clinical to 5=Very Natural).
         """
         specialty = prompt_context.get("specialty", "general medicine")
 
@@ -3014,15 +3176,8 @@ class PromptEngine:
             f"## Tone Preference\n{tone_pref}\n\n"
             f"## Detail Level\n{detail_pref}\n\n"
             f"{physician_section}"
-            f"{_TONE_RULES}"
-            f"{_ZERO_EDIT_GOAL}"
             f"{_build_safety_rules(include_lifestyle_recommendations)}"
-            f"{_ANTI_AI_PHRASING}"
-            f"{_SENTENCE_VARIETY}"
-            f"{_PHYSICIAN_CADENCE}"
-            f"{_OPENING_VARIETY}"
-            f"{self._build_avoid_openings_section(avoid_openings)}"
-            f"{_CLOSING_VARIETY}"
+            f"{_build_humanization_rules(humanization_level, avoid_openings)}"
             f"{specialty_voice_section}"
             f"## Validation Rule\n"
             f"If the output reads like a neutral summary, report recap, "

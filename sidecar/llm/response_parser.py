@@ -30,6 +30,7 @@ class ValidationIssue:
 def parse_and_validate_response(
     tool_result: Optional[dict],
     parsed_report: ParsedReport,
+    humanization_level: int = 3,
 ) -> tuple[ExplanationResult, list[ValidationIssue]]:
     """
     Parse the LLM tool call result into ExplanationResult.
@@ -137,12 +138,22 @@ def parse_and_validate_response(
     for m in result.measurements:
         m.plain_language = apply_contractions(m.plain_language)
 
-    # 8. Check for residual AI-like patterns in the summary
-    ai_warnings = check_ai_patterns(result.overall_summary)
-    for w in ai_warnings:
-        issues.append(ValidationIssue(severity="warning", message=w))
+    # 8. Auto-fix AI patterns at higher humanization levels
+    if humanization_level >= 4:
+        aggressive = humanization_level >= 5
+        result.overall_summary = fix_ai_patterns(result.overall_summary, aggressive=aggressive)
+        for f in result.key_findings:
+            f.explanation = fix_ai_patterns(f.explanation, aggressive=aggressive)
+        for m in result.measurements:
+            m.plain_language = fix_ai_patterns(m.plain_language, aggressive=aggressive)
 
-    # 9. Check measurement plain_language diversity
+    # 9. Check for residual AI-like patterns in the summary
+    if humanization_level >= 3:
+        ai_warnings = check_ai_patterns(result.overall_summary)
+        for w in ai_warnings:
+            issues.append(ValidationIssue(severity="warning", message=w))
+
+    # 10. Check measurement plain_language diversity
     diversity_warnings = check_measurement_diversity(result.measurements)
     for w in diversity_warnings:
         issues.append(ValidationIssue(severity="warning", message=w))
@@ -424,6 +435,115 @@ def check_ai_patterns(overall_summary: str) -> list[str]:
             )
 
     return warnings
+
+
+# ---------------------------------------------------------------------------
+# AI pattern auto-fix post-processing
+# ---------------------------------------------------------------------------
+
+# Phrases to strip from output (case-insensitive matching)
+_FIX_BANNED_PHRASES = [
+    "let's break this down",
+    "let me break this down",
+    "let me walk you through",
+    "i'll walk you through",
+    "here's what that means",
+    "here's what we're looking at",
+    "to put it simply",
+    "in simple terms",
+    "simply put",
+    "the key takeaway is",
+    "the bottom line is",
+    "the main takeaway",
+    "what does this mean for you?",
+    "what does this tell us?",
+    "there are several things",
+    "there are a few things",
+    "as noted in your report",
+    "as your report shows",
+    "after reviewing",
+    "upon review",
+    "having reviewed",
+    "it's important to note that",
+    "it's worth noting that",
+    "it's worth mentioning that",
+    "it's also worth noting",
+    "it's also important to",
+    "another thing to note",
+    "i want to draw your attention to",
+    "i'd like to draw attention to",
+    "based on the results provided",
+    "based on your test results",
+]
+
+# Formal transitions → casual replacements (used at level 5 only)
+_TRANSITION_REPLACEMENTS: list[tuple[str, list[str]]] = [
+    ("additionally,", ["Also,", "And", "Plus,"]),
+    ("furthermore,", ["And", "On top of that,", "Also,"]),
+    ("moreover,", ["And", "Plus,", "Also,"]),
+    ("however,", ["That said,", "But", "Though"]),
+    ("consequently,", ["So", "Which means", "As a result,"]),
+    ("nevertheless,", ["Still,", "That said,", "Even so,"]),
+    ("in conclusion,", ["So overall —", "Bottom line:", "All in all,"]),
+    ("in summary,", ["So overall —", "The short version:", "Bottom line:"]),
+    ("to summarize,", ["So —", "In short,", "Bottom line:"]),
+]
+
+# Pre-compile patterns for banned phrases
+_FIX_BANNED_PATTERNS = [
+    (re.compile(r"\b" + re.escape(phrase) + r"\b", re.IGNORECASE), phrase)
+    for phrase in _FIX_BANNED_PHRASES
+]
+
+# Counter for rotating through transition alternatives
+_transition_counter = 0
+
+
+def fix_ai_patterns(text: str, aggressive: bool = False) -> str:
+    """Auto-fix AI-like patterns in generated text.
+
+    Args:
+        text: The text to clean up.
+        aggressive: If True (level 5), also replace formal transitions and
+            strip trailing .0 from whole numbers.
+    """
+    if not text:
+        return text
+
+    # 1. Strip banned phrases
+    for pattern, _ in _FIX_BANNED_PATTERNS:
+        text = pattern.sub("", text)
+
+    # 2. Replace formal transitions (aggressive mode only)
+    if aggressive:
+        global _transition_counter
+        for formal, alternatives in _TRANSITION_REPLACEMENTS:
+            pat = re.compile(r"\b" + re.escape(formal), re.IGNORECASE)
+            def _replace_transition(m: re.Match, _alts=alternatives) -> str:
+                global _transition_counter
+                replacement = _alts[_transition_counter % len(_alts)]
+                _transition_counter += 1
+                # Preserve capitalization context
+                if m.start() == 0 or (m.start() >= 2 and text[m.start() - 2] in ".!?\n"):
+                    return replacement[0].upper() + replacement[1:]
+                return replacement
+            text = pat.sub(_replace_transition, text)
+
+        # 3. Strip trailing .0 from whole numbers (e.g., "60.0%" → "60%")
+        text = re.sub(r"(\d+)\.0(%|\s|,|\.(?:\s|$))", r"\1\2", text)
+
+    # 4. Clean up artifacts from removals
+    text = re.sub(r"  +", " ", text)          # double spaces
+    text = re.sub(r" ([,.])", r"\1", text)     # space before punctuation
+    text = re.sub(r"\.\s*\.", ".", text)        # double periods
+    text = re.sub(r"^\s+", "", text, flags=re.MULTILINE)  # leading whitespace on lines
+
+    # 5. Capitalize after period if removal left lowercase
+    def _cap_after_period(m: re.Match) -> str:
+        return m.group(1) + m.group(2).upper()
+    text = re.sub(r"(\.\s+)([a-z])", _cap_after_period, text)
+
+    return text.strip()
 
 
 # ---------------------------------------------------------------------------

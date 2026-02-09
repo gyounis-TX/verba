@@ -446,6 +446,7 @@ export function ResultsScreen() {
 
   const handleRegenerate = useCallback(async () => {
     if (!extractionResult) return;
+    if (isDirty && !window.confirm("Regenerating will overwrite your edits. Continue?")) return;
     setIsRegenerating(true);
     const isShort = commentMode === "short";
     const isSms = commentMode === "sms";
@@ -464,13 +465,15 @@ export function ResultsScreen() {
       logUsage({ model_used: response.model_used, input_tokens: response.input_tokens, output_tokens: response.output_tokens, request_type: "explain", deep_analysis: deepAnalysis });
       // Clear combined summary so it re-generates with updated data
       setCombinedSummary(null);
+      setIsDirty(false);
+      setIsEditing(false);
       showToast("success", "Explanation regenerated.");
     } catch {
       showToast("error", "Failed to regenerate explanation.");
     } finally {
       setIsRegenerating(false);
     }
-  }, [extractionResult, commentMode, buildRequestParams, sectionSettings, refinementInstruction, deepAnalysis, showToast]);
+  }, [extractionResult, commentMode, buildRequestParams, sectionSettings, refinementInstruction, deepAnalysis, isDirty, showToast]);
 
   const handleOpenChangeType = useCallback(() => {
     setModalSelectedType(effectiveTestType || null);

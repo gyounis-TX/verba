@@ -643,6 +643,7 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
     is_sms = bool(body.sms_summary)
     use_analogies = body.use_analogies if body.use_analogies is not None else settings.use_analogies
     include_lifestyle = body.include_lifestyle_recommendations if body.include_lifestyle_recommendations is not None else settings.include_lifestyle_recommendations
+    humanization_level = settings.humanization_level
     system_prompt = prompt_engine.build_system_prompt(
         literacy_level=literacy_level,
         prompt_context=prompt_context,
@@ -663,6 +664,7 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
         anxiety_level=body.anxiety_level or 0,
         use_analogies=use_analogies,
         include_lifestyle_recommendations=include_lifestyle,
+        humanization_level=humanization_level,
     )
     # 6b. Load template if specified
     template_tone = None
@@ -807,7 +809,7 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
     _logger.warning(
         "Prompt sizes -- system: %d chars, user: %d chars, short_comment: %s, sms: %s, test_type: %s",
         len(system_prompt), len(user_prompt), bool(body.short_comment), is_sms,
-        parsed.test_type,
+        parsed_report.test_type,
     )
     _logger.warning("User prompt tail (last 600 chars): %s", user_prompt[-600:])
 
@@ -863,6 +865,7 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
         explanation, issues = parse_and_validate_response(
             tool_result=llm_response.tool_call_result,
             parsed_report=parsed_report,
+            humanization_level=humanization_level,
         )
     except ValueError as e:
         raise HTTPException(
@@ -1081,6 +1084,7 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
         is_sms = bool(explain_request.sms_summary)
         use_analogies = explain_request.use_analogies if explain_request.use_analogies is not None else settings.use_analogies
         include_lifestyle = explain_request.include_lifestyle_recommendations if explain_request.include_lifestyle_recommendations is not None else settings.include_lifestyle_recommendations
+        humanization_level = settings.humanization_level
 
         system_prompt = prompt_engine.build_system_prompt(
             literacy_level=literacy_level,
@@ -1103,6 +1107,7 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             use_analogies=use_analogies,
             include_lifestyle_recommendations=include_lifestyle,
             avoid_openings=explain_request.avoid_openings or None,
+            humanization_level=humanization_level,
         )
 
         template_tone = None
@@ -1283,6 +1288,7 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             explanation, issues = parse_and_validate_response(
                 tool_result=llm_response.tool_call_result,
                 parsed_report=parsed_report,
+                humanization_level=humanization_level,
             )
         except ValueError as e:
             yield _sse_event({"stage": "error", "message": f"LLM response validation failed: {e}"})

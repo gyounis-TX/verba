@@ -224,6 +224,7 @@ export interface AppSettings {
   use_analogies: boolean;
   include_lifestyle_recommendations: boolean;
   custom_phrases: string[];
+  humanization_level: number;
 }
 
 export interface SettingsUpdate {
@@ -258,6 +259,7 @@ export interface SettingsUpdate {
   use_analogies?: boolean;
   include_lifestyle_recommendations?: boolean;
   custom_phrases?: string[];
+  humanization_level?: number;
 }
 
 // --- Template Types ---
