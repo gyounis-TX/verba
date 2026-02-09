@@ -264,6 +264,30 @@ async def scrub_preview(body: dict = Body(...)):
     }
 
 
+def _assess_normalcy(type_id: str | None, extraction_result: "ExtractionResult") -> bool:
+    """Check if all parsed measurements are NORMAL or UNDETERMINED.
+
+    Returns True only when measurements exist and none are abnormal.
+    Returns False on any failure, no handler, no measurements, or any abnormal status.
+    """
+    if not type_id:
+        return False
+    try:
+        from api.analysis_models import SeverityStatus
+        _resolved_id, handler = registry.resolve(type_id)
+        if handler is None:
+            return False
+        parsed = handler.parse(extraction_result)
+        if not parsed.measurements:
+            return False
+        for m in parsed.measurements:
+            if m.status not in (SeverityStatus.NORMAL, SeverityStatus.UNDETERMINED):
+                return False
+        return True
+    except Exception:
+        return False
+
+
 @router.post("/analyze/detect-type", response_model=DetectTypeResponse)
 @limiter.limit(ANALYZE_RATE_LIMIT)
 async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)):
@@ -308,6 +332,7 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
     type_id, confidence = registry.detect(extraction_result)
 
     if confidence >= 0.4 and type_id is not None:
+        is_normal = _assess_normalcy(type_id, extraction_result)
         return DetectTypeResponse(
             test_type=type_id,
             confidence=round(confidence, 3),
@@ -316,6 +341,7 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
             llm_attempted=False,
             is_compound=compound_result.is_compound,
             compound_segments=compound_segments,
+            is_likely_normal=is_normal,
         )
 
     # Tier 2: LLM fallback
@@ -348,6 +374,7 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
             )
 
             if llm_type_id is not None and llm_confidence >= 0.5:
+                is_normal = _assess_normalcy(llm_type_id, extraction_result)
                 return DetectTypeResponse(
                     test_type=llm_type_id,
                     confidence=round(llm_confidence, 3),
@@ -356,11 +383,13 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
                     llm_attempted=True,
                     is_compound=compound_result.is_compound,
                     compound_segments=compound_segments,
+                    is_likely_normal=is_normal,
                 )
     except Exception:
         _logger.exception("LLM fallback failed during detect-type")
 
     # Tier 3: Return best keyword result with "none" method (frontend shows dropdown)
+    is_normal = _assess_normalcy(type_id, extraction_result)
     return DetectTypeResponse(
         test_type=type_id,
         confidence=round(confidence, 3),
@@ -369,6 +398,7 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
         llm_attempted=llm_attempted,
         is_compound=compound_result.is_compound,
         compound_segments=compound_segments,
+        is_likely_normal=is_normal,
     )
 
 
@@ -598,6 +628,96 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
     except Exception:
         pass
 
+    # --- Quick Normal fast path ---
+    if body.quick_normal:
+        settings = await settings_store.get_settings(user_id=user_id)
+        provider_str = body.provider.value if body.provider else settings.llm_provider.value
+        api_key = body.api_key or settings_store.get_api_key_for_provider(provider_str)
+        if not api_key:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No API key configured for provider '{provider_str}'.",
+            )
+
+        # Resolve physician name
+        extracted_physician = extract_physician_name(extraction_result.full_text)
+        source = settings.physician_name_source.value
+        if source == "auto_extract":
+            active_physician = extracted_physician
+        elif source == "custom":
+            active_physician = settings.custom_physician_name
+        else:
+            active_physician = None
+
+        voice = settings.explanation_voice.value
+        name_drop = settings.name_drop
+
+        prompt_engine = PromptEngine()
+        prompt_context = handler.get_prompt_context(extraction_result) if handler else {}
+        prompt_context["test_type_display"] = parsed_report.test_type_display
+        if settings.specialty and "specialty" not in prompt_context:
+            prompt_context["specialty"] = settings.specialty
+
+        # PHI scrub clinical context only (no raw report text sent)
+        scrubbed_clinical = (
+            scrub_phi(body.clinical_context).scrubbed_text
+            if body.clinical_context else None
+        )
+
+        system_prompt = prompt_engine.build_quick_normal_system_prompt(
+            prompt_context=prompt_context,
+            physician_name=active_physician,
+            explanation_voice=voice,
+            name_drop=name_drop,
+        )
+        user_prompt = prompt_engine.build_quick_normal_user_prompt(
+            parsed_report=parsed_report,
+            clinical_context=scrubbed_clinical,
+        )
+
+        llm_provider = LLMProvider(provider_str)
+        model_override = (
+            settings.claude_model
+            if provider_str in ("claude", "bedrock")
+            else settings.openai_model
+        )
+        client = LLMClient(provider=llm_provider, api_key=api_key, model=model_override)
+
+        try:
+            llm_response = await with_retry(
+                client.call_with_tool,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                tool_name=EXPLANATION_TOOL_NAME,
+                tool_schema=EXPLANATION_TOOL_SCHEMA,
+                max_tokens=256,
+                max_attempts=2,
+            )
+        except (LLMRetryError, Exception) as e:
+            raise HTTPException(status_code=502, detail=f"Quick normal LLM call failed: {e}")
+
+        try:
+            explanation, issues = parse_and_validate_response(
+                tool_result=llm_response.tool_call_result,
+                parsed_report=parsed_report,
+                humanization_level=3,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=502, detail=f"Quick normal response validation failed: {e}")
+
+        return ExplainResponse(
+            explanation=explanation,
+            parsed_report=parsed_report,
+            validation_warnings=[issue.message for issue in issues],
+            phi_categories_found=[],
+            physician_name=extracted_physician,
+            model_used=llm_response.model,
+            input_tokens=llm_response.input_tokens,
+            output_tokens=llm_response.output_tokens,
+            severity_score=0.0,
+            tone_auto_adjusted=False,
+        )
+
     # 4. Resolve API key
     settings = await settings_store.get_settings(user_id=user_id)
     provider_str = body.provider.value if body.provider else settings.llm_provider.value
@@ -745,11 +865,16 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
             if template_tone:
                 prompt_context["tone"] = template_tone
 
-    # 6c. Fetch liked examples for style guidance
+    # 6c. Derive severity band for personalization filtering
+    from storage.database import _severity_band
+    current_band = _severity_band(severity_score)
+
+    # 6c2. Fetch liked examples for style guidance (severity-filtered)
     liked_examples = await _db_call(
         "get_liked_examples",
         limit=2, test_type=test_type,
         tone_preference=tone_pref, detail_preference=detail_pref,
+        severity_band=current_band,
         user_id=user_id,
     )
 
@@ -806,11 +931,29 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
     except (ImportError, Exception):
         vocab_prefs = None
 
-    # 6m. Fetch persistent style profile
+    # 6m. Fetch persistent style profile (severity-filtered)
     try:
-        style_profile = await _db_call("get_style_profile", test_type, user_id=user_id)
+        style_profile = await _db_call("get_style_profile", test_type, severity_band=current_band, user_id=user_id)
     except Exception:
         style_profile = None
+
+    # 6n. Fetch preferred sign-off
+    try:
+        preferred_signoff = await _db_call("get_preferred_signoff", test_type, user_id=user_id)
+    except Exception:
+        preferred_signoff = None
+
+    # 6o. Fetch term preferences
+    try:
+        term_preferences = await _db_call("get_term_preferences", test_type=test_type, user_id=user_id)
+    except Exception:
+        term_preferences = None
+
+    # 6p. Fetch conditional rules for current severity band
+    try:
+        conditional_rules = await _db_call("get_conditional_rules", test_type, current_band, user_id=user_id)
+    except Exception:
+        conditional_rules = None
 
     # Combine custom phrases (from settings) with learned phrases (from edits)
     all_custom_phrases = list(settings.custom_phrases) if hasattr(settings, 'custom_phrases') else []
@@ -859,6 +1002,9 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
         vocabulary_preferences=vocab_prefs,
         style_profile=style_profile,
         batch_prior_summaries=body.batch_prior_summaries,
+        preferred_signoff=preferred_signoff,
+        term_preferences=term_preferences,
+        conditional_rules=conditional_rules,
     )
 
     # Log prompt sizes for debugging token issues
@@ -960,8 +1106,15 @@ async def _update_style_profile_from_history(history_id: str, user_id: str | Non
     if not text:
         return
 
-    from storage.database import _extract_stylistic_patterns
+    from storage.database import _extract_stylistic_patterns, _severity_band
     patterns = _extract_stylistic_patterns(text)
+
+    # Derive severity band from stored score
+    sev_score = record.get("severity_score")
+    if sev_score is None:
+        sev_score = full_response.get("severity_score")
+    band = _severity_band(sev_score) if sev_score is not None else None
+    created_at = record.get("created_at")
 
     # Build profile data from the patterns
     profile_data: dict = {}
@@ -977,7 +1130,9 @@ async def _update_style_profile_from_history(history_id: str, user_id: str | Non
         profile_data["preferred_closings"] = patterns["closings"]
 
     if profile_data:
-        await _db_call("update_style_profile", test_type, profile_data, 0.3, user_id=user_id)
+        # Update base profile
+        await _db_call("update_style_profile", test_type, profile_data, 0.3,
+                        severity_band=band, created_at=created_at, user_id=user_id)
 
 
 def _sse_event(data: dict) -> str:
@@ -1216,10 +1371,15 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
                 if template_tone:
                     prompt_context["tone"] = template_tone
 
+        # Derive severity band for personalization filtering
+        from storage.database import _severity_band
+        current_band = _severity_band(severity_score)
+
         liked_examples = await _db_call(
             "get_liked_examples",
             limit=2, test_type=test_type,
             tone_preference=tone_pref, detail_preference=detail_pref,
+            severity_band=current_band,
             user_id=user_id,
         )
         teaching_points = await _db_call("list_all_teaching_points_for_prompt", test_type=test_type, user_id=user_id)
@@ -1268,11 +1428,29 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
         except (ImportError, Exception):
             vocab_prefs = None
 
-        # Fetch persistent style profile
+        # Fetch persistent style profile (severity-filtered)
         try:
-            style_profile = await _db_call("get_style_profile", test_type, user_id=user_id)
+            style_profile = await _db_call("get_style_profile", test_type, severity_band=current_band, user_id=user_id)
         except Exception:
             style_profile = None
+
+        # Fetch preferred sign-off
+        try:
+            preferred_signoff = await _db_call("get_preferred_signoff", test_type, user_id=user_id)
+        except Exception:
+            preferred_signoff = None
+
+        # Fetch term preferences
+        try:
+            term_preferences = await _db_call("get_term_preferences", test_type=test_type, user_id=user_id)
+        except Exception:
+            term_preferences = None
+
+        # Fetch conditional rules for current severity band
+        try:
+            conditional_rules = await _db_call("get_conditional_rules", test_type, current_band, user_id=user_id)
+        except Exception:
+            conditional_rules = None
 
         all_custom_phrases = list(settings.custom_phrases) if hasattr(settings, 'custom_phrases') else []
         for lp in learned_phrases:
@@ -1320,6 +1498,9 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             vocabulary_preferences=vocab_prefs,
             style_profile=style_profile,
             batch_prior_summaries=explain_request.batch_prior_summaries,
+            preferred_signoff=preferred_signoff,
+            term_preferences=term_preferences,
+            conditional_rules=conditional_rules,
         )
 
         llm_provider = LLMProvider(provider_str)
@@ -1891,6 +2072,16 @@ async def get_history_detail(request: Request, history_id: str):
 async def create_history(request: Request, body: HistoryCreateRequest = Body(...)):
     """Save a new analysis history record."""
     user_id = _get_user_id(request)
+    # Extract severity_score from full_response if available
+    _sev_score = None
+    if isinstance(body.full_response, dict):
+        _sev_score = body.full_response.get("severity_score")
+        if _sev_score is not None:
+            try:
+                _sev_score = float(_sev_score)
+            except (TypeError, ValueError):
+                _sev_score = None
+
     record = await _db_call(
         "save_history",
         test_type=body.test_type,
@@ -1900,6 +2091,7 @@ async def create_history(request: Request, body: HistoryCreateRequest = Body(...
         filename=body.filename,
         tone_preference=body.tone_preference,
         detail_preference=body.detail_preference,
+        severity_score=_sev_score,
         user_id=user_id,
     )
     # Record which settings were used for edit-parameter correlation
@@ -1947,6 +2139,14 @@ async def toggle_history_liked(
             await _update_style_profile_from_history(history_id, user_id)
         except Exception:
             pass
+        # Trigger conditional pattern analysis (non-blocking)
+        try:
+            record = await _db_call("get_history", history_id, user_id=user_id)
+            if record:
+                from storage.conditional_pattern_analyzer import analyze_and_store_patterns
+                await analyze_and_store_patterns(_db(), record.get("test_type", ""), user_id=user_id, is_pg=_USE_PG)
+        except Exception:
+            pass
     return HistoryLikeResponse(id=history_id, liked=body.liked)
 
 
@@ -1957,6 +2157,14 @@ async def mark_history_copied(request: Request, history_id: str):
     updated = await _db_call("mark_copied", history_id, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
+    # Trigger conditional pattern analysis (non-blocking)
+    try:
+        record = await _db_call("get_history", history_id, user_id=user_id)
+        if record:
+            from storage.conditional_pattern_analyzer import analyze_and_store_patterns
+            await analyze_and_store_patterns(_db(), record.get("test_type", ""), user_id=user_id, is_pg=_USE_PG)
+    except Exception:
+        pass
     return {"id": history_id, "copied": True}
 
 
@@ -1976,6 +2184,31 @@ async def save_edited_text(request: Request, history_id: str, body: EditedTextRe
         await _db_call("save_history_settings_used", history_id, tone=None, detail=None, literacy=None, was_edited=True, user_id=user_id)
     except Exception:
         pass  # Non-critical
+
+    # Extract term preferences from the edit (non-blocking)
+    try:
+        record = await _db_call("get_history", history_id, user_id=user_id)
+        if record:
+            fr = record.get("full_response", {})
+            if isinstance(fr, str):
+                fr = json.loads(fr)
+            original = fr.get("explanation", {}).get("overall_summary", "")
+            measurements = fr.get("parsed_report", {}).get("measurements")
+            if original and body.edited_text:
+                from storage.term_extractor import extract_term_preferences
+                prefs = extract_term_preferences(original, body.edited_text, measurements)
+                test_type = record.get("test_type")
+                for pref in prefs:
+                    await _db_call(
+                        "upsert_term_preference",
+                        pref["medical_term"], test_type,
+                        pref["preferred_phrasing"],
+                        pref.get("keep_technical", False),
+                        user_id=user_id,
+                    )
+    except Exception:
+        pass  # Non-critical
+
     return {"id": history_id, "edited_text_saved": True}
 
 

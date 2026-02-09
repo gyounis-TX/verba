@@ -186,6 +186,7 @@ class PgDatabase:
         tone_preference: int | None = None,
         detail_preference: int | None = None,
         user_id: str | None = None,
+        severity_score: float | None = None,
     ) -> dict[str, Any]:
         pool = await _get_pool()
         sync_id = str(uuid.uuid4())
@@ -195,11 +196,12 @@ class PgDatabase:
                 """INSERT INTO history
                    (user_id, sync_id, test_type, test_type_display, filename,
                     summary, full_response, tone_preference, detail_preference,
-                    created_at, updated_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)""",
+                    created_at, updated_at, severity_score)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)""",
                 user_id, sync_id, test_type, test_type_display,
                 filename, summary, json.dumps(full_response),
                 tone_preference, detail_preference, now, now,
+                severity_score,
             )
             row = await conn.fetchrow(
                 "SELECT * FROM history WHERE sync_id = $1 AND user_id = $2",
@@ -362,7 +364,7 @@ class PgDatabase:
             "edit_rate": round(r["edit_count"] / r["cnt"], 2),
         }
 
-    async def get_style_profile(self, test_type: str, user_id: str | None = None) -> dict[str, Any] | None:
+    async def get_style_profile(self, test_type: str, user_id: str | None = None, severity_band: str | None = None) -> dict[str, Any] | None:
         pool = await _get_pool()
         try:
             async with pool.acquire() as conn:
@@ -374,35 +376,71 @@ class PgDatabase:
                 return None
             profile_raw = row["profile"]
             profile = json.loads(profile_raw) if isinstance(profile_raw, str) else profile_raw
+            # Apply severity-band overrides if present
+            if severity_band and "severity_overrides" in profile:
+                overrides = profile["severity_overrides"].get(severity_band, {})
+                if overrides:
+                    merged = dict(profile)
+                    merged.pop("severity_overrides", None)
+                    merged.update(overrides)
+                    return {"profile": merged, "sample_count": row["sample_count"]}
             return {"profile": profile, "sample_count": row["sample_count"]}
         except Exception:
             return None
 
     async def update_style_profile(
         self, test_type: str, new_data: dict[str, Any], alpha: float = 0.3,
-        user_id: str | None = None,
+        user_id: str | None = None, severity_band: str | None = None,
+        created_at: str | None = None,
     ) -> None:
-        from storage.database import _merge_profile
+        from storage.database import _merge_profile, _compute_adaptive_alpha
         pool = await _get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT profile, sample_count FROM style_profiles WHERE test_type = $1 AND user_id = $2",
+                "SELECT profile, sample_count, updated_at AS last_updated FROM style_profiles WHERE test_type = $1 AND user_id = $2",
                 test_type, user_id,
             )
+
+            effective_alpha = alpha
+            if created_at and row and row["last_updated"]:
+                last_upd = str(row["last_updated"]) if row["last_updated"] else None
+                if last_upd:
+                    effective_alpha = _compute_adaptive_alpha(alpha, created_at, last_upd)
+
             if row:
                 profile_raw = row["profile"]
                 existing = json.loads(profile_raw) if isinstance(profile_raw, str) else profile_raw
                 sample_count = row["sample_count"] + 1
-                merged = _merge_profile(existing, new_data, alpha)
             else:
-                merged = new_data
+                existing = {}
                 sample_count = 1
+
+            if severity_band:
+                overrides = existing.get("severity_overrides", {})
+                band_data = overrides.get(severity_band, {})
+                if band_data:
+                    merged_band = _merge_profile(band_data, new_data, effective_alpha)
+                else:
+                    merged_band = new_data
+                overrides[severity_band] = merged_band
+                existing["severity_overrides"] = overrides
+                merged = existing
+            else:
+                if row:
+                    sev_overrides = existing.pop("severity_overrides", None)
+                    merged = _merge_profile(existing, new_data, effective_alpha)
+                    if sev_overrides:
+                        merged["severity_overrides"] = sev_overrides
+                else:
+                    merged = new_data
+
+            now = _now()
             await conn.execute(
-                """INSERT INTO style_profiles (test_type, user_id, profile, sample_count, updated_at)
-                   VALUES ($1, $2, $3, $4, $5)
+                """INSERT INTO style_profiles (test_type, user_id, profile, sample_count, updated_at, last_data_at)
+                   VALUES ($1, $2, $3, $4, $5, $6)
                    ON CONFLICT(test_type, user_id) DO UPDATE SET
-                   profile = $3, sample_count = $4, updated_at = $5""",
-                test_type, user_id, json.dumps(merged), sample_count, _now(),
+                   profile = $3, sample_count = $4, updated_at = $5, last_data_at = $6""",
+                test_type, user_id, json.dumps(merged), sample_count, now, created_at or now,
             )
 
     async def save_edited_text(self, history_id: int | str, edited_text: str, user_id: str | None = None) -> bool:
@@ -574,6 +612,7 @@ class PgDatabase:
         tone_preference: int | None = None,
         detail_preference: int | None = None,
         user_id: str | None = None,
+        severity_band: str | None = None,
     ) -> list[dict]:
         pool = await _get_pool()
         conditions = ["user_id = $1", "(liked = true OR copied = true)"]
@@ -593,21 +632,80 @@ class PgDatabase:
             params.append(detail_preference)
             idx += 1
 
+        # Severity-band filtering with fallback
+        severity_cond = None
+        if severity_band == "normal":
+            severity_cond = "(severity_score IS NULL OR severity_score < 0.2)"
+        elif severity_band == "mild":
+            severity_cond = "(severity_score >= 0.2 AND severity_score < 0.5)"
+        elif severity_band == "moderate":
+            severity_cond = "(severity_score >= 0.5 AND severity_score < 0.8)"
+        elif severity_band == "severe":
+            severity_cond = "(severity_score >= 0.8)"
+
+        if severity_cond:
+            band_where = " WHERE " + " AND ".join(conditions + [severity_cond])
+            async with pool.acquire() as conn:
+                count_row = await conn.fetchrow(
+                    f"SELECT COUNT(*) as cnt FROM history{band_where}",
+                    *params,
+                )
+            if count_row["cnt"] >= 2:
+                conditions.append(severity_cond)
+
         where = " WHERE " + " AND ".join(conditions)
-        params.append(limit)
+        # Fetch more candidates for recency re-ranking
+        fetch_limit = max(limit * 3, 5)
+        params.append(fetch_limit)
 
         async with pool.acquire() as conn:
-            # Prioritize: copied-without-editing (strongest signal) > high-rated > liked > copied-with-edits
             rows = await conn.fetch(
-                f"""SELECT full_response FROM history{where}
+                f"""SELECT full_response, created_at, liked, copied, quality_rating, edited_text
+                    FROM history{where}
                     ORDER BY (CASE WHEN copied = true AND edited_text IS NULL THEN 0 ELSE 1 END),
                              COALESCE(quality_rating, 0) DESC,
                              liked DESC, copied DESC, created_at DESC LIMIT ${idx}""",
                 *params,
             )
 
-        examples: list[dict] = []
+        # Recency re-ranking: score = approval_signal * 0.6 + recency * 0.4
+        from datetime import datetime as _dt, timezone as _tz
+        now_dt = _dt.now(_tz.utc)
+        scored_rows: list[tuple[float, Any]] = []
         for row in rows:
+            approval = 0.0
+            if row["copied"] and not row["edited_text"]:
+                approval = 1.0
+            elif row["quality_rating"] and row["quality_rating"] >= 4:
+                approval = 0.9
+            elif row["liked"]:
+                approval = 0.7
+            else:
+                approval = 0.5
+
+            recency = 0.2
+            try:
+                created = row["created_at"]
+                if isinstance(created, str):
+                    created = _dt.fromisoformat(created.replace("Z", "+00:00"))
+                if hasattr(created, 'tzinfo') and created.tzinfo is None:
+                    created = created.replace(tzinfo=_tz.utc)
+                days = (now_dt - created).days
+                if days <= 7:
+                    recency = 1.0
+                elif days <= 30:
+                    recency = 0.5
+            except (ValueError, TypeError, AttributeError):
+                pass
+
+            score = approval * 0.6 + recency * 0.4
+            scored_rows.append((score, row))
+
+        scored_rows.sort(key=lambda x: -x[0])
+        ranked_rows = [r for _, r in scored_rows[:limit]]
+
+        examples: list[dict] = []
+        for row in ranked_rows:
             try:
                 fr_raw = row["full_response"]
                 full_response = json.loads(fr_raw) if isinstance(fr_raw, str) else fr_raw
@@ -636,6 +734,147 @@ class PgDatabase:
             except (json.JSONDecodeError, TypeError):
                 continue
         return examples
+
+    async def get_preferred_signoff(self, test_type: str, limit: int = 10, user_id: str | None = None) -> str | None:
+        """Extract the most common sign-off from copied/liked outputs."""
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT full_response, edited_text FROM history
+                   WHERE user_id = $1 AND test_type = $2 AND (liked = true OR copied = true)
+                   ORDER BY updated_at DESC LIMIT $3""",
+                user_id, test_type, limit,
+            )
+
+        closing_re = re.compile(
+            r"(?:feel free to|don't hesitate to|please don't hesitate|"
+            r"if you have any questions|call (?:our|the|my) office|"
+            r"looking forward to|we will discuss|take care|"
+            r"best regards|warmly|sincerely|please reach out|"
+            r"do not hesitate)[^.!?]*[.!?]?",
+            re.IGNORECASE,
+        )
+
+        signoff_counts: dict[str, int] = {}
+        for row in rows:
+            text = row["edited_text"]
+            if not text:
+                try:
+                    fr_raw = row["full_response"]
+                    fr = json.loads(fr_raw) if isinstance(fr_raw, str) else fr_raw
+                    text = fr.get("explanation", {}).get("overall_summary", "")
+                except (json.JSONDecodeError, TypeError):
+                    continue
+            if not text:
+                continue
+            paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+            if not paragraphs:
+                continue
+            match = closing_re.search(paragraphs[-1])
+            if match:
+                key = match.group(0).strip().lower()
+                signoff_counts[key] = signoff_counts.get(key, 0) + 1
+
+        if not signoff_counts:
+            return None
+        best_key, best_count = max(signoff_counts.items(), key=lambda x: x[1])
+        if best_count < 3:
+            return None
+        # Return original-case version
+        for row in rows:
+            text = row["edited_text"]
+            if not text:
+                try:
+                    fr_raw = row["full_response"]
+                    fr = json.loads(fr_raw) if isinstance(fr_raw, str) else fr_raw
+                    text = fr.get("explanation", {}).get("overall_summary", "")
+                except (json.JSONDecodeError, TypeError):
+                    continue
+            if not text:
+                continue
+            paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+            if paragraphs:
+                match = closing_re.search(paragraphs[-1])
+                if match and match.group(0).strip().lower() == best_key:
+                    return match.group(0).strip()
+        return None
+
+    # --- Term Preferences ---
+
+    async def upsert_term_preference(
+        self, medical_term: str, test_type: str | None,
+        preferred_phrasing: str, keep_technical: bool = False,
+        user_id: str | None = None,
+    ) -> None:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """INSERT INTO term_preferences
+                   (user_id, medical_term, test_type, preferred_phrasing, keep_technical, count, updated_at)
+                   VALUES ($1, $2, $3, $4, $5, 1, $6)
+                   ON CONFLICT(user_id, medical_term, test_type) DO UPDATE SET
+                   preferred_phrasing = $4, keep_technical = $5,
+                   count = term_preferences.count + 1, updated_at = $6""",
+                user_id, medical_term.lower(), test_type, preferred_phrasing,
+                keep_technical, _now(),
+            )
+
+    async def get_term_preferences(
+        self, test_type: str | None = None, min_count: int = 3,
+        user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            if test_type:
+                rows = await conn.fetch(
+                    """SELECT medical_term, preferred_phrasing, keep_technical, count
+                       FROM term_preferences
+                       WHERE user_id = $1 AND (test_type IS NULL OR test_type = $2) AND count >= $3
+                       ORDER BY count DESC""",
+                    user_id, test_type, min_count,
+                )
+            else:
+                rows = await conn.fetch(
+                    """SELECT medical_term, preferred_phrasing, keep_technical, count
+                       FROM term_preferences
+                       WHERE user_id = $1 AND count >= $2
+                       ORDER BY count DESC""",
+                    user_id, min_count,
+                )
+        return [dict(row) for row in rows]
+
+    # --- Conditional Rules ---
+
+    async def upsert_conditional_rule(
+        self, test_type: str, severity_band: str, phrase: str,
+        pattern_type: str = "general", user_id: str | None = None,
+    ) -> None:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """INSERT INTO conditional_rules
+                   (user_id, test_type, severity_band, phrase, pattern_type, count, updated_at)
+                   VALUES ($1, $2, $3, $4, $5, 1, $6)
+                   ON CONFLICT(user_id, test_type, severity_band, phrase) DO UPDATE SET
+                   count = conditional_rules.count + 1,
+                   pattern_type = $5, updated_at = $6""",
+                user_id, test_type, severity_band, phrase, pattern_type, _now(),
+            )
+
+    async def get_conditional_rules(
+        self, test_type: str, severity_band: str, min_count: int = 3,
+        user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT phrase, pattern_type, count
+                   FROM conditional_rules
+                   WHERE user_id = $1 AND test_type = $2 AND severity_band = $3 AND count >= $4
+                   ORDER BY count DESC LIMIT 5""",
+                user_id, test_type, severity_band, min_count,
+            )
+        return [dict(row) for row in rows]
 
     # --- Templates ---
 

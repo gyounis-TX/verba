@@ -111,6 +111,43 @@ def _extract_stylistic_patterns(text: str) -> dict[str, list[str]]:
     return patterns
 
 
+def _severity_band(score: float | None) -> str:
+    """Map a severity score (0.0-1.0) to a named band."""
+    if score is None or score < 0.2:
+        return "normal"
+    elif score < 0.5:
+        return "mild"
+    elif score < 0.8:
+        return "moderate"
+    else:
+        return "severe"
+
+
+def _compute_adaptive_alpha(
+    base_alpha: float, created_at: str, last_updated: str,
+) -> float:
+    """Return an adaptive alpha based on recency of data.
+
+    - <= 1 day since last update: alpha * 1.5 (capped at 0.6)
+    - 1-7 days: base alpha
+    - > 7 days: alpha * 0.7 (floor 0.1)
+    """
+    try:
+        from datetime import datetime, timezone
+        # Parse ISO 8601 timestamps
+        created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        updated = datetime.fromisoformat(last_updated.replace("Z", "+00:00"))
+        delta = abs((created - updated).total_seconds()) / 86400  # days
+        if delta <= 1:
+            return min(base_alpha * 1.5, 0.6)
+        elif delta <= 7:
+            return base_alpha
+        else:
+            return max(base_alpha * 0.7, 0.1)
+    except (ValueError, TypeError):
+        return base_alpha
+
+
 def _merge_profile(
     existing: dict[str, Any], new_data: dict[str, Any], alpha: float,
 ) -> dict[str, Any]:
@@ -153,7 +190,19 @@ CREATE TABLE IF NOT EXISTS history (
     filename TEXT,
     summary TEXT NOT NULL,
     full_response TEXT NOT NULL,
-    liked INTEGER NOT NULL DEFAULT 0
+    liked INTEGER NOT NULL DEFAULT 0,
+    tone_preference INTEGER,
+    detail_preference INTEGER,
+    copied INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT,
+    sync_id TEXT,
+    edited_text TEXT,
+    quality_rating INTEGER,
+    quality_note TEXT,
+    tone_used INTEGER,
+    detail_used INTEGER,
+    literacy_used TEXT,
+    was_edited INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at);
 
@@ -272,6 +321,30 @@ class Database:
                 "ALTER TABLE history ADD COLUMN literacy_used TEXT",
                 "ALTER TABLE history ADD COLUMN was_edited INTEGER NOT NULL DEFAULT 0",
                 "CREATE TABLE IF NOT EXISTS style_profiles (test_type TEXT PRIMARY KEY, profile TEXT NOT NULL, sample_count INTEGER NOT NULL DEFAULT 0, updated_at TEXT)",
+                "ALTER TABLE history ADD COLUMN severity_score REAL",
+                "ALTER TABLE style_profiles ADD COLUMN last_data_at TEXT",
+                # New tables for personalization features
+                """CREATE TABLE IF NOT EXISTS term_preferences (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    medical_term TEXT NOT NULL,
+                    test_type TEXT,
+                    preferred_phrasing TEXT NOT NULL,
+                    keep_technical INTEGER NOT NULL DEFAULT 0,
+                    source TEXT NOT NULL DEFAULT 'edit',
+                    count INTEGER NOT NULL DEFAULT 1,
+                    updated_at TEXT,
+                    UNIQUE(medical_term, test_type)
+                )""",
+                """CREATE TABLE IF NOT EXISTS conditional_rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    test_type TEXT NOT NULL,
+                    severity_band TEXT NOT NULL,
+                    phrase TEXT NOT NULL,
+                    pattern_type TEXT NOT NULL DEFAULT 'general',
+                    count INTEGER NOT NULL DEFAULT 1,
+                    updated_at TEXT,
+                    UNIQUE(test_type, severity_band, phrase)
+                )""",
             ]
             for migration in migrations:
                 try:
@@ -308,6 +381,26 @@ class Database:
                     "UPDATE settings SET updated_at = ? WHERE updated_at IS NULL",
                     (_now(),),
                 )
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+
+            # Backfill severity_score from full_response JSON
+            try:
+                rows_no_sev = conn.execute(
+                    "SELECT id, full_response FROM history WHERE severity_score IS NULL"
+                ).fetchall()
+                for row in rows_no_sev:
+                    try:
+                        fr = json.loads(row["full_response"]) if isinstance(row["full_response"], str) else row["full_response"]
+                        sev = fr.get("severity_score") if isinstance(fr, dict) else None
+                        if sev is not None:
+                            conn.execute(
+                                "UPDATE history SET severity_score = ? WHERE id = ?",
+                                (float(sev), row["id"]),
+                            )
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        pass
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
@@ -409,14 +502,15 @@ class Database:
         filename: str | None = None,
         tone_preference: int | None = None,
         detail_preference: int | None = None,
+        severity_score: float | None = None,
     ) -> dict[str, Any]:
         conn = self._get_conn()
         try:
             sid = str(uuid.uuid4())
             now = _now()
             cursor = conn.execute(
-                """INSERT INTO history (test_type, test_type_display, filename, summary, full_response, tone_preference, detail_preference, sync_id, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO history (test_type, test_type_display, filename, summary, full_response, tone_preference, detail_preference, sync_id, updated_at, severity_score)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     test_type,
                     test_type_display,
@@ -427,6 +521,7 @@ class Database:
                     detail_preference,
                     sid,
                     now,
+                    severity_score,
                 ),
             )
             conn.commit()
@@ -617,8 +712,12 @@ class Database:
         finally:
             conn.close()
 
-    def get_style_profile(self, test_type: str) -> dict[str, Any] | None:
-        """Get the persistent style profile for a test type."""
+    def get_style_profile(self, test_type: str, severity_band: str | None = None) -> dict[str, Any] | None:
+        """Get the persistent style profile for a test type.
+
+        If severity_band is given, merge band-specific overrides from
+        profile.severity_overrides[band] onto the base profile.
+        """
         conn = self._get_conn()
         try:
             row = conn.execute(
@@ -627,8 +726,17 @@ class Database:
             ).fetchone()
             if not row:
                 return None
+            profile = json.loads(row["profile"])
+            # Apply severity-band overrides if present
+            if severity_band and "severity_overrides" in profile:
+                overrides = profile["severity_overrides"].get(severity_band, {})
+                if overrides:
+                    merged = dict(profile)
+                    merged.pop("severity_overrides", None)
+                    merged.update(overrides)
+                    return {"profile": merged, "sample_count": row["sample_count"]}
             return {
-                "profile": json.loads(row["profile"]),
+                "profile": profile,
                 "sample_count": row["sample_count"],
             }
         except Exception:
@@ -638,33 +746,62 @@ class Database:
 
     def update_style_profile(
         self, test_type: str, new_data: dict[str, Any], alpha: float = 0.3,
+        severity_band: str | None = None, created_at: str | None = None,
     ) -> None:
         """Update the style profile using exponential moving average.
 
         *alpha* controls how quickly the profile adapts (0 = never, 1 = replace).
+        If *severity_band* is given, writes to profile.severity_overrides[band].
+        If *created_at* is given, alpha is adjusted for recency (Phase D).
         """
         conn = self._get_conn()
         try:
             row = conn.execute(
-                "SELECT profile, sample_count FROM style_profiles WHERE test_type = ?",
+                "SELECT profile, sample_count, updated_at AS last_updated FROM style_profiles WHERE test_type = ?",
                 (test_type,),
             ).fetchone()
+
+            # Adaptive alpha based on recency
+            effective_alpha = alpha
+            if created_at and row and row["last_updated"]:
+                effective_alpha = _compute_adaptive_alpha(alpha, created_at, row["last_updated"])
 
             if row:
                 existing = json.loads(row["profile"])
                 sample_count = row["sample_count"] + 1
-                merged = _merge_profile(existing, new_data, alpha)
             else:
-                merged = new_data
+                existing = {}
                 sample_count = 1
 
+            if severity_band:
+                # Write to severity_overrides sub-dict
+                overrides = existing.get("severity_overrides", {})
+                band_data = overrides.get(severity_band, {})
+                if band_data:
+                    merged_band = _merge_profile(band_data, new_data, effective_alpha)
+                else:
+                    merged_band = new_data
+                overrides[severity_band] = merged_band
+                existing["severity_overrides"] = overrides
+                merged = existing
+            else:
+                if row:
+                    # Preserve severity_overrides during base merge
+                    sev_overrides = existing.pop("severity_overrides", None)
+                    merged = _merge_profile(existing, new_data, effective_alpha)
+                    if sev_overrides:
+                        merged["severity_overrides"] = sev_overrides
+                else:
+                    merged = new_data
+
+            now = _now()
             conn.execute(
-                """INSERT INTO style_profiles (test_type, profile, sample_count, updated_at)
-                   VALUES (?, ?, ?, ?)
+                """INSERT INTO style_profiles (test_type, profile, sample_count, updated_at, last_data_at)
+                   VALUES (?, ?, ?, ?, ?)
                    ON CONFLICT(test_type) DO UPDATE SET
                    profile = excluded.profile, sample_count = excluded.sample_count,
-                   updated_at = excluded.updated_at""",
-                (test_type, json.dumps(merged), sample_count, _now()),
+                   updated_at = excluded.updated_at, last_data_at = excluded.last_data_at""",
+                (test_type, json.dumps(merged), sample_count, now, created_at or now),
             )
             conn.commit()
         finally:
@@ -830,6 +967,80 @@ class Database:
         finally:
             conn.close()
 
+    def get_preferred_signoff(self, test_type: str, limit: int = 10) -> str | None:
+        """Extract the most common sign-off from copied/liked outputs.
+
+        Prefers edited_text (doctor's actual words) over generated text.
+        Returns the sign-off only if it appears >= 3 times.
+        """
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT full_response, edited_text FROM history
+                   WHERE test_type = ? AND (liked = 1 OR copied = 1)
+                   ORDER BY updated_at DESC LIMIT ?""",
+                (test_type, limit),
+            ).fetchall()
+
+            signoff_counts: dict[str, int] = {}
+            closing_re = re.compile(
+                r"(?:feel free to|don't hesitate to|please don't hesitate|"
+                r"if you have any questions|call (?:our|the|my) office|"
+                r"looking forward to|we will discuss|take care|"
+                r"best regards|warmly|sincerely|please reach out|"
+                r"do not hesitate)[^.!?]*[.!?]?",
+                re.IGNORECASE,
+            )
+
+            for row in rows:
+                text = row["edited_text"]
+                if not text:
+                    try:
+                        fr = json.loads(row["full_response"]) if isinstance(row["full_response"], str) else row["full_response"]
+                        text = fr.get("explanation", {}).get("overall_summary", "")
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                if not text:
+                    continue
+
+                # Get last paragraph
+                paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+                if not paragraphs:
+                    continue
+                last_para = paragraphs[-1]
+                match = closing_re.search(last_para)
+                if match:
+                    signoff = match.group(0).strip()
+                    # Normalize to lowercase key for counting
+                    key = signoff.lower()
+                    signoff_counts[key] = signoff_counts.get(key, 0) + 1
+
+            if not signoff_counts:
+                return None
+
+            best_key, best_count = max(signoff_counts.items(), key=lambda x: x[1])
+            if best_count >= 3:
+                # Return the original-case version by re-scanning
+                for row in rows:
+                    text = row["edited_text"]
+                    if not text:
+                        try:
+                            fr = json.loads(row["full_response"]) if isinstance(row["full_response"], str) else row["full_response"]
+                            text = fr.get("explanation", {}).get("overall_summary", "")
+                        except (json.JSONDecodeError, TypeError):
+                            continue
+                    if not text:
+                        continue
+                    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+                    if paragraphs:
+                        match = closing_re.search(paragraphs[-1])
+                        if match and match.group(0).strip().lower() == best_key:
+                            return match.group(0).strip()
+                return None
+            return None
+        finally:
+            conn.close()
+
     def get_prior_measurements(
         self, test_type: str, limit: int = 3
     ) -> list[dict[str, Any]]:
@@ -889,6 +1100,7 @@ class Database:
         test_type: str | None = None,
         tone_preference: int | None = None,
         detail_preference: int | None = None,
+        severity_band: str | None = None,
     ) -> list[dict]:
         conn = self._get_conn()
         try:
@@ -903,19 +1115,75 @@ class Database:
             if detail_preference is not None:
                 conditions.append("detail_preference = ?")
                 params.append(detail_preference)
+
+            # Severity-band filtering with fallback
+            severity_cond = None
+            if severity_band == "normal":
+                severity_cond = "(severity_score IS NULL OR severity_score < 0.2)"
+            elif severity_band == "mild":
+                severity_cond = "(severity_score >= 0.2 AND severity_score < 0.5)"
+            elif severity_band == "moderate":
+                severity_cond = "(severity_score >= 0.5 AND severity_score < 0.8)"
+            elif severity_band == "severe":
+                severity_cond = "(severity_score >= 0.8)"
+
+            if severity_cond:
+                band_conditions = conditions + [severity_cond]
+                band_where = " WHERE " + " AND ".join(band_conditions)
+                count_row = conn.execute(
+                    f"SELECT COUNT(*) as cnt FROM history{band_where}",
+                    params,
+                ).fetchone()
+                if count_row["cnt"] >= 2:
+                    conditions.append(severity_cond)
+
             where_clause = " WHERE " + " AND ".join(conditions)
-            params.append(limit)
-            # Prioritize: copied-without-editing (strongest signal) > high-rated > liked > copied-with-edits
+            # Fetch more candidates for recency re-ranking, then return top `limit`
+            fetch_limit = max(limit * 3, 5)
+            params.append(fetch_limit)
             rows = conn.execute(
-                f"""SELECT full_response FROM history{where_clause}
+                f"""SELECT full_response, created_at, liked, copied, quality_rating, edited_text
+                    FROM history{where_clause}
                     ORDER BY (CASE WHEN copied = 1 AND edited_text IS NULL THEN 0 ELSE 1 END),
                              COALESCE(quality_rating, 0) DESC,
                              liked DESC, copied DESC, created_at DESC LIMIT ?""",
                 params,
             ).fetchall()
 
-            examples: list[dict] = []
+            # Recency re-ranking: score = approval_signal * 0.6 + recency * 0.4
+            from datetime import datetime, timezone
+            now_dt = datetime.now(timezone.utc)
+            scored_rows: list[tuple[float, Any]] = []
             for row in rows:
+                approval = 0.0
+                if row["copied"] and not row["edited_text"]:
+                    approval = 1.0
+                elif row["quality_rating"] and row["quality_rating"] >= 4:
+                    approval = 0.9
+                elif row["liked"]:
+                    approval = 0.7
+                else:
+                    approval = 0.5
+
+                recency = 0.2
+                try:
+                    created = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
+                    days = (now_dt - created).days
+                    if days <= 7:
+                        recency = 1.0
+                    elif days <= 30:
+                        recency = 0.5
+                except (ValueError, TypeError, AttributeError):
+                    pass
+
+                score = approval * 0.6 + recency * 0.4
+                scored_rows.append((score, row))
+
+            scored_rows.sort(key=lambda x: -x[0])
+            ranked_rows = [r for _, r in scored_rows[:limit]]
+
+            examples: list[dict] = []
+            for row in ranked_rows:
                 try:
                     full_response = json.loads(row["full_response"])
                     explanation = full_response.get("explanation", {})
@@ -946,6 +1214,95 @@ class Database:
                 except (json.JSONDecodeError, TypeError):
                     continue
             return examples
+        finally:
+            conn.close()
+
+    # --- Term Preferences ---
+
+    def upsert_term_preference(
+        self, medical_term: str, test_type: str | None,
+        preferred_phrasing: str, keep_technical: bool = False,
+    ) -> None:
+        """Insert or increment count for a term preference."""
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO term_preferences
+                   (medical_term, test_type, preferred_phrasing, keep_technical, count, updated_at)
+                   VALUES (?, ?, ?, ?, 1, ?)
+                   ON CONFLICT(medical_term, test_type) DO UPDATE SET
+                   preferred_phrasing = excluded.preferred_phrasing,
+                   keep_technical = excluded.keep_technical,
+                   count = count + 1,
+                   updated_at = excluded.updated_at""",
+                (medical_term.lower(), test_type, preferred_phrasing, 1 if keep_technical else 0, _now()),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_term_preferences(
+        self, test_type: str | None = None, min_count: int = 3,
+    ) -> list[dict[str, Any]]:
+        """Return term preferences with count >= min_count."""
+        conn = self._get_conn()
+        try:
+            if test_type:
+                rows = conn.execute(
+                    """SELECT medical_term, preferred_phrasing, keep_technical, count
+                       FROM term_preferences
+                       WHERE (test_type IS NULL OR test_type = ?) AND count >= ?
+                       ORDER BY count DESC""",
+                    (test_type, min_count),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """SELECT medical_term, preferred_phrasing, keep_technical, count
+                       FROM term_preferences WHERE count >= ?
+                       ORDER BY count DESC""",
+                    (min_count,),
+                ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+    # --- Conditional Rules ---
+
+    def upsert_conditional_rule(
+        self, test_type: str, severity_band: str, phrase: str,
+        pattern_type: str = "general",
+    ) -> None:
+        """Insert or increment count for a conditional rule."""
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO conditional_rules
+                   (test_type, severity_band, phrase, pattern_type, count, updated_at)
+                   VALUES (?, ?, ?, ?, 1, ?)
+                   ON CONFLICT(test_type, severity_band, phrase) DO UPDATE SET
+                   count = count + 1,
+                   pattern_type = excluded.pattern_type,
+                   updated_at = excluded.updated_at""",
+                (test_type, severity_band, phrase, pattern_type, _now()),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_conditional_rules(
+        self, test_type: str, severity_band: str, min_count: int = 3,
+    ) -> list[dict[str, Any]]:
+        """Return conditional rules for a test type and severity band."""
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT phrase, pattern_type, count
+                   FROM conditional_rules
+                   WHERE test_type = ? AND severity_band = ? AND count >= ?
+                   ORDER BY count DESC LIMIT 5""",
+                (test_type, severity_band, min_count),
+            ).fetchall()
+            return [dict(row) for row in rows]
         finally:
             conn.close()
 

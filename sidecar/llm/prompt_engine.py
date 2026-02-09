@@ -3216,6 +3216,9 @@ class PromptEngine:
         lab_reference_ranges_section: str | None = None,
         vocabulary_preferences: dict | None = None,
         style_profile: dict | None = None,
+        preferred_signoff: str | None = None,
+        term_preferences: list[dict] | None = None,
+        conditional_rules: list[dict] | None = None,
     ) -> str:
         """Build the user prompt with report data, ranges, and glossary.
 
@@ -3602,6 +3605,42 @@ class PromptEngine:
                     closings = profile["preferred_closings"][:3]
                     sections.append("- Preferred closing styles: " + "; ".join(f'"{c}"' for c in closings))
 
+        # 1h3d. Preferred sign-off
+        if preferred_signoff and not short_comment:
+            sections.append("\n## Preferred Sign-off")
+            sections.append(
+                f'The physician consistently ends communications with: "{preferred_signoff}"\n'
+                f"End the overall_summary with this or a very similar closing."
+            )
+
+        # 1h3e. Medical term preferences
+        if term_preferences and not short_comment:
+            plain_terms = [t for t in term_preferences if not t.get("keep_technical")]
+            tech_terms = [t for t in term_preferences if t.get("keep_technical")]
+            if plain_terms or tech_terms:
+                sections.append("\n## Medical Term Preferences")
+                if plain_terms:
+                    sections.append("**Use plain language for these terms:**")
+                    for t in plain_terms[:10]:
+                        sections.append(
+                            f'- Instead of "{t["medical_term"]}", say "{t["preferred_phrasing"]}"'
+                        )
+                if tech_terms:
+                    sections.append("**Keep these terms technical:**")
+                    for t in tech_terms[:10]:
+                        sections.append(f'- Keep: "{t["medical_term"]}"')
+
+        # 1h3f. Context-specific conditional rules
+        if conditional_rules and not short_comment:
+            sections.append("\n## Context-Specific Patterns")
+            sections.append(
+                "The physician consistently uses these when results fall in this severity range:"
+            )
+            for rule in conditional_rules[:5]:
+                ptype = rule.get("pattern_type", "general")
+                label = ptype.replace("_", " ").title()
+                sections.append(f'- {label}: "{rule["phrase"]}"')
+
         # 1h4. Quality feedback adjustments (from low-rated reports)
         if quality_feedback and not short_comment:
             sections.append("\n## Quality Feedback Adjustments")
@@ -3801,3 +3840,59 @@ class PromptEngine:
             )
 
         return "\n".join(sections)
+
+    # ------------------------------------------------------------------
+    # Quick Normal — ultra-short reassurance message
+    # ------------------------------------------------------------------
+
+    def build_quick_normal_system_prompt(
+        self,
+        prompt_context: dict,
+        physician_name: str | None = None,
+        explanation_voice: str = "third_person",
+        name_drop: bool = True,
+    ) -> str:
+        """Build a minimal system prompt for quick-normal reassurance messages."""
+        specialty = prompt_context.get("specialty", "physician")
+        test_display = prompt_context.get("test_type_display", "test")
+
+        parts: list[str] = [
+            f"You are a clinical communicator writing a brief reassurance message "
+            f"for a patient whose {test_display} results are all within normal limits.",
+            "",
+            "## Rules",
+            "- Write 1-3 sentences, 150-300 characters total.",
+            "- Warm, reassuring tone. Mention the test type by name.",
+            "- Do NOT include specific numeric values or measurements.",
+            "- Do NOT suggest follow-up appointments or next steps.",
+            "- Plain text only — no markdown, bullets, or formatting.",
+            "- Do NOT start with 'Great news' or 'Good news'.",
+        ]
+
+        if name_drop and physician_name:
+            voice_label = "first person (I/my)" if explanation_voice == "first_person" else "third person"
+            parts.append(
+                f"\n## Physician Voice\n"
+                f"Write in {voice_label} as Dr. {physician_name}, {specialty}."
+            )
+
+        return "\n".join(parts)
+
+    def build_quick_normal_user_prompt(
+        self,
+        parsed_report: "ParsedReport",
+        clinical_context: str | None = None,
+    ) -> str:
+        """Build a minimal user prompt for quick-normal reassurance messages."""
+        parts: list[str] = [
+            f"Test type: {parsed_report.test_type_display}",
+            f"Measurements parsed: {len(parsed_report.measurements)}",
+            "All measurements are within normal range.",
+        ]
+        if clinical_context:
+            parts.append(f"\nClinical context: {clinical_context}")
+        parts.append(
+            "\nWrite a brief reassurance message for the patient. "
+            "Call the explain_report tool with your response."
+        )
+        return "\n".join(parts)
