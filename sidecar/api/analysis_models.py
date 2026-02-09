@@ -37,6 +37,8 @@ class ParsedMeasurement(BaseModel):
     prior_values: list[PriorValue] = Field(default_factory=list)
     raw_text: str = ""
     page_number: Optional[int] = None
+    lab_flag: Optional[str] = None
+    lab_ref_range: Optional[str] = None
 
 
 class ReportSection(BaseModel):

@@ -189,7 +189,7 @@ export function SettingsScreen() {
     } finally {
       setSaving(false);
     }
-  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, quickReasons, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, smsEnabled, smsCharLimit, footerType, customFooterText, useAnalogies, includeLifestyleRecommendations, defaultCommentMode, severityAdaptiveTone, showToast]);
+  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, humanizationLevel, quickReasons, customPhrases, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, smsEnabled, smsCharLimit, footerType, customFooterText, useAnalogies, includeLifestyleRecommendations, defaultCommentMode, severityAdaptiveTone, showToast]);
 
   // Auto-save: debounce 800ms after any setting changes
   const handleSaveRef = useRef(handleSave);
@@ -203,7 +203,7 @@ export function SettingsScreen() {
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, quickReasons, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, smsEnabled, smsCharLimit, footerType, customFooterText, useAnalogies, includeLifestyleRecommendations, defaultCommentMode, severityAdaptiveTone]);
+  }, [literacyLevel, specialty, practiceName, includeKeyFindings, includeMeasurements, tonePreference, detailPreference, humanizationLevel, quickReasons, customPhrases, nextStepsOptions, explanationVoice, nameDrop, physicianNameSource, customPhysicianName, practiceProviders, shortCommentCharLimit, smsEnabled, smsCharLimit, footerType, customFooterText, useAnalogies, includeLifestyleRecommendations, defaultCommentMode, severityAdaptiveTone]);
 
 
   if (loading) {
