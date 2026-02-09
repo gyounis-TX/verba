@@ -72,6 +72,7 @@ class DetectTypeResponse(BaseModel):
     llm_attempted: bool = False
     is_compound: bool = False
     compound_segments: list[CompoundSegmentInfo] = Field(default_factory=list)
+    is_likely_normal: bool = False
 
 
 class DetectTypeRequest(BaseModel):

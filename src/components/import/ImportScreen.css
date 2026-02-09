@@ -1054,6 +1054,117 @@
   cursor: not-allowed;
 }
 
+/* Proceed button group */
+.proceed-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.proceed-btn--quick-normal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm) var(--space-xl);
+  background-color: #16a34a;
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.proceed-btn--quick-normal:hover {
+  background-color: #15803d;
+}
+
+/* Quick Normal modal elements */
+.quick-normal-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.quick-normal-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #16a34a;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.quick-normal-error {
+  padding: var(--space-md);
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius-md);
+  background-color: #fef2f2;
+  color: #991b1b;
+  font-size: var(--font-size-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.quick-normal-error p {
+  margin: 0;
+}
+
+.quick-normal-result {
+  padding: var(--space-md);
+  border: 1px solid #86efac;
+  border-radius: var(--radius-md);
+  background-color: #f0fdf4;
+}
+
+.quick-normal-text {
+  margin: 0;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+.quick-normal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.quick-normal-btn--primary {
+  background-color: #16a34a;
+  color: white;
+}
+
+.quick-normal-btn--primary:hover {
+  background-color: #15803d;
+}
+
+.quick-normal-btn--secondary {
+  background-color: var(--color-surface-raised);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.quick-normal-btn--secondary:hover {
+  background-color: var(--color-surface-hover);
+}
+
 /* Compact detection fallback (replaces inline type buttons) */
 .detection-fallback-compact {
   display: flex;

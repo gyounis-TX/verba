@@ -101,12 +101,23 @@ export interface TestTypeInfo {
   category?: string;
 }
 
+export interface CompoundSegmentInfo {
+  start_page: number;
+  end_page: number;
+  detected_type: string | null;
+  confidence: number;
+  char_count: number;
+}
+
 export interface DetectTypeResponse {
   test_type: string | null;
   confidence: number;
   available_types: TestTypeInfo[];
   detection_method: "keyword" | "llm" | "none";
   llm_attempted: boolean;
+  is_compound: boolean;
+  compound_segments: CompoundSegmentInfo[];
+  is_likely_normal: boolean;
 }
 
 export interface ParseRequest {
@@ -174,6 +185,7 @@ export interface ExplainRequest {
   include_lifestyle_recommendations?: boolean;
   avoid_openings?: string[];
   batch_prior_summaries?: Array<{ label: string; test_type_display: string; measurements_summary: string }>;
+  quick_normal?: boolean;
 }
 
 export interface ExplainResponse {

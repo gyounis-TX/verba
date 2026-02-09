@@ -77,6 +77,7 @@ class ExplainRequest(BaseModel):
     include_lifestyle_recommendations: Optional[bool] = None
     avoid_openings: Optional[list[str]] = None
     batch_prior_summaries: Optional[list[dict]] = None
+    quick_normal: Optional[bool] = None
 
 
 # --- Response sub-models ---

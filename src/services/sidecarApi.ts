@@ -320,6 +320,8 @@ class SidecarApi {
       body.quick_reasons = request.quick_reasons;
     if (request.use_analogies != null)
       body.use_analogies = request.use_analogies;
+    if (request.quick_normal != null)
+      body.quick_normal = request.quick_normal;
 
     const response = await this.fetchWithAuth(`${baseUrl}/analyze/explain`, {
       method: "POST",

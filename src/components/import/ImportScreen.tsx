@@ -4,6 +4,7 @@ import { sidecarApi } from "../../services/sidecarApi";
 import { useToast } from "../shared/Toast";
 import type { ExtractionResult, Template, SharedTemplate, DetectTypeResponse } from "../../types/sidecar";
 import { groupTypesByCategory } from "../../utils/testTypeCategories";
+import QuickNormalModal from "./QuickNormalModal";
 import "./ImportScreen.css";
 import "../shared/TypeModal.css";
 
@@ -149,6 +150,9 @@ export function ImportScreen() {
   const [modalSelectedType, setModalSelectedType] = useState<string | null>(null);
   const [modalCustomType, setModalCustomType] = useState("");
   const [modalEditingKey, setModalEditingKey] = useState<string | null>(null);
+
+  // Quick Normal modal state
+  const [showQuickNormal, setShowQuickNormal] = useState(false);
 
   // Single-report preview collapse state
   const [singlePreviewExpanded, setSinglePreviewExpanded] = useState(false);
@@ -1235,20 +1239,38 @@ export function ImportScreen() {
                 No PHI is stored or sent to the AI. All identifiable information is redacted before processing.
               </p>
 
-              <button
-                className="proceed-btn"
-                onClick={handleProceed}
-                disabled={(() => {
-                  const successEntries = [...extractionResults.values()].filter(e => e.status === "success");
+              {(() => {
+                const successEntries = [...extractionResults.values()].filter(e => e.status === "success");
+                const isSingleReport = successEntries.length <= 1;
+                const isLikelyNormal = isSingleReport && detectionStatus === "success" && detectionResult?.is_likely_normal === true;
+                const proceedDisabled = (() => {
                   if (successEntries.length > 1) {
-                    // Batch mode: block only while detection is still running
                     return successEntries.some(e => e.detectionStatus === "detecting");
                   }
                   return !resolvedTestType || detectionStatus === "detecting";
-                })()}
-              >
-                Continue to Processing
-              </button>
+                })();
+
+                return (
+                  <div className="proceed-actions">
+                    {isLikelyNormal && (
+                      <button
+                        className="proceed-btn--quick-normal"
+                        onClick={() => setShowQuickNormal(true)}
+                        disabled={proceedDisabled}
+                      >
+                        Quick Normal
+                      </button>
+                    )}
+                    <button
+                      className="proceed-btn"
+                      onClick={handleProceed}
+                      disabled={proceedDisabled}
+                    >
+                      {isLikelyNormal ? "Full Analysis" : "Continue to Processing"}
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -1470,6 +1492,26 @@ export function ImportScreen() {
         </div>
         );
       })()}
+
+      {/* Quick Normal Modal */}
+      {showQuickNormal && result && resolvedTestType && (
+        <QuickNormalModal
+          extractionResult={result}
+          testType={resolvedTestType}
+          testTypeDisplay={
+            detectionResult?.available_types?.find(
+              (t) => t.test_type_id === resolvedTestType,
+            )?.display_name ?? resolvedTestType
+          }
+          clinicalContext={clinicalContext.trim() || undefined}
+          quickReasons={selectedReasons.size > 0 ? Array.from(selectedReasons) : undefined}
+          onClose={() => setShowQuickNormal(false)}
+          onViewFullAnalysis={() => {
+            setShowQuickNormal(false);
+            handleProceed();
+          }}
+        />
+      )}
 
       {/* Patient Mismatch Warning Modal */}
       {showMismatchModal && (
