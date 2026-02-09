@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { IS_TAURI } from "../../services/platform";
 import { sidecarApi } from "../../services/sidecarApi";
 import { queueSettingsUpsert } from "../../services/syncEngine";
 import { useToast } from "../shared/Toast";

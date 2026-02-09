@@ -224,6 +224,7 @@ export interface AppSettings {
   use_analogies: boolean;
   include_lifestyle_recommendations: boolean;
   custom_phrases: string[];
+  severity_adaptive_tone: boolean;
   humanization_level: number;
 }
 
@@ -259,6 +260,7 @@ export interface SettingsUpdate {
   use_analogies?: boolean;
   include_lifestyle_recommendations?: boolean;
   custom_phrases?: string[];
+  severity_adaptive_tone?: boolean;
   humanization_level?: number;
 }
 
