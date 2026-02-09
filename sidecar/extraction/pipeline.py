@@ -9,6 +9,7 @@ from api.models import (
     PageType,
 )
 from .detector import PDFDetector
+from .emr_fingerprint import detect_emr_source
 from .ocr_extractor import OCRExtractor
 from .preprocessor import ImagePreprocessor
 from .table_extractor import TableExtractor
@@ -16,6 +17,18 @@ from .text_extractor import TextExtractor
 
 
 class ExtractionPipeline:
+    @staticmethod
+    def _extract_pdf_metadata(file_path: str) -> dict | None:
+        """Extract PDF metadata using PyMuPDF if available."""
+        try:
+            import fitz
+            doc = fitz.open(file_path)
+            metadata = doc.metadata
+            doc.close()
+            return metadata
+        except Exception:
+            return None
+
     def extract_from_pdf(self, file_path: str) -> ExtractionResult:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -80,6 +93,10 @@ class ExtractionPipeline:
         if not full_text.strip():
             warnings.append("No text could be extracted from this PDF.")
 
+        # Step 5: EMR/PACS source fingerprinting
+        pdf_metadata = self._extract_pdf_metadata(file_path)
+        emr_fp = detect_emr_source(full_text, pdf_metadata=pdf_metadata, input_mode="pdf")
+
         return ExtractionResult(
             input_mode=InputMode.PDF,
             full_text=full_text,
@@ -90,6 +107,8 @@ class ExtractionPipeline:
             total_chars=len(full_text),
             filename=os.path.basename(file_path),
             warnings=warnings,
+            emr_source=emr_fp.source.value if emr_fp.source.value != "unknown" else None,
+            emr_source_confidence=emr_fp.confidence,
         )
 
     def extract_from_image(self, file_path: str) -> ExtractionResult:
@@ -150,6 +169,10 @@ class ExtractionPipeline:
             confidence=1.0,
             char_count=len(text),
         )
+
+        # EMR/PACS source fingerprinting
+        emr_fp = detect_emr_source(text, input_mode="text")
+
         return ExtractionResult(
             input_mode=InputMode.TEXT,
             full_text=text,
@@ -160,4 +183,6 @@ class ExtractionPipeline:
             total_chars=len(text),
             filename=None,
             warnings=[],
+            emr_source=emr_fp.source.value if emr_fp.source.value != "unknown" else None,
+            emr_source_confidence=emr_fp.confidence,
         )

@@ -32,7 +32,9 @@ _CARDIAC: list[GenericTestType] = [
     GenericTestType("cta_coronary", "CTA Coronary", [
         "cta", "ct angiography", "coronary ct", "coronary cta", "ct coronary",
         "calcium score", "agatston",
-    ], category="cardiac"),
+    ], category="cardiac",
+        negative_keywords=["pulmonary embolism", "ctpa"],
+    ),
     GenericTestType("cardiac_mri", "Cardiac MRI", [
         "cardiac mri", "cardiac magnetic", "cmr", "myocardial",
         "late gadolinium", "t1 mapping", "t2 mapping",
@@ -40,11 +42,15 @@ _CARDIAC: list[GenericTestType] = [
     GenericTestType("ekg", "EKG / ECG", [
         "ekg", "ecg", "electrocardiogram", "12-lead", "12 lead",
         "sinus rhythm", "qrs", "qt interval", "st segment",
-    ], category="cardiac"),
+    ], category="cardiac",
+        negative_keywords=["echocardiogram", "echocardiography", "transthoracic", "wall motion"],
+    ),
     GenericTestType("holter_monitor", "Holter Monitor", [
         "holter", "ambulatory monitor", "24-hour monitor", "48-hour monitor",
         "event monitor", "continuous monitoring",
-    ], category="cardiac"),
+    ], category="cardiac",
+        negative_keywords=["stress test", "exercise"],
+    ),
     # Stress test subtypes — these provide dropdown entries and LLM detection
     # listings. The StressFamilyHandler (registered separately) handles actual
     # detection with higher confidence, so these generic entries serve as
@@ -53,7 +59,9 @@ _CARDIAC: list[GenericTestType] = [
         "exercise treadmill", "treadmill test", "exercise stress test",
         "bruce protocol", "exercise tolerance test", "graded exercise test",
         "exercise ecg", "exercise ekg",
-    ], category="cardiac"),
+    ], category="cardiac",
+        negative_keywords=["spect", "sestamibi", "nuclear", "pet/ct", "dobutamine"],
+    ),
     GenericTestType("pharma_spect_stress", "Pharmacologic SPECT Nuclear Stress", [
         "pharmacologic stress", "lexiscan", "regadenoson", "adenosine stress",
         "spect", "sestamibi", "myocardial perfusion", "nuclear stress",

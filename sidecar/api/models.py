@@ -56,6 +56,8 @@ class ExtractionResult(BaseModel):
     total_chars: int
     filename: Optional[str] = None
     warnings: list[str] = Field(default_factory=list)
+    emr_source: Optional[str] = None          # "vidistar", "epic", "cerner", etc.
+    emr_source_confidence: float = 0.0
 
 
 class ExtractionError(BaseModel):

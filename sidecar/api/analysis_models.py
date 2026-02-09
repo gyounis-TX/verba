@@ -56,12 +56,22 @@ class ParsedReport(BaseModel):
     secondary_test_types: list[str] = Field(default_factory=list)
 
 
+class CompoundSegmentInfo(BaseModel):
+    start_page: int
+    end_page: int
+    detected_type: Optional[str] = None
+    confidence: float = 0.0
+    char_count: int = 0
+
+
 class DetectTypeResponse(BaseModel):
     test_type: Optional[str] = None
     confidence: float = 0.0
     available_types: list[dict] = Field(default_factory=list)
     detection_method: str = "keyword"   # "keyword" | "llm" | "none"
     llm_attempted: bool = False
+    is_compound: bool = False
+    compound_segments: list[CompoundSegmentInfo] = Field(default_factory=list)
 
 
 class DetectTypeRequest(BaseModel):

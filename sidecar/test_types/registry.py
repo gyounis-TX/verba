@@ -59,25 +59,33 @@ class TestTypeRegistry:
         if header_id is not None:
             return (header_id, header_conf)
 
-        best_id: Optional[str] = None
-        best_confidence: float = 0.0
-        best_handler: Optional[BaseTestType] = None
-
+        scores: list[tuple[str, float, BaseTestType]] = []
         for type_id, handler in self._handlers.items():
             try:
                 confidence = handler.detect(extraction_result)
-                if confidence > best_confidence:
-                    best_confidence = confidence
-                    best_id = type_id
-                    best_handler = handler
+                if confidence > 0.0:
+                    scores.append((type_id, confidence, handler))
             except Exception as e:
                 logger.error(f"Detection failed for '{type_id}': {e}")
 
+        if not scores:
+            return (None, 0.0)
+
+        scores.sort(key=lambda x: x[1], reverse=True)
+        best_id, best_confidence, best_handler = scores[0]
+
+        # Disambiguation: prefer specialized over generic when close
+        if len(scores) >= 2:
+            _, second_conf, second_handler = scores[1]
+            if best_confidence - second_conf <= 0.15:
+                from test_types.generic import GenericTestType
+                if isinstance(best_handler, GenericTestType) and not isinstance(second_handler, GenericTestType):
+                    best_id, best_confidence, best_handler = scores[1]
+
         # Allow family-style handlers to resolve to a specific subtype
-        if best_handler is not None:
-            subtype = best_handler.resolve_subtype(extraction_result)
-            if subtype is not None:
-                best_id = subtype[0]
+        subtype = best_handler.resolve_subtype(extraction_result)
+        if subtype is not None:
+            best_id = subtype[0]
 
         return (best_id, best_confidence)
 

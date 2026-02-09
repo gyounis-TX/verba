@@ -110,6 +110,7 @@ class GenericTestType(BaseTestType):
         measurement_extractor: MeasurementExtractor | None = None,
         reference_ranges: dict | None = None,
         glossary: dict[str, str] | None = None,
+        negative_keywords: list[str] | None = None,
     ):
         self._test_type_id = test_type_id
         self._display_name = display_name
@@ -119,6 +120,7 @@ class GenericTestType(BaseTestType):
         self._measurement_extractor = measurement_extractor
         self._reference_ranges = reference_ranges or {}
         self._glossary = glossary or {}
+        self._negative_keywords = negative_keywords or []
 
     @property
     def test_type_id(self) -> str:
@@ -147,19 +149,43 @@ class GenericTestType(BaseTestType):
                 return label
         return None
 
+    @property
+    def has_measurement_extractor(self) -> bool:
+        return self._measurement_extractor is not None
+
     def detect(self, extraction_result: ExtractionResult) -> float:
         """Keyword matching against full_text (case-insensitive).
 
-        Score: 0.0 if no keywords match, up to 1.0 based on number of keyword hits.
+        Weighted by keyword length: longer keywords are more specific.
+        Capped at 0.55 so generics never beat specialized handlers (0.7+ base).
+        Negative keywords reduce score to penalize false-positive confusion.
         """
         text = extraction_result.full_text.lower()
-        hits = sum(1 for kw in self._keywords if kw.lower() in text)
 
-        if hits == 0:
+        # Weighted hits: longer keywords are more specific
+        weighted_hits = 0.0
+        for kw in self._keywords:
+            if kw.lower() in text:
+                length = len(kw)
+                if length >= 25:
+                    weighted_hits += 2.0
+                elif length >= 15:
+                    weighted_hits += 1.5
+                else:
+                    weighted_hits += 1.0
+
+        if weighted_hits == 0:
             return 0.0
 
-        # Scale: 1 hit = 0.3, 2 hits = 0.5, 3+ hits = 0.6+, caps at 1.0
-        score = min(1.0, 0.2 + hits * 0.15)
+        # Cap at 0.55 so generics never beat specialized handlers (0.7+ base)
+        score = min(0.55, 0.15 + weighted_hits * 0.08)
+
+        # Negative keyword penalty
+        if self._negative_keywords:
+            neg_hits = sum(1 for nk in self._negative_keywords if nk.lower() in text)
+            if neg_hits > 0:
+                score *= max(0.0, 1.0 - neg_hits * 0.3)
+
         return score
 
     def parse(

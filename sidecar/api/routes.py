@@ -287,6 +287,23 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
 
     available = registry.list_types()
 
+    # Compound report detection
+    from extraction.compound_detector import detect_compound_report
+    from api.analysis_models import CompoundSegmentInfo
+    compound_result = detect_compound_report(extraction_result, registry=registry)
+    compound_segments: list[CompoundSegmentInfo] = []
+    if compound_result.is_compound:
+        compound_segments = [
+            CompoundSegmentInfo(
+                start_page=seg.start_page,
+                end_page=seg.end_page,
+                detected_type=seg.detected_type,
+                confidence=round(seg.confidence, 3),
+                char_count=len(seg.text),
+            )
+            for seg in compound_result.segments
+        ]
+
     # Tier 1: Keyword detection
     type_id, confidence = registry.detect(extraction_result)
 
@@ -297,6 +314,8 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
             available_types=available,
             detection_method="keyword",
             llm_attempted=False,
+            is_compound=compound_result.is_compound,
+            compound_segments=compound_segments,
         )
 
     # Tier 2: LLM fallback
@@ -335,6 +354,8 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
                     available_types=available,
                     detection_method="llm",
                     llm_attempted=True,
+                    is_compound=compound_result.is_compound,
+                    compound_segments=compound_segments,
                 )
     except Exception:
         _logger.exception("LLM fallback failed during detect-type")
@@ -346,6 +367,8 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
         available_types=available,
         detection_method="none",
         llm_attempted=llm_attempted,
+        is_compound=compound_result.is_compound,
+        compound_segments=compound_segments,
     )
 
 
@@ -589,6 +612,31 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
                 f"Set it in Settings or pass api_key in the request."
             ),
         )
+
+    # 4b. LLM measurement extraction for generic types without extractors
+    inc_measurements_check = body.include_measurements if body.include_measurements is not None else True
+    if (
+        not parsed_report.measurements
+        and inc_measurements_check
+        and handler is not None
+    ):
+        from test_types.generic import GenericTestType
+        if isinstance(handler, GenericTestType) and not handler.has_measurement_extractor:
+            from test_types.llm_measurement_extractor import llm_extract_measurements
+            sections_text = "\n\n".join(
+                f"[{s.name}]\n{s.content}" for s in parsed_report.sections
+            )
+            provider_enum = LLMProvider(provider_str)
+            llm_client = LLMClient(provider=provider_enum, api_key=api_key)
+            llm_measurements = await llm_extract_measurements(
+                llm_client,
+                extraction_result.full_text,
+                sections_text,
+                parsed_report.test_type_display,
+                handler.get_prompt_context(extraction_result).get("specialty", "general"),
+            )
+            if llm_measurements:
+                parsed_report.measurements = llm_measurements
 
     # 5. PHI scrub
     scrub_result = scrub_phi(extraction_result.full_text)
@@ -1042,6 +1090,34 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
         if not api_key:
             yield _sse_event({"stage": "error", "message": f"No API key configured for provider '{provider_str}'. Set it in Settings."})
             return
+
+        # LLM measurement extraction for generic types without extractors
+        inc_measurements_check = explain_request.include_measurements if explain_request.include_measurements is not None else True
+        if (
+            not parsed_report.measurements
+            and inc_measurements_check
+            and handler is not None
+        ):
+            from test_types.generic import GenericTestType
+            if isinstance(handler, GenericTestType) and not handler.has_measurement_extractor:
+                from test_types.llm_measurement_extractor import llm_extract_measurements
+                sections_text = "\n\n".join(
+                    f"[{s.name}]\n{s.content}" for s in parsed_report.sections
+                )
+                provider_enum = LLMProvider(provider_str)
+                llm_client = LLMClient(provider=provider_enum, api_key=api_key)
+                llm_measurements = await llm_extract_measurements(
+                    llm_client,
+                    extraction_result.full_text,
+                    sections_text,
+                    parsed_report.test_type_display,
+                    handler.get_prompt_context(extraction_result).get("specialty", "general"),
+                )
+                if llm_measurements:
+                    parsed_report.measurements = llm_measurements
+                    # Update the parse message
+                    m_count = len(parsed_report.measurements)
+                    yield _sse_event({"stage": "parsing", "message": f"LLM extracted {m_count} measurement{'s' if m_count != 1 else ''}"})
 
         scrub_result = scrub_phi(extraction_result.full_text)
         scrubbed_clinical_context = (
