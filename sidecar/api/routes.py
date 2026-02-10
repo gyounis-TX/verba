@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import tempfile
 
@@ -58,9 +59,25 @@ from api.rate_limit import limiter, ANALYZE_RATE_LIMIT
 REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "").lower() == "true"
 _USE_PG = bool(os.getenv("DATABASE_URL", ""))
 
+_logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 pipeline = ExtractionPipeline()
+
+
+async def _build_extract_llm_client(request: Request) -> LLMClient | None:
+    """Build an LLM client for vision OCR fallback, or None if unavailable."""
+    try:
+        user_id = _get_user_id(request)
+        settings = await settings_store.get_settings(user_id=user_id)
+        provider_str = settings.llm_provider.value
+        api_key = settings_store.get_api_key_for_provider(provider_str)
+        if api_key:
+            return LLMClient(provider=LLMProvider(provider_str), api_key=api_key)
+    except Exception:
+        _logger.debug("Could not build LLM client for vision OCR", exc_info=True)
+    return None
 
 
 def _get_user_id(request: Request) -> str | None:
@@ -100,7 +117,7 @@ async def health_check():
 
 
 @router.post("/extract/pdf", response_model=ExtractionResult)
-async def extract_pdf(file: UploadFile = File(...)):
+async def extract_pdf(request: Request, file: UploadFile = File(...)):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
 
@@ -126,7 +143,8 @@ async def extract_pdf(file: UploadFile = File(...)):
             tmp.write(content)
             tmp_path = tmp.name
 
-        result = pipeline.extract_from_pdf(tmp_path)
+        llm_client = await _build_extract_llm_client(request)
+        result = await pipeline.extract_from_pdf(tmp_path, llm_client=llm_client)
         result.filename = file.filename
         return result
 
@@ -143,7 +161,7 @@ async def extract_pdf(file: UploadFile = File(...)):
 
 
 @router.post("/extract/file", response_model=ExtractionResult)
-async def extract_file(file: UploadFile = File(...)):
+async def extract_file(request: Request, file: UploadFile = File(...)):
     """Accept PDF, image (jpg/jpeg/png), or text (.txt) files."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided.")
@@ -162,6 +180,8 @@ async def extract_file(file: UploadFile = File(...)):
         if len(content) == 0:
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
+        llm_client = await _build_extract_llm_client(request)
+
         if ext == ".pdf":
             if not content[:4] == b"%PDF":
                 raise HTTPException(
@@ -171,7 +191,7 @@ async def extract_file(file: UploadFile = File(...)):
             with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
                 tmp.write(content)
                 tmp_path = tmp.name
-            result = pipeline.extract_from_pdf(tmp_path)
+            result = await pipeline.extract_from_pdf(tmp_path, llm_client=llm_client)
             result.filename = file.filename
             return result
 
@@ -179,7 +199,7 @@ async def extract_file(file: UploadFile = File(...)):
             with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
                 tmp.write(content)
                 tmp_path = tmp.name
-            result = pipeline.extract_from_image(tmp_path)
+            result = await pipeline.extract_from_image(tmp_path, llm_client=llm_client)
             result.filename = file.filename
             return result
 
@@ -669,6 +689,10 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
             physician_name=active_physician,
             explanation_voice=voice,
             name_drop=name_drop,
+            literacy_level=settings.literacy_level,
+            tone_preference=settings.tone_preference,
+            humanization_level=settings.humanization_level,
+            custom_phrases=list(settings.custom_phrases) if settings.custom_phrases else None,
         )
         user_prompt = prompt_engine.build_quick_normal_user_prompt(
             parsed_report=parsed_report,

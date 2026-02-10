@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+import logging
 import os
+from typing import TYPE_CHECKING
 
 from PIL import Image
 
@@ -15,6 +19,13 @@ from .preprocessor import ImagePreprocessor
 from .table_extractor import TableExtractor
 from .text_extractor import TextExtractor
 
+if TYPE_CHECKING:
+    from llm.client import LLMClient
+
+logger = logging.getLogger(__name__)
+
+_VISION_CONFIDENCE_THRESHOLD = 0.5
+
 
 class ExtractionPipeline:
     @staticmethod
@@ -29,7 +40,11 @@ class ExtractionPipeline:
         except Exception:
             return None
 
-    def extract_from_pdf(self, file_path: str) -> ExtractionResult:
+    async def extract_from_pdf(
+        self,
+        file_path: str,
+        llm_client: LLMClient | None = None,
+    ) -> ExtractionResult:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
 
@@ -61,18 +76,38 @@ class ExtractionPipeline:
                 ocr_results = ocr_extractor.extract_pages(scanned_pages)
                 page_results.extend(ocr_results)
 
+                # Vision fallback for low-confidence OCR pages
                 for r in ocr_results:
-                    if r.confidence < 0.3:
-                        warnings.append(
-                            f"Page {r.page_number}: very low OCR confidence "
-                            f"({r.confidence:.0%}). Text is likely unreliable — "
-                            "consider re-scanning at higher resolution."
-                        )
-                    elif r.confidence < 0.5:
-                        warnings.append(
-                            f"Page {r.page_number}: low OCR confidence "
-                            f"({r.confidence:.0%}). Some text may be inaccurate."
-                        )
+                    if r.confidence < _VISION_CONFIDENCE_THRESHOLD and llm_client:
+                        page_image = self._get_pdf_page_image(file_path, r.page_number)
+                        if page_image:
+                            vision_text, vision_conf = await self._try_vision_ocr(
+                                llm_client, page_image, r.page_number,
+                            )
+                            if vision_conf > 0:
+                                r.text = vision_text
+                                r.confidence = vision_conf
+                                r.extraction_method = "vision_ocr"
+                                r.char_count = len(vision_text)
+                                warnings.append(
+                                    f"Page {r.page_number}: AI-assisted OCR used "
+                                    f"(Tesseract confidence was low)."
+                                )
+                                continue
+
+                    # Original warning logic for pages still using Tesseract
+                    if r.extraction_method != "vision_ocr":
+                        if r.confidence < 0.3:
+                            warnings.append(
+                                f"Page {r.page_number}: very low OCR confidence "
+                                f"({r.confidence:.0%}). Text is likely unreliable — "
+                                "consider re-scanning at higher resolution."
+                            )
+                        elif r.confidence < 0.5:
+                            warnings.append(
+                                f"Page {r.page_number}: low OCR confidence "
+                                f"({r.confidence:.0%}). Some text may be inaccurate."
+                            )
             except Exception as e:
                 warnings.append(
                     f"OCR failed for scanned pages: {str(e)}. "
@@ -111,7 +146,11 @@ class ExtractionPipeline:
             emr_source_confidence=emr_fp.confidence,
         )
 
-    def extract_from_image(self, file_path: str) -> ExtractionResult:
+    async def extract_from_image(
+        self,
+        file_path: str,
+        llm_client: LLMClient | None = None,
+    ) -> ExtractionResult:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
 
@@ -136,17 +175,37 @@ class ExtractionPipeline:
 
             page_num = i + 1
 
-            if avg_confidence < 0.3:
-                warnings.append(
-                    f"Page {page_num}: very low OCR confidence "
-                    f"({avg_confidence:.0%}). Text is likely unreliable — "
-                    "consider re-scanning at higher resolution."
+            # Vision fallback for low-confidence OCR
+            if avg_confidence < _VISION_CONFIDENCE_THRESHOLD and llm_client:
+                vision_text, vision_conf = await self._try_vision_ocr(
+                    llm_client, frame, page_num,
                 )
-            elif avg_confidence < 0.5:
-                warnings.append(
-                    f"Page {page_num}: low OCR confidence "
-                    f"({avg_confidence:.0%}). Some text may be inaccurate."
-                )
+                if vision_conf > 0:
+                    text = vision_text
+                    avg_confidence = vision_conf
+                    extraction_method = "vision_ocr"
+                    warnings.append(
+                        f"Page {page_num}: AI-assisted OCR used "
+                        f"(Tesseract confidence was low)."
+                    )
+                else:
+                    extraction_method = "ocr"
+            else:
+                extraction_method = "ocr"
+
+            # Warnings for pages still using Tesseract
+            if extraction_method == "ocr":
+                if avg_confidence < 0.3:
+                    warnings.append(
+                        f"Page {page_num}: very low OCR confidence "
+                        f"({avg_confidence:.0%}). Text is likely unreliable — "
+                        "consider re-scanning at higher resolution."
+                    )
+                elif avg_confidence < 0.5:
+                    warnings.append(
+                        f"Page {page_num}: low OCR confidence "
+                        f"({avg_confidence:.0%}). Some text may be inaccurate."
+                    )
 
             if not text and n_frames == 1:
                 warnings.append("No text could be extracted from this image.")
@@ -154,7 +213,7 @@ class ExtractionPipeline:
             page_results.append(PageExtractionResult(
                 page_number=page_num,
                 text=text,
-                extraction_method="ocr",
+                extraction_method=extraction_method,
                 confidence=round(avg_confidence, 3),
                 char_count=len(text),
             ))
@@ -208,3 +267,40 @@ class ExtractionPipeline:
             emr_source=emr_src,
             emr_source_confidence=emr_fp.confidence,
         )
+
+    @staticmethod
+    def _get_pdf_page_image(file_path: str, page_number: int) -> Image.Image | None:
+        """Render a PDF page to a PIL Image using PyMuPDF."""
+        try:
+            import fitz
+            doc = fitz.open(file_path)
+            page = doc[page_number - 1]  # 0-indexed
+            # Render at 300 DPI (default is 72, so zoom = 300/72 ≈ 4.17)
+            mat = fitz.Matrix(300 / 72, 300 / 72)
+            pix = page.get_pixmap(matrix=mat)
+            img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+            doc.close()
+            return img
+        except Exception:
+            logger.exception("Failed to render PDF page %d to image", page_number)
+            return None
+
+    @staticmethod
+    async def _try_vision_ocr(
+        llm_client: LLMClient,
+        page_image: Image.Image,
+        page_number: int,
+    ) -> tuple[str, float]:
+        """Attempt vision OCR on a page image. Returns (text, confidence)."""
+        from .vision_ocr import vision_ocr_page
+
+        logger.info("Attempting vision OCR for page %d", page_number)
+        text, confidence = await vision_ocr_page(llm_client, page_image)
+        if confidence > 0:
+            logger.info(
+                "Vision OCR succeeded for page %d: %d chars",
+                page_number, len(text),
+            )
+        else:
+            logger.warning("Vision OCR failed for page %d", page_number)
+        return text, confidence

@@ -104,6 +104,32 @@ class LLMClient:
             return "claude-sonnet-4-20250514"
         return "gpt-4.1-mini"
 
+    async def call_with_vision(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        image_bytes: bytes,
+        media_type: str = "image/png",
+        max_tokens: int = 4096,
+        temperature: float = 0.0,
+    ) -> LLMResponse:
+        """Send an image + text prompt and return a plain text response."""
+        if self.provider == LLMProvider.CLAUDE:
+            return await self._call_claude_vision(
+                system_prompt, user_prompt, image_bytes, media_type,
+                max_tokens, temperature,
+            )
+        elif self.provider == LLMProvider.BEDROCK:
+            return await self._call_bedrock_vision(
+                system_prompt, user_prompt, image_bytes, media_type,
+                max_tokens, temperature,
+            )
+        else:
+            return await self._call_openai_vision(
+                system_prompt, user_prompt, image_bytes, media_type,
+                max_tokens, temperature,
+            )
+
     async def call(
         self,
         system_prompt: str,
@@ -460,4 +486,155 @@ class LLMClient:
             model=model_id,
             input_tokens=usage.get("inputTokens", 0),
             output_tokens=usage.get("outputTokens", 0),
+        )
+
+    # ── Vision methods ──────────────────────────────────────────────
+
+    async def _call_claude_vision(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        image_bytes: bytes,
+        media_type: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> LLMResponse:
+        import base64
+
+        import anthropic
+
+        client = anthropic.AsyncAnthropic(api_key=self.api_key)
+        response = await client.messages.create(
+            model=self.model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=system_prompt,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": base64.b64encode(image_bytes).decode("ascii"),
+                        },
+                    },
+                    {"type": "text", "text": user_prompt},
+                ],
+            }],
+        )
+
+        raw_text = ""
+        for block in response.content:
+            if block.type == "text":
+                raw_text += block.text
+
+        return LLMResponse(
+            provider=LLMProvider.CLAUDE,
+            raw_content=raw_text,
+            tool_call_result=None,
+            model=response.model,
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+        )
+
+    async def _call_bedrock_vision(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        image_bytes: bytes,
+        media_type: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> LLMResponse:
+        import asyncio
+
+        bedrock = self._get_bedrock_client()
+        region = self.api_key.get("region", "us-east-1") if isinstance(self.api_key, dict) else "us-east-1"
+        model_id = _to_bedrock_model_id(self.model, region)
+
+        # Map MIME type to Bedrock image format
+        fmt_map = {
+            "image/png": "png",
+            "image/jpeg": "jpeg",
+            "image/gif": "gif",
+            "image/webp": "webp",
+        }
+        img_format = fmt_map.get(media_type, "png")
+
+        def _invoke():
+            return bedrock.converse(
+                modelId=model_id,
+                system=[{"text": system_prompt}],
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"image": {"format": img_format, "source": {"bytes": image_bytes}}},
+                        {"text": user_prompt},
+                    ],
+                }],
+                inferenceConfig={"maxTokens": max_tokens, "temperature": temperature},
+            )
+
+        response = await asyncio.get_event_loop().run_in_executor(None, _invoke)
+
+        raw_text = ""
+        for block in response["output"]["message"]["content"]:
+            if "text" in block:
+                raw_text += block["text"]
+
+        usage = response.get("usage", {})
+        return LLMResponse(
+            provider=LLMProvider.BEDROCK,
+            raw_content=raw_text,
+            tool_call_result=None,
+            model=model_id,
+            input_tokens=usage.get("inputTokens", 0),
+            output_tokens=usage.get("outputTokens", 0),
+        )
+
+    async def _call_openai_vision(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        image_bytes: bytes,
+        media_type: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> LLMResponse:
+        import base64
+
+        import openai
+
+        client = openai.AsyncOpenAI(api_key=self.api_key)
+        b64_data = base64.b64encode(image_bytes).decode("ascii")
+        data_url = f"data:{media_type};base64,{b64_data}"
+
+        response = await client.chat.completions.create(
+            model=self.model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                        {"type": "text", "text": user_prompt},
+                    ],
+                },
+            ],
+        )
+
+        choice = response.choices[0]
+        raw_text = choice.message.content or ""
+
+        return LLMResponse(
+            provider=LLMProvider.OPENAI,
+            raw_content=raw_text,
+            tool_call_result=None,
+            model=response.model,
+            input_tokens=response.usage.prompt_tokens,
+            output_tokens=response.usage.completion_tokens,
         )
