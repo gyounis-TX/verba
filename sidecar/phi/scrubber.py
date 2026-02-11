@@ -200,7 +200,25 @@ _PHI_PATTERNS: list[tuple[str, re.Pattern, str]] = [
 ]
 
 
-def scrub_phi(text: str) -> ScrubResult:
+def _build_provider_patterns(names: list[str]) -> list[re.Pattern]:
+    """Build whole-word regex patterns for practice provider names.
+
+    For each name, matches the bare name and optional "Dr."/"Dr" prefix.
+    E.g. "Dr. Smith" → matches "Dr. Smith", "Dr Smith", "Smith".
+    """
+    patterns = []
+    for name in names:
+        bare = re.sub(r"(?i)^dr\.?\s*", "", name).strip()
+        if not bare:
+            continue
+        escaped = re.escape(bare)
+        patterns.append(re.compile(
+            rf"(?i)\b(?:Dr\.?\s*)?{escaped}\b"
+        ))
+    return patterns
+
+
+def scrub_phi(text: str, provider_names: list[str] | None = None) -> ScrubResult:
     """Remove PHI patterns from text. Returns scrubbed copy."""
     scrubbed = text
     categories_found: set[str] = set()
@@ -212,6 +230,15 @@ def scrub_phi(text: str) -> ScrubResult:
             categories_found.add(category)
             total_redactions += len(matches)
             scrubbed = pattern.sub(replacement, scrubbed)
+
+    # Scrub practice provider names (catches names without labeled prefixes)
+    if provider_names:
+        for pat in _build_provider_patterns(provider_names):
+            matches = pat.findall(scrubbed)
+            if matches:
+                categories_found.add("physician_name")
+                total_redactions += len(matches)
+                scrubbed = pat.sub("[PHYSICIAN REDACTED]", scrubbed)
 
     return ScrubResult(
         scrubbed_text=scrubbed,

@@ -277,15 +277,19 @@ async def detect_pdf_type(file: UploadFile = File(...)):
 
 
 @router.post("/extraction/scrub-preview")
-async def scrub_preview(body: dict = Body(...)):
+async def scrub_preview(request: Request, body: dict = Body(...)):
     """Return PHI-scrubbed text for preview purposes."""
     full_text = body.get("full_text", "")
     clinical_context = body.get("clinical_context", "")
     if not full_text:
         raise HTTPException(status_code=400, detail="full_text is required.")
 
-    scrub_result = scrub_phi(full_text)
-    scrubbed_clinical = scrub_phi(clinical_context).scrubbed_text if clinical_context else ""
+    user_id = _get_user_id(request)
+    settings = await settings_store.get_settings(user_id=user_id)
+    providers = list(settings.practice_providers) if settings.practice_providers else None
+
+    scrub_result = scrub_phi(full_text, provider_names=providers)
+    scrubbed_clinical = scrub_phi(clinical_context, provider_names=providers).scrubbed_text if clinical_context else ""
 
     return {
         "scrubbed_text": scrub_result.scrubbed_text,
@@ -793,8 +797,9 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
             prompt_context["specialty"] = settings.specialty
 
         # PHI scrub clinical context only (no raw report text sent)
+        providers = list(settings.practice_providers) if settings.practice_providers else None
         scrubbed_clinical = (
-            scrub_phi(body.clinical_context).scrubbed_text
+            scrub_phi(body.clinical_context, provider_names=providers).scrubbed_text
             if body.clinical_context else None
         )
 
@@ -897,11 +902,12 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
                 parsed_report.measurements = llm_measurements
 
     # 5. PHI scrub
-    scrub_result = scrub_phi(extraction_result.full_text)
+    providers = list(settings.practice_providers) if settings.practice_providers else None
+    scrub_result = scrub_phi(extraction_result.full_text, provider_names=providers)
 
     # 5a. PHI scrub clinical context if provided
     scrubbed_clinical_context = (
-        scrub_phi(body.clinical_context).scrubbed_text
+        scrub_phi(body.clinical_context, provider_names=providers).scrubbed_text
         if body.clinical_context
         else None
     )
@@ -1425,9 +1431,10 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
                     m_count = len(parsed_report.measurements)
                     yield _sse_event({"stage": "parsing", "message": f"LLM extracted {m_count} measurement{'s' if m_count != 1 else ''}"})
 
-        scrub_result = scrub_phi(extraction_result.full_text)
+        providers = list(settings.practice_providers) if settings.practice_providers else None
+        scrub_result = scrub_phi(extraction_result.full_text, provider_names=providers)
         scrubbed_clinical_context = (
-            scrub_phi(explain_request.clinical_context).scrubbed_text
+            scrub_phi(explain_request.clinical_context, provider_names=providers).scrubbed_text
             if explain_request.clinical_context
             else None
         )
@@ -1800,11 +1807,12 @@ async def interpret_report(request: Request, body: InterpretRequest = Body(...))
         glossary = {}
         display_name = test_type
 
-    # PHI scrub
-    scrub_result = scrub_phi(extraction_result.full_text)
-
     # Get LLM client
     settings = await settings_store.get_settings(user_id=user_id)
+
+    # PHI scrub
+    providers = list(settings.practice_providers) if settings.practice_providers else None
+    scrub_result = scrub_phi(extraction_result.full_text, provider_names=providers)
     provider_str = settings.llm_provider.value
     api_key = settings_store.get_api_key_for_provider(provider_str)
     if not api_key:
@@ -2065,9 +2073,10 @@ async def synthesize_reports(request: Request, body: dict = Body(...)):
         f"Detail level: {detail_desc}\n"
     )
 
+    providers = list(settings.practice_providers) if settings.practice_providers else None
     clinical_context_section = ""
     if clinical_context:
-        scrubbed = scrub_phi(clinical_context).scrubbed_text
+        scrubbed = scrub_phi(clinical_context, provider_names=providers).scrubbed_text
         clinical_context_section = f"\nClinical Context: {scrubbed}\n"
 
     user_prompt = (
@@ -2789,10 +2798,14 @@ async def generate_letter(request: Request, body: LetterGenerateRequest = Body(.
         model=model_override,
     )
 
+    # PHI scrub the prompt before sending to LLM
+    providers = list(settings.practice_providers) if settings.practice_providers else None
+    scrubbed_prompt = scrub_phi(body.prompt, provider_names=providers).scrubbed_text
+
     try:
         llm_response = await client.call(
             system_prompt=system_prompt,
-            user_prompt=body.prompt,
+            user_prompt=scrubbed_prompt,
         )
     except Exception as e:
         raise HTTPException(

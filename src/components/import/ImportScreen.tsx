@@ -869,30 +869,28 @@ export function ImportScreen() {
                     {pastedText.length.toLocaleString()} characters
                   </span>
                   <div className="text-input-footer-right">
-                    {pastedText.trim().length > 0 && (
-                      <button
-                        type="button"
-                        className="batch-add-more-btn-inline"
-                        onClick={() => {
-                          const id1 = textEntryNextId;
-                          const id2 = textEntryNextId + 1;
-                          setTextEntries([
-                            { id: id1, label: "Report 1", text: pastedText },
-                            { id: id2, label: "Report 2", text: "" },
-                          ]);
-                          setTextEntryNextId(id2 + 1);
-                          setPastedText("");
-                        }}
-                      >
-                        + Add another report
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="batch-add-more-btn-inline"
+                      onClick={() => {
+                        const id1 = textEntryNextId;
+                        const id2 = textEntryNextId + 1;
+                        setTextEntries([
+                          { id: id1, label: "Report 1", text: pastedText },
+                          { id: id2, label: "Report 2", text: "" },
+                        ]);
+                        setTextEntryNextId(id2 + 1);
+                        setPastedText("");
+                      }}
+                    >
+                      + Add another report
+                    </button>
                     <button
                       type="button"
                       className="browse-file-btn"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      or browse files
+                      Browse files
                     </button>
                   </div>
                 </div>
