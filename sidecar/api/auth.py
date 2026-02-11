@@ -5,6 +5,7 @@ In web mode, validates Supabase JWT tokens and extracts user_id from the 'sub' c
 Supports both HS256 (legacy) and RS256 (modern Supabase) signing algorithms.
 """
 
+import logging
 import os
 
 import jwt
@@ -12,6 +13,8 @@ from jwt import PyJWKClient
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+_logger = logging.getLogger(__name__)
 
 REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "").lower() == "true"
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
@@ -62,7 +65,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Skip auth entirely in desktop mode
         if not REQUIRE_AUTH:
             request.state.user_id = None
-            return await call_next(request)
+            try:
+                return await call_next(request)
+            except Exception as exc:
+                _logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+                return JSONResponse(
+                    {"detail": f"Internal server error: {type(exc).__name__}: {exc}"},
+                    status_code=500,
+                )
 
         # Skip auth for health check and CORS preflight
         if request.url.path == "/health" or request.method == "OPTIONS":
@@ -91,4 +101,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 {"detail": f"Invalid token: {e}"}, status_code=401
             )
 
-        return await call_next(request)
+        try:
+            return await call_next(request)
+        except Exception as exc:
+            _logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+            return JSONResponse(
+                {"detail": f"Internal server error: {type(exc).__name__}: {exc}"},
+                status_code=500,
+            )
