@@ -1,9 +1,12 @@
+import logging
 import os
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
 from fastapi.middleware.cors import CORSMiddleware
+
+_logger = logging.getLogger(__name__)
 
 
 class NoCacheMiddleware(BaseHTTPMiddleware):
@@ -55,8 +58,12 @@ class CORSErrorWrapper:
             await self.app(scope, receive, send)
             return
 
+        response_started = False
+
         async def send_with_cors(message):
+            nonlocal response_started
             if message["type"] == "http.response.start":
+                response_started = True
                 headers = dict(message.get("headers", []))
                 # Only add if CORSMiddleware didn't already
                 if b"access-control-allow-origin" not in headers:
@@ -67,7 +74,25 @@ class CORSErrorWrapper:
                     message["headers"] = list(message.get("headers", [])) + extra
             await send(message)
 
-        await self.app(scope, receive, send_with_cors)
+        try:
+            await self.app(scope, receive, send_with_cors)
+        except Exception:
+            _logger.exception("Unhandled exception escaped middleware chain")
+            if not response_started:
+                # Send a 500 with CORS headers so the browser can read it
+                await send({
+                    "type": "http.response.start",
+                    "status": 500,
+                    "headers": [
+                        (b"content-type", b"application/json"),
+                        (b"access-control-allow-origin", request_origin.encode()),
+                        (b"access-control-allow-credentials", b"true"),
+                    ],
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": b'{"detail":"Internal server error"}',
+                })
 
 
 def add_cors_middleware(app):
