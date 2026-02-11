@@ -98,15 +98,24 @@ async def _db_call(method_name: str, *args, user_id=None, **kwargs):
     For PgDatabase, methods are async coroutines.
     For Database (SQLite), methods are synchronous.
     """
+    import logging as _logging
+    _db_logger = _logging.getLogger("db_call")
     db = _db()
     method = getattr(db, method_name)
 
-    if _USE_PG:
-        # PgDatabase methods are async and accept user_id
-        return await method(*args, user_id=user_id, **kwargs)
-    else:
-        # SQLite Database methods are sync and ignore user_id
-        return method(*args, **kwargs)
+    try:
+        if _USE_PG:
+            # PgDatabase methods are async and accept user_id
+            return await method(*args, user_id=user_id, **kwargs)
+        else:
+            # SQLite Database methods are sync and ignore user_id
+            return method(*args, **kwargs)
+    except Exception as exc:
+        _db_logger.exception("Database error in %s: %s", method_name, exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error in {method_name}: {type(exc).__name__}: {exc}",
+        )
 
 
 @router.get("/health")
