@@ -2,6 +2,7 @@ import os
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+from starlette.types import ASGIApp, Receive, Scope, Send
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -14,6 +15,59 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         return response
+
+
+class CORSErrorWrapper:
+    """Raw ASGI wrapper that ensures CORS headers on ALL responses.
+
+    Starlette's BaseHTTPMiddleware swallows exceptions from call_next()
+    and produces bare 500 responses that bypass CORSMiddleware. This
+    wrapper sits outside everything and patches CORS headers onto any
+    response that's missing them.
+    """
+
+    def __init__(self, app: ASGIApp, allowed_origins: list[str]) -> None:
+        self.app = app
+        self.allowed_origins = allowed_origins
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Extract Origin from request headers
+        request_origin = None
+        for header_name, header_value in scope.get("headers", []):
+            if header_name == b"origin":
+                request_origin = header_value.decode("latin-1")
+                break
+
+        if not request_origin:
+            await self.app(scope, receive, send)
+            return
+
+        # Check if origin is allowed
+        origin_allowed = (
+            "*" in self.allowed_origins
+            or request_origin in self.allowed_origins
+        )
+        if not origin_allowed:
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_cors(message):
+            if message["type"] == "http.response.start":
+                headers = dict(message.get("headers", []))
+                # Only add if CORSMiddleware didn't already
+                if b"access-control-allow-origin" not in headers:
+                    extra = [
+                        (b"access-control-allow-origin", request_origin.encode()),
+                        (b"access-control-allow-credentials", b"true"),
+                    ]
+                    message["headers"] = list(message.get("headers", [])) + extra
+            await send(message)
+
+        await self.app(scope, receive, send_with_cors)
 
 
 def add_cors_middleware(app):
@@ -33,3 +87,5 @@ def add_cors_middleware(app):
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Outermost: ensure CORS headers even on bare 500s from BaseHTTPMiddleware
+    app.add_middleware(CORSErrorWrapper, allowed_origins=origins)
