@@ -156,7 +156,10 @@ export function AppShell() {
             <p>Loading...</p>
           </div>
         ) : !isAuthenticated ? (
-          <AuthScreen onAuthSuccess={() => setIsAuthenticated(true)} />
+          <AuthScreen onAuthSuccess={() => {
+            setIsAuthenticated(true);
+            navigate("/import");
+          }} />
         ) : !onboardingChecked ? (
           <div className="sidecar-loading">
             <p>Loading...</p>
