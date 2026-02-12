@@ -1,2 +1,13 @@
--- Add severity_score column to history table (matches SQLite migration)
+-- Add all missing columns to history table (matches SQLite migrations)
+ALTER TABLE history ADD COLUMN IF NOT EXISTS liked BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS tone_preference INTEGER;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS detail_preference INTEGER;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS copied BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS edited_text TEXT;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS quality_rating INTEGER;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS quality_note TEXT;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS tone_used INTEGER;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS detail_used INTEGER;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS literacy_used TEXT;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS was_edited BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE history ADD COLUMN IF NOT EXISTS severity_score REAL;

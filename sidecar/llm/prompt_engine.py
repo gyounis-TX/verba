@@ -853,11 +853,38 @@ most effective reassurance tools real physicians use.
 "This is extremely common — about X% of people your age have the same finding,
 and the vast majority never have any problems from it."
 
-### Usage Rules
-1. Always pair numbers with analogies: "6mm — about the size of a pencil eraser"
-2. Use functional analogies for percentages: "pumping at 55% efficiency"
-3. Provide risk context when available: "less than 1% chance of being concerning"
-4. Connect to daily life: "This explains why you might feel tired"
+### Deployment Matrix — When to Use What
+
+**Size/value analogies** (always use when the measurement is included):
+- Always pair numbers with analogies: "6mm — about the size of a pencil eraser"
+- Use functional analogies for percentages: "pumping at 55% efficiency"
+- Connect to daily life when relevant: "This explains why you might feel tired"
+
+**Prevalence statistics** (use selectively based on severity):
+- **Mild/trace/incidental findings** → ALWAYS cite prevalence. This is one of the
+  most powerful reassurance tools. "Trace tricuspid regurgitation is seen in ~70%
+  of healthy hearts."
+- **Mild findings + anxious patient** → cite prevalence AND add an extra
+  reassurance layer: "This is extremely common — about 70% of healthy hearts
+  show the same thing, and it almost never causes any issues."
+- **Moderate findings** → do NOT cite prevalence. Prevalence can minimize a
+  finding that genuinely needs attention. Instead, use softened language from the
+  Tone Rules pool.
+- **Severe/critical findings** → NEVER cite prevalence. Focus on clear, careful
+  explanation of what it means and what the physician will discuss with them.
+
+**Risk context** (use for mild-to-moderate):
+- Provide risk context when available: "less than 1% chance of being concerning"
+- Do NOT provide risk context for severe/critical findings — it can sound
+  dismissive.
+
+**Anxiety integration:**
+- When anxiety level is moderate-to-severe, prevalence becomes an even more
+  important tool for mild findings. Use it proactively.
+- When anxiety is severe, pair prevalence with explicit reassurance phrases:
+  "Many people have this and live completely normal, active lives."
+- When anxiety is none/mild and findings are normal, prevalence is unnecessary —
+  just state that things look good.
 """
 
 
@@ -2738,6 +2765,36 @@ It should sound exactly like the physician wrote it themselves. This means:
 
 """
 
+_CONSTRAINT_HIERARCHY = """\
+## CONSTRAINT RESOLUTION ORDER
+
+When multiple rules in this prompt compete, resolve conflicts using this
+priority (highest first):
+
+1. **Safety rules** — absolute. Never suggest treatments, never invent data,
+   never exceed the report. These CANNOT be overridden by any other rule.
+2. **Anxiety level** — overrides tone setting. If anxiety is active, the tone
+   has already been adjusted to match. Do NOT fight the tone override; it was
+   set intentionally. Anxiety also activates prevalence-based reassurance
+   (see Analogy Guidelines).
+3. **Severity of findings** — when findings are moderate-to-severe, shift
+   toward careful, precise language even if humanization level is high.
+   A severe finding at humanization level 5 should still sound measured and
+   deliberate, not breezy. Reduce fragment sentences and casual asides for
+   severe findings.
+4. **Physician personalization** (edit corrections, teaching points, vocabulary
+   preferences) — these reflect explicit physician intent. They override
+   default phrasing, analogy choices, and style rules below.
+5. **Humanization & style rules** — sentence variety, anti-AI phrasing,
+   opening/closing variety. These shape the voice but yield to the priorities
+   above.
+6. **Default tone/detail settings** — the baseline when nothing else applies.
+
+When in doubt: safety > patient anxiety > clinical severity > physician
+preferences > style rules > defaults.
+
+"""
+
 
 _SEVERITY_WEIGHTS = {
     "normal": 0.0,
@@ -3158,6 +3215,7 @@ class PromptEngine:
 
         return (
             f"{_PHYSICIAN_IDENTITY.format(specialty=specialty)}"
+            f"{_CONSTRAINT_HIERARCHY}"
             f"{demographics_section}"
             f"{test_type_hint_section}"
             f"{_CLINICAL_VOICE_RULE.format(specialty=specialty)}"
@@ -3274,11 +3332,13 @@ class PromptEngine:
             )
 
             # Extract and add medication-specific guidance
+            has_clinical_intelligence = False
             detected_meds = _extract_medications_from_context(effective_context)
             if detected_meds:
                 med_guidance = _build_medication_guidance(detected_meds)
                 if med_guidance:
                     sections.append(med_guidance)
+                    has_clinical_intelligence = True
 
             # Extract and add chronic condition guidance
             detected_conditions = _extract_conditions_from_context(effective_context)
@@ -3286,6 +3346,7 @@ class PromptEngine:
                 condition_guidance = _build_condition_guidance(detected_conditions)
                 if condition_guidance:
                     sections.append(condition_guidance)
+                    has_clinical_intelligence = True
 
             # Extract chief complaint and symptoms for correlation
             chief_complaint = _extract_chief_complaint(effective_context)
@@ -3294,6 +3355,7 @@ class PromptEngine:
                 cc_guidance = _build_chief_complaint_guidance(chief_complaint, detected_symptoms)
                 if cc_guidance:
                     sections.append(cc_guidance)
+                    has_clinical_intelligence = True
 
             # Detect relevant lab patterns
             detected_patterns = _detect_lab_patterns(
@@ -3304,6 +3366,27 @@ class PromptEngine:
                 pattern_guidance = _build_lab_pattern_guidance(detected_patterns)
                 if pattern_guidance:
                     sections.append(pattern_guidance)
+                    has_clinical_intelligence = True
+
+            # Cross-reference rule: tell the LLM to connect the clinical
+            # intelligence above with the parsed measurements below
+            if has_clinical_intelligence:
+                sections.append(
+                    "\n## Cross-Reference Rule\n"
+                    "Before interpreting each measurement in the Parsed Measurements "
+                    "section below, check the Medication Considerations, Condition "
+                    "Guidance, and Chief Complaint sections above. If a medication or "
+                    "condition can explain or influence a measurement, mention that "
+                    "connection in your interpretation. For example:\n"
+                    "- Heart rate of 52 + beta blocker detected → note that the low "
+                    "rate likely reflects the medication, not a cardiac problem\n"
+                    "- A1C of 7.2% + diabetes detected → interpret in the context of "
+                    "diabetic management targets, not generic reference ranges\n"
+                    "- Low potassium + diuretic detected → mention the medication as "
+                    "a likely contributor\n"
+                    "Do NOT repeat the medication/condition sections verbatim — just "
+                    "weave the relevant connections into your measurement interpretations."
+                )
 
         # 1c. Quick reasons (structured clinical indicators from settings)
         if quick_reasons:
@@ -3367,6 +3450,36 @@ class PromptEngine:
             sections.append("\n## Closing Text")
             sections.append(
                 f"End the overall_summary with the following closing text:\n{closing_text}"
+            )
+
+        # 1f-preamble. Personalization priority (only if any personalization active)
+        _has_personalization = any([
+            liked_examples, teaching_points, custom_phrases, recent_edits,
+            edit_corrections, vocabulary_preferences, style_profile,
+            term_preferences, conditional_rules, quality_feedback,
+        ])
+        if _has_personalization and not short_comment:
+            sections.append(
+                "\n## Personalization Priority\n"
+                "The sections below contain the physician's learned preferences. "
+                "When they conflict with each other, resolve using this priority "
+                "(highest first):\n"
+                "1. **Edit corrections & vocabulary preferences** — the physician "
+                "explicitly changed these words/phrases. Always honor them.\n"
+                "2. **Teaching points** — the physician wrote these instructions "
+                "by hand. Follow them closely.\n"
+                "3. **Quality feedback adjustments** — the physician rated output "
+                "poorly and these adjustments address that. Apply them.\n"
+                "4. **Term preferences** — explicit choices about medical vs. plain "
+                "language for specific terms.\n"
+                "5. **Style profile & liked examples** — learned passively from "
+                "approved outputs. Good defaults, but yield to explicit corrections.\n"
+                "6. **Conditional rules & editing patterns** — inferred patterns. "
+                "Use as tiebreakers, not overrides.\n\n"
+                "If a teaching point says \"always use EF percentage\" but a term "
+                "preference says \"use pumping strength\", the teaching point wins. "
+                "If an edit correction bans a phrase that a liked example used as an "
+                "opening, the edit correction wins."
             )
 
         # 1f. Preferred output style from liked/copied examples
@@ -3831,16 +3944,48 @@ class PromptEngine:
             "recommendations not present in the data."
         )
 
+        # Build priority ordering instruction
+        priority_parts: list[str] = []
+        if quick_reasons:
+            priority_parts.append(
+                "1. **Address Primary Clinical Indications first** — the physician "
+                "selected these as the key clinical questions. Open by addressing "
+                "whether findings support, argue against, or are inconclusive for "
+                "each indication."
+            )
+        priority_parts.append(
+            f"{'2' if quick_reasons else '1'}. **Critical/severe findings next** — "
+            "address the most clinically significant measurements first, in "
+            "descending order of severity. Each abnormal finding should get "
+            "individual attention with clinical context."
+        )
+        if effective_context:
+            priority_parts.append(
+                f"{'3' if quick_reasons else '2'}. **Connect to clinical context** — "
+                "link findings to the patient's history, medications, symptoms, "
+                "and reason for testing. This is where medication and condition "
+                "cross-references matter most."
+            )
+        priority_parts.append(
+            f"{'4' if quick_reasons else '3' if effective_context else '2'}. "
+            "**Group normal findings last** — batch unremarkable results into "
+            "a brief summary. Do not list each normal finding individually."
+        )
+        sections.append(
+            "\n**INTERPRETATION ORDER:**\n" + "\n".join(priority_parts)
+        )
+
         if is_perfusion:
             sections.append(
-                "\n**ORDERING REQUIREMENT**: This is a nuclear perfusion study. "
+                "\n**PERFUSION OVERRIDE**: This is a nuclear perfusion study. "
                 "Your FIRST paragraph must address perfusion and ischemia findings "
                 "(whether blood flow to all parts of the heart is adequate, whether "
                 "there are any perfusion defects or areas of reduced blood flow). "
                 "Do NOT mention ejection fraction, pumping function, or how "
                 "strongly/effectively the heart pumps until AFTER you have fully "
                 "discussed perfusion/ischemia findings. Ejection fraction should "
-                "appear no earlier than the third paragraph."
+                "appear no earlier than the third paragraph. This overrides the "
+                "general interpretation order above."
             )
 
         return "\n".join(sections)
