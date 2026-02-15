@@ -49,8 +49,7 @@ def _decode_token(token: str) -> dict:
         signing_key.key,
         algorithms=["RS256"],
         issuer=_COGNITO_ISSUER,
-        # Cognito id_tokens use 'aud', access_tokens use 'client_id'
-        options={"verify_aud": False, "verify_audience": False},
+        audience=COGNITO_CLIENT_ID,
     )
 
 
