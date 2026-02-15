@@ -82,16 +82,13 @@ async def _get_pool():
 
         params = _parse_database_url(DATABASE_URL)
 
-        # For RDS in-VPC connections, SSL is optional.
-        # Set DATABASE_SSL=true to enable SSL (e.g. for cross-network connections).
-        use_ssl = os.getenv("DATABASE_SSL", "").lower() == "true"
-        ssl_arg: object = False
-        if use_ssl:
-            import ssl as _ssl
-            ssl_ctx = _ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = _ssl.CERT_NONE
-            ssl_arg = ssl_ctx
+        # RDS requires SSL. Use a permissive context (no cert verification)
+        # since we're connecting within the same VPC.
+        import ssl as _ssl
+        ssl_ctx = _ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = _ssl.CERT_NONE
+        ssl_arg = ssl_ctx
 
         _pool = await asyncpg.create_pool(
             min_size=2,
