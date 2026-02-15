@@ -84,9 +84,18 @@ class EchocardiogramHandler(BaseTestType):
             "stenosis",
         ]
 
+        # Cardiac MRI reports share many moderate keywords with echo —
+        # penalise heavily when CMR-specific terms are present.
+        cmr_negatives = [
+            "cardiac mri", "cardiac magnetic", "cmr", "mr cardiac",
+            "mri cardiac", "mri heart", "late gadolinium", "t1 mapping",
+            "t2 mapping", "myocardial perfusion mri",
+        ]
+
         strong_count = sum(1 for k in strong_keywords if k in text)
         moderate_count = sum(1 for k in moderate_keywords if k in text)
         weak_count = sum(1 for k in weak_keywords if k in text)
+        cmr_count = sum(1 for k in cmr_negatives if k in text)
 
         if strong_count > 0:
             base = 0.7
@@ -98,7 +107,13 @@ class EchocardiogramHandler(BaseTestType):
             base = 0.0
 
         bonus = min(0.3, moderate_count * 0.05 + weak_count * 0.02)
-        return min(1.0, base + bonus)
+        score = min(1.0, base + bonus)
+
+        # If cardiac MRI terms are found and no strong echo keywords, suppress
+        if cmr_count > 0 and strong_count == 0:
+            score *= max(0.0, 1.0 - cmr_count * 0.4)
+
+        return score
 
     def parse(
         self,

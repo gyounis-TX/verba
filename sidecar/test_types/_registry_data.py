@@ -38,6 +38,7 @@ _CARDIAC: list[GenericTestType] = [
     GenericTestType("cardiac_mri", "Cardiac MRI", [
         "cardiac mri", "cardiac magnetic", "cmr", "myocardial",
         "late gadolinium", "t1 mapping", "t2 mapping",
+        "mr cardiac", "mri cardiac", "mri heart",
     ], category="cardiac"),
     GenericTestType("ekg", "EKG / ECG", [
         "ekg", "ecg", "electrocardiogram", "12-lead", "12 lead",
