@@ -21,13 +21,19 @@ _ADMIN_EMAILS = set(
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def _require_admin(request: Request) -> str:
+async def _require_admin(request: Request) -> str:
     """Extract user_id and verify admin access. Raises 403 if not admin."""
     uid = getattr(request.state, "user_id", None)
     if not uid:
         raise HTTPException(status_code=401, detail="Authentication required.")
-    # For now, check admin by user_id presence in ADMIN_EMAILS env var
-    # or by checking the users table
+    if not _ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="No admin users configured.")
+    # Look up user's email from the database and check against admin list
+    from storage.pg_database import _get_pool
+    pool = await _get_pool()
+    row = await pool.fetchrow("SELECT email FROM users WHERE id = $1::uuid", uid)
+    if not row or row["email"].lower() not in {e.lower() for e in _ADMIN_EMAILS}:
+        raise HTTPException(status_code=403, detail="Admin access required.")
     return uid
 
 
@@ -37,7 +43,7 @@ async def admin_usage_summary(request: Request, since: str = Query(...)):
     if not REQUIRE_AUTH:
         raise HTTPException(status_code=404, detail="Not available in desktop mode.")
 
-    _require_admin(request)
+    await _require_admin(request)
 
     from storage.pg_database import _get_pool
     pool = await _get_pool()
@@ -57,7 +63,7 @@ async def admin_list_users(request: Request):
     if not REQUIRE_AUTH:
         raise HTTPException(status_code=404, detail="Not available in desktop mode.")
 
-    _require_admin(request)
+    await _require_admin(request)
 
     from storage.pg_database import _get_pool
     pool = await _get_pool()
