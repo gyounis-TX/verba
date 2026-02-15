@@ -12,46 +12,9 @@
  */
 
 import { sidecarApi } from "./sidecarApi";
-import { IS_TAURI, APP_VERSION } from "./platform";
-
-// ---------------------------------------------------------------------------
-// Pull shared content (teaching points + templates from other users)
-// ---------------------------------------------------------------------------
-
-async function pullSharedContent(): Promise<void> {
-  // TODO: Re-enable shared content sync via sidecar API endpoints
-  // after AWS migration is complete.
-  return;
-}
+import { IS_TAURI } from "./platform";
 
 type SyncTable = "settings" | "history" | "templates" | "letters" | "teaching_points";
-
-const SYNC_TABLES: SyncTable[] = [
-  "settings",
-  "history",
-  "templates",
-  "letters",
-  "teaching_points",
-];
-
-// Keys that should never be synced to the cloud
-const EXCLUDED_SETTINGS_KEYS = new Set([
-  "claude_api_key",
-  "openai_api_key",
-  "aws_access_key_id",
-  "aws_secret_access_key",
-  "api_key",
-]);
-
-interface SyncQueueItem {
-  table: SyncTable;
-  operation: "upsert" | "delete";
-  data: Record<string, unknown>;
-  timestamp: string;
-}
-
-let syncQueue: SyncQueueItem[] = [];
-let isSyncing = false;
 
 export function isCloudSyncAvailable(): boolean {
   // Cloud sync is disabled during AWS migration.
@@ -81,11 +44,6 @@ export function queueChange(
   if (!IS_TAURI) return; // Web mode: backend writes directly to RDS
   if (!isCloudSyncAvailable()) return;
   // TODO: Re-enable via sidecar sync API after AWS migration
-}
-
-async function pushQueuedChanges(): Promise<void> {
-  // Cloud sync disabled during AWS migration
-  return;
 }
 
 export async function pushAllLocal(): Promise<void> {
