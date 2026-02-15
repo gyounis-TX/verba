@@ -86,10 +86,14 @@ class EchocardiogramHandler(BaseTestType):
 
         # Cardiac MRI reports share many moderate keywords with echo —
         # penalise heavily when CMR-specific terms are present.
+        # "echocardiogram" often appears in CMR comparison lines, so the
+        # penalty must apply even when strong echo keywords are found.
         cmr_negatives = [
             "cardiac mri", "cardiac magnetic", "cmr", "mr cardiac",
             "mri cardiac", "mri heart", "late gadolinium", "t1 mapping",
             "t2 mapping", "myocardial perfusion mri",
+            "delayed enhancement", "gadolinium", "cine imaging",
+            "t2 stir",
         ]
 
         strong_count = sum(1 for k in strong_keywords if k in text)
@@ -109,9 +113,9 @@ class EchocardiogramHandler(BaseTestType):
         bonus = min(0.3, moderate_count * 0.05 + weak_count * 0.02)
         score = min(1.0, base + bonus)
 
-        # If cardiac MRI terms are found and no strong echo keywords, suppress
-        if cmr_count > 0 and strong_count == 0:
-            score *= max(0.0, 1.0 - cmr_count * 0.4)
+        # Suppress echo score when cardiac MRI terms are present
+        if cmr_count > 0:
+            score *= max(0.0, 1.0 - cmr_count * 0.3)
 
         return score
 

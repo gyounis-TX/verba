@@ -39,7 +39,10 @@ _CARDIAC: list[GenericTestType] = [
         "cardiac mri", "cardiac magnetic", "cmr", "myocardial",
         "late gadolinium", "t1 mapping", "t2 mapping",
         "mr cardiac", "mri cardiac", "mri heart",
-    ], category="cardiac"),
+        "delayed enhancement", "gadolinium", "cine imaging", "t2 stir",
+    ], category="cardiac",
+        negative_keywords=["echocardiogram", "echocardiography", "transthoracic"],
+    ),
     GenericTestType("ekg", "EKG / ECG", [
         "ekg", "ecg", "electrocardiogram", "12-lead", "12 lead",
         "sinus rhythm", "qrs", "qt interval", "st segment",
