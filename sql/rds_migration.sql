@@ -726,3 +726,90 @@ RETURNS TABLE (
     WHERE us.recipient_id = p_user_id
     ORDER BY us.created_at DESC;
 $$;
+
+-- =============================================================================
+-- 23. Practices (organizations)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS practices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    specialty TEXT,
+    join_code TEXT UNIQUE NOT NULL,
+    sharing_enabled BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_practices_join_code ON practices(join_code);
+
+-- =============================================================================
+-- 24. Practice Members
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS practice_members (
+    practice_id UUID NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member',
+    joined_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (practice_id, user_id),
+    UNIQUE (user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_practice_members_user ON practice_members(user_id);
+
+-- =============================================================================
+-- Practice RPC Functions
+-- =============================================================================
+
+-- Get practice info for a user
+CREATE OR REPLACE FUNCTION get_user_practice(p_user_id UUID)
+RETURNS TABLE(
+    practice_id UUID, practice_name TEXT, specialty TEXT,
+    join_code TEXT, sharing_enabled BOOLEAN,
+    role TEXT, member_count BIGINT
+) LANGUAGE sql STABLE AS $$
+    SELECT p.id, p.name, p.specialty, p.join_code, p.sharing_enabled,
+           pm.role, (SELECT COUNT(*) FROM practice_members WHERE practice_id = p.id)
+    FROM practice_members pm
+    JOIN practices p ON p.id = pm.practice_id
+    WHERE pm.user_id = p_user_id;
+$$;
+
+-- List practice members with usage stats
+CREATE OR REPLACE FUNCTION list_practice_members(p_practice_id UUID)
+RETURNS TABLE(
+    user_id UUID, email TEXT, role TEXT, joined_at TIMESTAMPTZ,
+    report_count BIGINT, last_active TIMESTAMPTZ
+) LANGUAGE sql STABLE AS $$
+    SELECT pm.user_id, u.email, pm.role, pm.joined_at,
+           COALESCE(up.report_count, 0)::BIGINT,
+           u.last_sign_in_at
+    FROM practice_members pm
+    JOIN users u ON u.id = pm.user_id
+    LEFT JOIN LATERAL (
+        SELECT * FROM usage_periods up2
+        WHERE up2.user_id = pm.user_id ORDER BY up2.period_start DESC LIMIT 1
+    ) up ON TRUE
+    WHERE pm.practice_id = p_practice_id
+    ORDER BY pm.role DESC, pm.joined_at;
+$$;
+
+-- Practice usage summary
+CREATE OR REPLACE FUNCTION practice_usage_summary(p_practice_id UUID, p_since TIMESTAMPTZ)
+RETURNS TABLE(
+    total_members BIGINT, total_queries BIGINT,
+    total_input_tokens BIGINT, total_output_tokens BIGINT,
+    deep_analysis_count BIGINT
+) LANGUAGE sql STABLE AS $$
+    SELECT
+        (SELECT COUNT(*) FROM practice_members WHERE practice_id = p_practice_id),
+        COUNT(*),
+        COALESCE(SUM(input_tokens), 0),
+        COALESCE(SUM(output_tokens), 0),
+        COALESCE(SUM(CASE WHEN deep_analysis THEN 1 ELSE 0 END), 0)
+    FROM usage_log ul
+    JOIN practice_members pm ON pm.user_id = ul.user_id
+    WHERE pm.practice_id = p_practice_id
+      AND ul.created_at >= p_since;
+$$;

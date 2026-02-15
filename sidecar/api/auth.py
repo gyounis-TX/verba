@@ -33,6 +33,72 @@ _jwks_client: PyJWKClient | None = None
 # Track which user IDs have been provisioned this process lifetime
 _provisioned_users: set[str] = set()
 
+# Cache practice context per user_id to avoid DB query per request
+_practice_cache: dict[str, dict | None] = {}
+
+
+async def _attach_practice_context(request) -> None:
+    """Attach practice_id, practice_role, practice_sharing to request.state.
+
+    Uses a per-process cache keyed by user_id. Cache entries are invalidated
+    by practice.py when membership or settings change.
+    """
+    user_id = getattr(request.state, "user_id", None)
+    if not user_id:
+        request.state.practice_id = None
+        request.state.practice_role = None
+        request.state.practice_sharing = None
+        return
+
+    if user_id in _practice_cache:
+        cached = _practice_cache[user_id]
+        if cached is None:
+            request.state.practice_id = None
+            request.state.practice_role = None
+            request.state.practice_sharing = None
+        else:
+            request.state.practice_id = cached["practice_id"]
+            request.state.practice_role = cached["practice_role"]
+            request.state.practice_sharing = cached["practice_sharing"]
+        return
+
+    try:
+        from storage.pg_database import _get_pool
+        pool = await _get_pool()
+        row = await pool.fetchrow(
+            "SELECT pm.practice_id, pm.role, p.sharing_enabled "
+            "FROM practice_members pm JOIN practices p ON p.id = pm.practice_id "
+            "WHERE pm.user_id = $1::uuid", user_id,
+        )
+        if row:
+            ctx = {
+                "practice_id": str(row["practice_id"]),
+                "practice_role": row["role"],
+                "practice_sharing": row["sharing_enabled"],
+            }
+            _practice_cache[user_id] = ctx
+            request.state.practice_id = ctx["practice_id"]
+            request.state.practice_role = ctx["practice_role"]
+            request.state.practice_sharing = ctx["practice_sharing"]
+        else:
+            _practice_cache[user_id] = None
+            request.state.practice_id = None
+            request.state.practice_role = None
+            request.state.practice_sharing = None
+    except Exception:
+        _logger.exception("Failed to load practice context for user %s", user_id)
+        request.state.practice_id = None
+        request.state.practice_role = None
+        request.state.practice_sharing = None
+
+
+def invalidate_practice_cache(user_id: str) -> None:
+    """Remove a user's practice context from cache.
+
+    Called by practice.py when membership or settings change.
+    """
+    _practice_cache.pop(user_id, None)
+
 
 async def _ensure_user_exists(user_id: str, email: str) -> None:
     """Upsert user into the database on first authenticated request."""
@@ -123,6 +189,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             )
         except Exception:
             _logger.exception("Failed to auto-provision user %s", request.state.user_id)
+
+        # Attach practice context to request state
+        await _attach_practice_context(request)
 
         try:
             return await call_next(request)

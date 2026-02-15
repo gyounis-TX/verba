@@ -30,6 +30,7 @@ import type {
   SharedTemplate,
 } from "../types/sidecar";
 import type { BillingStatus, TierLimits } from "../types/billing";
+import type { PracticeInfo, PracticeMember, Practice, PracticeUsageSummary } from "../types/practice";
 
 class SidecarApi {
   private baseUrl: string | null = null;
@@ -1297,6 +1298,140 @@ class SidecarApi {
     const response = await this.fetchWithAuth(`${baseUrl}/admin/users`, {
       cache: "no-store",
     });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  // --- Practice ---
+
+  async getMyPractice(): Promise<PracticeInfo | null> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(`${baseUrl}/practice/mine`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async createPractice(
+    name: string,
+    specialty?: string,
+  ): Promise<PracticeInfo> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(`${baseUrl}/practice/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, specialty: specialty || null }),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async joinPractice(joinCode: string): Promise<PracticeInfo> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(`${baseUrl}/practice/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ join_code: joinCode }),
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async leavePractice(): Promise<void> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(`${baseUrl}/practice/leave`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+  }
+
+  async getPracticeMembers(): Promise<PracticeMember[]> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(`${baseUrl}/practice/members`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async removePracticeMember(userId: string): Promise<void> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(
+      `${baseUrl}/practice/members/${userId}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+  }
+
+  async updateMemberRole(
+    userId: string,
+    role: "admin" | "member",
+  ): Promise<void> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(
+      `${baseUrl}/practice/members/${userId}/role`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      },
+    );
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+  }
+
+  async updatePracticeSettings(
+    settings: Partial<Pick<Practice, "name" | "specialty" | "sharing_enabled">>,
+  ): Promise<Practice> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(
+      `${baseUrl}/practice/settings`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      },
+    );
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async regenerateJoinCode(): Promise<{ join_code: string }> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(
+      `${baseUrl}/practice/regenerate-code`,
+      { method: "POST" },
+    );
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async getPracticeUsage(since: string): Promise<PracticeUsageSummary> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(
+      `${baseUrl}/practice/usage?since=${encodeURIComponent(since)}`,
+      { cache: "no-store" },
+    );
     if (!response.ok) {
       await this.handleErrorResponse(response);
     }

@@ -1210,6 +1210,46 @@ class PgDatabase:
         own = await self.list_teaching_points(test_type=test_type, user_id=user_id)
         for tp in own:
             tp["source"] = "own"
+
+        # Include practice members' teaching points if sharing is enabled
+        if user_id:
+            try:
+                pool = await _get_pool()
+                practice_row = await pool.fetchrow(
+                    "SELECT pm.practice_id, p.sharing_enabled "
+                    "FROM practice_members pm JOIN practices p ON p.id = pm.practice_id "
+                    "WHERE pm.user_id = $1::uuid", user_id,
+                )
+                if practice_row and practice_row["sharing_enabled"]:
+                    practice_id = str(practice_row["practice_id"])
+                    if test_type:
+                        shared_rows = await pool.fetch(
+                            """SELECT tp.id, tp.sync_id, tp.text, tp.test_type,
+                                      tp.created_at, tp.updated_at, u.email AS sharer_email
+                               FROM teaching_points tp
+                               JOIN practice_members pm ON pm.user_id = tp.user_id
+                               JOIN users u ON u.id = tp.user_id
+                               WHERE pm.practice_id = $1::uuid AND tp.user_id != $2::uuid
+                               AND (tp.test_type IS NULL OR tp.test_type = $3)""",
+                            practice_id, user_id, test_type,
+                        )
+                    else:
+                        shared_rows = await pool.fetch(
+                            """SELECT tp.id, tp.sync_id, tp.text, tp.test_type,
+                                      tp.created_at, tp.updated_at, u.email AS sharer_email
+                               FROM teaching_points tp
+                               JOIN practice_members pm ON pm.user_id = tp.user_id
+                               JOIN users u ON u.id = tp.user_id
+                               WHERE pm.practice_id = $1::uuid AND tp.user_id != $2::uuid""",
+                            practice_id, user_id,
+                        )
+                    for r in shared_rows:
+                        row_dict = _normalize_row(dict(r))
+                        row_dict["source"] = "practice"
+                        own.append(row_dict)
+            except Exception:
+                logger.exception("Failed to load practice teaching points for user %s", user_id)
+
         return own
 
     async def purge_shared_duplicates_from_own(self, user_id: str | None = None) -> int:
@@ -1224,6 +1264,29 @@ class PgDatabase:
         return None
 
     async def list_shared_templates(self, user_id: str | None = None) -> list[dict[str, Any]]:
+        # Include practice members' templates if sharing is enabled
+        if user_id:
+            try:
+                pool = await _get_pool()
+                practice_row = await pool.fetchrow(
+                    "SELECT pm.practice_id, p.sharing_enabled "
+                    "FROM practice_members pm JOIN practices p ON p.id = pm.practice_id "
+                    "WHERE pm.user_id = $1::uuid", user_id,
+                )
+                if practice_row and practice_row["sharing_enabled"]:
+                    practice_id = str(practice_row["practice_id"])
+                    rows = await pool.fetch(
+                        """SELECT t.*, u.email AS sharer_email
+                           FROM templates t
+                           JOIN practice_members pm ON pm.user_id = t.user_id
+                           JOIN users u ON u.id = t.user_id
+                           WHERE pm.practice_id = $1::uuid AND t.user_id != $2::uuid
+                           ORDER BY t.created_at DESC""",
+                        practice_id, user_id,
+                    )
+                    return [_normalize_row(dict(r)) for r in rows]
+            except Exception:
+                logger.exception("Failed to load practice templates for user %s", user_id)
         return []
 
     # --- Sync Helpers (stubs for web mode) ---

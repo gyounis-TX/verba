@@ -5,6 +5,7 @@ import { getSession, signOut } from "../../services/supabase";
 import { IS_TAURI } from "../../services/platform";
 import { useToast } from "../shared/Toast";
 import { SharingPanel } from "../teaching-points/SharingPanel";
+import { PracticePanel } from "./PracticePanel";
 import type { LiteracyLevel, ExplanationVoice, PhysicianNameSource, FooterType } from "../../types/sidecar";
 import "./SettingsScreen.css";
 
@@ -869,6 +870,9 @@ export function SettingsScreen() {
 
         {/* Sharing */}
         <SharingPanel />
+
+        {/* Practice — web mode only */}
+        {!IS_TAURI && <PracticePanel />}
 
         {/* Account Management — web mode only */}
         {!IS_TAURI && <AccountSection />}

@@ -116,11 +116,13 @@ def create_app() -> FastAPI:
         from api.billing import billing_router, admin_billing_router, webhook_router
         from api.account import router as account_router
         from api.admin import router as admin_router
+        from api.practice import router as practice_router
         app.include_router(billing_router)
         app.include_router(admin_billing_router)
         app.include_router(webhook_router)
         app.include_router(account_router)
         app.include_router(admin_router)
+        app.include_router(practice_router)
     return app
 
 
