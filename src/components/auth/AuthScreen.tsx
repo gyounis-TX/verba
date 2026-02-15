@@ -81,6 +81,16 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           const result = await signIn(email, password);
           if (result.error) {
             showToast("error", result.error);
+          } else if (result.userNotConfirmed) {
+            // Account exists but not verified — resend code and show verify screen
+            try {
+              await resendSignupOtp(email);
+              showToast("info", "A new verification code has been sent to your email.");
+            } catch {
+              showToast("info", "Please check your email for a verification code.");
+            }
+            setCode(["", "", "", "", "", ""]);
+            setMode("verify");
           } else if (result.newPasswordRequired) {
             setPassword("");
             setConfirmPassword("");

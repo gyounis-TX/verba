@@ -119,7 +119,7 @@ export async function signUp(
 export async function signIn(
   email: string,
   password: string,
-): Promise<{ error: string | null; newPasswordRequired?: boolean }> {
+): Promise<{ error: string | null; newPasswordRequired?: boolean; userNotConfirmed?: boolean }> {
   const pool = getUserPool();
   if (!pool) return { error: "Auth not configured." };
 
@@ -137,7 +137,11 @@ export async function signIn(
         resolve({ error: null });
       },
       onFailure(err) {
-        resolve({ error: err.message || "Sign-in failed." });
+        if (err.name === "UserNotConfirmedException") {
+          resolve({ error: null, userNotConfirmed: true });
+        } else {
+          resolve({ error: err.message || "Sign-in failed." });
+        }
       },
       newPasswordRequired() {
         // Store the CognitoUser so completeNewPassword can use it
