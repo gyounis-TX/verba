@@ -7,6 +7,7 @@ import {
   resendSignupOtp,
   resetPassword,
   confirmNewPassword,
+  completeNewPassword,
   signInWithGoogle,
   isAuthConfigured,
   type SignUpResult,
@@ -18,7 +19,7 @@ interface AuthScreenProps {
   onAuthSuccess: () => void;
 }
 
-type AuthMode = "signin" | "signup" | "verify" | "forgot" | "reset-code";
+type AuthMode = "signin" | "signup" | "verify" | "forgot" | "reset-code" | "new-password";
 
 export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const { showToast } = useToast();
@@ -80,6 +81,11 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           const result = await signIn(email, password);
           if (result.error) {
             showToast("error", result.error);
+          } else if (result.newPasswordRequired) {
+            setPassword("");
+            setConfirmPassword("");
+            setMode("new-password");
+            showToast("success", "Please set a new password.");
           } else {
             showToast("success", "Signed in successfully.");
             onAuthSuccess();
@@ -220,6 +226,81 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       setLoading(false);
     }
   }, [showToast]);
+
+  // New password required (admin-created user with temp password)
+  if (mode === "new-password") {
+    const handleNewPassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!password.trim() || password.length < 8) {
+        showToast("error", "Password must be at least 8 characters.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        showToast("error", "Passwords do not match.");
+        return;
+      }
+      setLoading(true);
+      try {
+        const result = await completeNewPassword(password);
+        if (result.error) {
+          showToast("error", result.error);
+        } else {
+          showToast("success", "Password set. Signed in.");
+          onAuthSuccess();
+        }
+      } catch {
+        showToast("error", "Could not set password.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <h2 className="auth-title">Set New Password</h2>
+          <p className="auth-subtitle">Your account requires a new password.</p>
+
+          <form className="auth-form" onSubmit={handleNewPassword}>
+            <label className="auth-label">
+              New Password
+              <input
+                type="password"
+                className="auth-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="New password"
+                required
+                minLength={8}
+                autoFocus
+              />
+            </label>
+
+            <label className="auth-label">
+              Confirm Password
+              <input
+                type="password"
+                className="auth-input"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                required
+                minLength={8}
+              />
+            </label>
+
+            <button
+              type="submit"
+              className="auth-submit-btn"
+              disabled={loading || !password || !confirmPassword}
+            >
+              {loading ? "Setting password..." : "Set Password"}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   // Reset password screen (Cognito: code + new password)
   if (mode === "reset-code") {

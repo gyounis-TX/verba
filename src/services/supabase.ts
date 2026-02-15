@@ -118,7 +118,7 @@ export async function signUp(
 export async function signIn(
   email: string,
   password: string,
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; newPasswordRequired?: boolean }> {
   const pool = getUserPool();
   if (!pool) return { error: "Auth not configured." };
 
@@ -139,7 +139,33 @@ export async function signIn(
         resolve({ error: err.message || "Sign-in failed." });
       },
       newPasswordRequired() {
-        resolve({ error: "Password change required. Please reset your password." });
+        // Store the CognitoUser so completeNewPassword can use it
+        _pendingNewPasswordUser = user;
+        resolve({ error: null, newPasswordRequired: true });
+      },
+    });
+  });
+}
+
+let _pendingNewPasswordUser: CognitoUser | null = null;
+
+export async function completeNewPassword(
+  newPassword: string,
+): Promise<{ error: string | null }> {
+  const user = _pendingNewPasswordUser;
+  if (!user) return { error: "No pending password challenge." };
+
+  return new Promise((resolve) => {
+    user.completeNewPasswordChallenge(newPassword, {}, {
+      onSuccess(session) {
+        _pendingNewPasswordUser = null;
+        const email = user.getUsername();
+        const s = sessionFromCognito(session, email);
+        _notifyListeners(s);
+        resolve({ error: null });
+      },
+      onFailure(err) {
+        resolve({ error: err.message || "Failed to set new password." });
       },
     });
   });
