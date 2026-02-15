@@ -30,6 +30,27 @@ _COGNITO_ISSUER = (
 # Cache for JWKS client
 _jwks_client: PyJWKClient | None = None
 
+# Track which user IDs have been provisioned this process lifetime
+_provisioned_users: set[str] = set()
+
+
+async def _ensure_user_exists(user_id: str, email: str) -> None:
+    """Upsert user into the database on first authenticated request."""
+    if user_id in _provisioned_users:
+        return
+    try:
+        from storage.pg_database import _get_pool
+        pool = await _get_pool()
+        await pool.execute(
+            """INSERT INTO users (id, email, last_sign_in_at)
+               VALUES ($1::uuid, $2, NOW())
+               ON CONFLICT (id) DO UPDATE SET last_sign_in_at = NOW()""",
+            user_id, email,
+        )
+        _provisioned_users.add(user_id)
+    except Exception:
+        raise
+
 
 def _get_jwks_client() -> PyJWKClient:
     """Get or create the cached JWKS client for Cognito."""
@@ -93,6 +114,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 {"detail": f"Invalid token: {e}"}, status_code=401
             )
+
+        # Auto-provision user in the database on first request
+        try:
+            await _ensure_user_exists(
+                request.state.user_id,
+                payload.get("email", ""),
+            )
+        except Exception:
+            _logger.exception("Failed to auto-provision user %s", request.state.user_id)
 
         try:
             return await call_next(request)
