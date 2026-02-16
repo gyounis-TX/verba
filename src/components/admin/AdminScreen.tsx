@@ -603,36 +603,44 @@ export function AdminScreen() {
                                 usage.sonnet_input_tokens +
                                 usage.sonnet_output_tokens
                               ).toLocaleString()}
-                              {" "}
-                              <span className="cost-inline">
-                                {formatCost(
-                                  calculateCostPerQuery(
-                                    usage.sonnet_queries,
-                                    usage.sonnet_input_tokens,
-                                    usage.sonnet_output_tokens,
-                                    SONNET_INPUT_COST,
-                                    SONNET_OUTPUT_COST,
-                                  ),
-                                )}/q
-                              </span>
+                              {usage.sonnet_queries > 0 && (
+                                <>
+                                  {" "}
+                                  <span className="cost-inline">
+                                    {formatCost(
+                                      calculateCostPerQuery(
+                                        usage.sonnet_queries,
+                                        usage.sonnet_input_tokens,
+                                        usage.sonnet_output_tokens,
+                                        SONNET_INPUT_COST,
+                                        SONNET_OUTPUT_COST,
+                                      ),
+                                    )}/q
+                                  </span>
+                                </>
+                              )}
                             </td>
                             <td>
                               {(
                                 usage.opus_input_tokens +
                                 usage.opus_output_tokens
                               ).toLocaleString()}
-                              {" "}
-                              <span className="cost-inline">
-                                {formatCost(
-                                  calculateCostPerQuery(
-                                    usage.opus_queries,
-                                    usage.opus_input_tokens,
-                                    usage.opus_output_tokens,
-                                    OPUS_INPUT_COST,
-                                    OPUS_OUTPUT_COST,
-                                  ),
-                                )}/q
-                              </span>
+                              {usage.opus_queries > 0 && (
+                                <>
+                                  {" "}
+                                  <span className="cost-inline">
+                                    {formatCost(
+                                      calculateCostPerQuery(
+                                        usage.opus_queries,
+                                        usage.opus_input_tokens,
+                                        usage.opus_output_tokens,
+                                        OPUS_INPUT_COST,
+                                        OPUS_OUTPUT_COST,
+                                      ),
+                                    )}/q
+                                  </span>
+                                </>
+                              )}
                             </td>
                             <td>
                               {cost30
