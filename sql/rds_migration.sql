@@ -828,3 +828,20 @@ CREATE TABLE IF NOT EXISTS detection_corrections (
 
 CREATE INDEX IF NOT EXISTS idx_detection_corrections_types
     ON detection_corrections(detected_type, corrected_type);
+
+-- =============================================================================
+-- PHI Access Audit Log — HIPAA §164.312(b) compliance
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS phi_access_log (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
+    resource_id TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_phi_access_log_user ON phi_access_log(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_phi_access_log_resource ON phi_access_log(resource_type, resource_id);

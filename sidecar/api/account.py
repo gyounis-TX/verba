@@ -67,6 +67,10 @@ async def export_account_data(request: Request):
         "teaching_points": teaching_points if isinstance(teaching_points, list) else [],
     }
 
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "export_account", "account")
+
     content = json.dumps(export, indent=2, default=str)
     return Response(
         content=content,
@@ -98,6 +102,10 @@ async def delete_account(request: Request):
             status_code=400,
             detail='Must include {"confirmation": "DELETE"} to confirm account deletion.',
         )
+
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "delete_account", "account")
 
     # Delete data from all tables
     tables_to_clear = [

@@ -69,9 +69,10 @@ async def lifespan(app: FastAPI):
     # Startup
     if _USE_PG:
         # Initialize PostgreSQL connection pool and run migrations
-        from storage.pg_database import _get_pool, run_migrations
+        from storage.pg_database import _get_pool, run_migrations, enforce_data_retention
         await _get_pool()
         await run_migrations()
+        await enforce_data_retention()
     else:
         # Desktop mode: initialize SQLite and keychain
         get_db()

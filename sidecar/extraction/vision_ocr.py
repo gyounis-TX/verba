@@ -65,6 +65,11 @@ async def vision_ocr_page(
     Confidence is fixed at 0.95 on success, 0.0 on failure.
     """
     try:
+        # Redact PHI from header/footer regions before sending to LLM
+        from phi.image_redactor import redact_image_phi
+        page_image = redact_image_phi(page_image)
+        logger.info("Applied image PHI redaction (header/footer blackout)")
+
         # Convert PIL Image to PNG bytes in-memory
         buf = io.BytesIO()
         page_image.save(buf, format="PNG")

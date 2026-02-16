@@ -77,6 +77,71 @@ async def admin_list_users(request: Request):
     return [dict(row) for row in rows]
 
 
+@router.get("/audit-log")
+async def admin_audit_log(
+    request: Request,
+    since: str = Query(None),
+    user_id: str = Query(None),
+    action: str = Query(None),
+    limit: int = Query(100, le=1000),
+    offset: int = Query(0),
+):
+    """Paginated PHI access audit log viewer for admins."""
+    if not REQUIRE_AUTH:
+        raise HTTPException(status_code=404, detail="Not available in desktop mode.")
+
+    await _require_admin(request)
+
+    from datetime import datetime
+
+    conditions = []
+    params: list = []
+    idx = 1
+
+    if since:
+        since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        conditions.append(f"p.created_at >= ${idx}::TIMESTAMPTZ")
+        params.append(since_dt)
+        idx += 1
+
+    if user_id:
+        conditions.append(f"p.user_id = ${idx}::uuid")
+        params.append(user_id)
+        idx += 1
+
+    if action:
+        conditions.append(f"p.action = ${idx}")
+        params.append(action)
+        idx += 1
+
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    from storage.pg_database import _get_pool
+    pool = await _get_pool()
+
+    async with pool.acquire() as conn:
+        count_row = await conn.fetchrow(
+            f"SELECT COUNT(*) as cnt FROM phi_access_log p{where}", *params,
+        )
+        total = count_row["cnt"]
+
+        rows = await conn.fetch(
+            f"""SELECT p.id, p.user_id, u.email, p.action, p.resource_type,
+                       p.resource_id, p.ip_address, p.user_agent, p.created_at
+                FROM phi_access_log p
+                LEFT JOIN users u ON u.id = p.user_id
+                {where}
+                ORDER BY p.created_at DESC
+                LIMIT ${idx} OFFSET ${idx + 1}""",
+            *params, limit, offset,
+        )
+
+    return {
+        "total": total,
+        "items": [dict(row) for row in rows],
+    }
+
+
 @router.post("/usage/log")
 async def log_usage(request: Request):
     """Log a usage entry (model, tokens, request type)."""

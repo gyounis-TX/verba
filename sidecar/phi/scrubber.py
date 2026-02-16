@@ -198,6 +198,42 @@ _PHI_PATTERNS: list[tuple[str, re.Pattern, str]] = [
         ),
         "[ACCOUNT REDACTED]",
     ),
+    # Dates beyond DOB — catch labeled date lines in medical reports
+    (
+        "date",
+        re.compile(
+            r"(?i)(?:date of (?:study|exam|service|procedure|admission|discharge|report|visit|birth))"
+            r"\s*[:=]?\s*[^\n]{1,30}"
+        ),
+        "[DATE REDACTED]",
+    ),
+    # Exam/study date patterns (MM/DD/YYYY after date-like labels)
+    (
+        "date",
+        re.compile(
+            r"(?i)(?:date|dated|exam|study|performed|acquired|admitted|discharged|"
+            r"procedure|service)\s*[:=]\s*"
+            r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}"
+        ),
+        "[DATE REDACTED]",
+    ),
+    # Ages over 89 (HIPAA Safe Harbor requires grouping as 90+)
+    (
+        "age_over_89",
+        re.compile(
+            r"\b(?:age[d:]?\s*)?(?:9[0-9]|1[0-4][0-9])\s*(?:-?\s*)?(?:year|yr|y/?o|y\.o\.)",
+            re.IGNORECASE,
+        ),
+        "[AGE 90+ REDACTED]",
+    ),
+    # URLs
+    (
+        "url",
+        re.compile(
+            r"https?://[^\s<>\"']+|www\.[^\s<>\"']+"
+        ),
+        "[URL REDACTED]",
+    ),
     # Physician names: "Ordering Physician: Dr. John Smith"
     (
         "physician_name",

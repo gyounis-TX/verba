@@ -86,12 +86,14 @@ async def _get_pool():
 
         params = _parse_database_url(DATABASE_URL)
 
-        # RDS requires SSL. Use a permissive context (no cert verification)
-        # since we're connecting within the same VPC.
+        # RDS requires SSL. Verify the server certificate against the RDS CA bundle.
         import ssl as _ssl
         ssl_ctx = _ssl.create_default_context()
-        ssl_ctx.check_hostname = False
-        ssl_ctx.verify_mode = _ssl.CERT_NONE
+        ssl_ctx.check_hostname = False  # RDS endpoint != cert CN
+        ssl_ctx.verify_mode = _ssl.CERT_REQUIRED
+        _rds_ca_path = os.path.join(os.path.dirname(__file__), "rds-combined-ca-bundle.pem")
+        if os.path.exists(_rds_ca_path):
+            ssl_ctx.load_verify_locations(_rds_ca_path)
         ssl_arg = ssl_ctx
 
         _pool = await asyncpg.create_pool(
@@ -130,6 +132,25 @@ async def close_pool():
         await _pool.close()
         _pool = None
         logger.info("PostgreSQL connection pool closed")
+
+
+async def enforce_data_retention():
+    """Purge expired data per retention policy. Run on startup + daily."""
+    pool = await _get_pool()
+    async with pool.acquire() as conn:
+        # 1. Usage logs older than 12 months
+        r1 = await conn.execute(
+            "DELETE FROM usage_log WHERE created_at < NOW() - INTERVAL '12 months'"
+        )
+        # 2. PHI access logs older than 6 years (HIPAA minimum)
+        r2 = await conn.execute(
+            "DELETE FROM phi_access_log WHERE created_at < NOW() - INTERVAL '6 years'"
+        )
+        # 3. Detection corrections older than 12 months
+        r3 = await conn.execute(
+            "DELETE FROM detection_corrections WHERE created_at < NOW() - INTERVAL '12 months'"
+        )
+    logger.info("Retention enforcement: usage=%s, audit=%s, corrections=%s", r1, r2, r3)
 
 
 class PgDatabase:

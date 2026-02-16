@@ -386,6 +386,10 @@ async def _try_re_ocr(
             if not page_img:
                 continue
 
+            # Redact PHI from header/footer regions before re-OCR
+            from phi.image_redactor import redact_image_phi
+            page_img = redact_image_phi(page_img)
+
             new_text, new_conf = await vision_ocr_page(
                 llm_client, page_img, additional_hints=vision_hints,
             )
@@ -2379,6 +2383,9 @@ async def get_history_detail(request: Request, history_id: str):
     if not record:
         raise HTTPException(status_code=404, detail="History record not found.")
     record["liked"] = bool(record.get("liked", 0))
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "view_report", "history", history_id)
     return HistoryDetailResponse(**record)
 
 
@@ -2396,13 +2403,19 @@ async def create_history(request: Request, body: HistoryCreateRequest = Body(...
             except (TypeError, ValueError):
                 _sev_score = None
 
+    # Scrub PHI from filename before persisting (e.g. "Smith_John_Echo.pdf")
+    _scrubbed_filename = body.filename
+    if _scrubbed_filename:
+        from phi.scrubber import scrub_phi
+        _scrubbed_filename = scrub_phi(_scrubbed_filename).scrubbed_text
+
     record = await _db_call(
         "save_history",
         test_type=body.test_type,
         test_type_display=body.test_type_display,
         summary=body.summary,
         full_response=body.full_response,
-        filename=body.filename,
+        filename=_scrubbed_filename,
         tone_preference=body.tone_preference,
         detail_preference=body.detail_preference,
         severity_score=_sev_score,
@@ -2433,6 +2446,9 @@ async def delete_history(request: Request, history_id: str):
     deleted = await _db_call("delete_history", history_id, user_id=user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="History record not found.")
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "delete_report", "history", history_id)
     return HistoryDeleteResponse(deleted=True, id=history_id)
 
 
@@ -2493,6 +2509,9 @@ async def save_edited_text(request: Request, history_id: str, body: EditedTextRe
     updated = await _db_call("save_edited_text", history_id, body.edited_text, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "edit_report", "history", history_id)
     # Mark this report as edited for edit-parameter correlation
     try:
         await _db_call("save_history_settings_used", history_id, tone=None, detail=None, literacy=None, was_edited=True, user_id=user_id)
@@ -2533,6 +2552,9 @@ async def rate_history(request: Request, history_id: str, body: HistoryRateReque
     updated = await _db_call("rate_history", history_id, body.rating, body.note, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "rate_report", "history", history_id)
     # Update style profile for highly-rated reports (4+)
     if body.rating >= 4:
         try:
@@ -2892,6 +2914,9 @@ async def get_letter(request: Request, letter_id: str):
     record = await _db_call("get_letter", letter_id, user_id=user_id)
     if not record:
         raise HTTPException(status_code=404, detail="Letter not found.")
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "view_letter", "letter", letter_id)
     return LetterResponse(**record)
 
 
@@ -2902,6 +2927,9 @@ async def delete_letter(request: Request, letter_id: str):
     deleted = await _db_call("delete_letter", letter_id, user_id=user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Letter not found.")
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "delete_letter", "letter", letter_id)
     return LetterDeleteResponse(deleted=True, id=letter_id)
 
 
