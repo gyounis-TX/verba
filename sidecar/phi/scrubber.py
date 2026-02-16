@@ -206,13 +206,18 @@ _PHI_PATTERNS: list[tuple[str, re.Pattern, str]] = [
             r"|Ordered\s+by|Referring\s+Provider|Attending\s+Physician"
             r"|Requesting\s+Physician|Primary\s+Care\s+Physician|Clinician"
             r"|Interpreting\s+Physician|Interpreted\s+by|Read\s+by"
+            r"|Electronically\s+Signed\s+by|Signed\s+by|Dictated\s+by"
+            r"|Verified\s+by|Approved\s+by|Reported\s+by|Finalized\s+by"
             r"|Supervising\s+Physician|Sonographer|Technologist"
             r"|Practice\s+Provider|Provider)"
             r"\s*[:\-]?\s*"
             r"(?:Dr\.?\s*)?"
             r"[A-Za-z][A-Za-z\s.\-']+?"
-            r"(?=\s*(?:\n|$|(?:,\s*(?:MD|DO|NP|PA|Ph\.?D|FACC|FACS))|"
-            r"(?:\s+(?:MD|DO|NP|PA|Ph\.?D|FACC|FACS))))"
+            r"(?=\s*(?:\n|$|(?:,\s*(?:MD|DO|NP|PA|Ph\.?D|FACC|FACS|FASE|FHRS"
+            r"|RPVI|RN|RDCS|RDMS|RT|MBA|MPH|MS|BSN|ARNP|CNP|CRNP|DNP))|"
+            r"(?:\s+(?:MD|DO|NP|PA|Ph\.?D|FACC|FACS|FASE|FHRS"
+            r"|RPVI|RN|RDCS|RDMS|RT|MBA|MPH|MS|BSN|ARNP|CNP|CRNP|DNP))"
+            r"|\s+on\s+\d))"
         ),
         "[PHYSICIAN REDACTED]",
     ),

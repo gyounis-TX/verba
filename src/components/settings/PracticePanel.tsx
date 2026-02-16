@@ -18,7 +18,6 @@ const SPECIALTY_OPTIONS = [
 ];
 
 export function PracticePanel() {
-  const { showToast } = useToast();
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState<PracticeInfo | null>(null);
