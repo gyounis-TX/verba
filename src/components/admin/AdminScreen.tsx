@@ -34,6 +34,15 @@ function calculateCostPerQuery(
   return totalCost / queries;
 }
 
+function calculateTotalCost(usage: UserUsageSummary): number {
+  return (
+    (usage.sonnet_input_tokens / 1_000_000) * SONNET_INPUT_COST +
+    (usage.sonnet_output_tokens / 1_000_000) * SONNET_OUTPUT_COST +
+    (usage.opus_input_tokens / 1_000_000) * OPUS_INPUT_COST +
+    (usage.opus_output_tokens / 1_000_000) * OPUS_OUTPUT_COST
+  );
+}
+
 function formatCost(cost: number | null): string {
   if (cost === null) return "—";
   if (cost < 0.01) return "<$0.01";
@@ -69,6 +78,7 @@ export function AdminScreen() {
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [refreshKey, setRefreshKey] = useState(0);
   const [usageSummary, setUsageSummary] = useState<UserUsageSummary[]>([]);
+  const [usage30d, setUsage30d] = useState<UserUsageSummary[]>([]);
   const [allUsers, setAllUsers] = useState<RegisteredUser[]>([]);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
@@ -111,13 +121,15 @@ export function AdminScreen() {
       setDashboardLoading(true);
       setDashboardError(null);
       try {
-        const [users, usage] = await Promise.all([
+        const [users, usage, cost30d] = await Promise.all([
           fetchAllUsers(),
           fetchUsageSummary(sinceDate(timeRange)),
+          fetchUsageSummary(sinceDate("30d")),
         ]);
         if (cancelled) return;
         setAllUsers(users);
         setUsageSummary(usage);
+        setUsage30d(cost30d);
       } catch (err) {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : "Failed to load dashboard data";
@@ -564,15 +576,12 @@ export function AdminScreen() {
                 <thead>
                   <tr>
                     <th>Email</th>
-                    <th>Version</th>
-                    <th>Signed Up</th>
                     <th>Queries</th>
                     <th>Sonnet Tokens</th>
-                    <th>Sonnet $/Query</th>
                     <th>Opus Tokens</th>
-                    <th>Opus $/Query</th>
-                    <th>Deep Analysis</th>
+                    <th>30d Cost</th>
                     <th>Last Active</th>
+                    <th>Signed Up</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -580,13 +589,12 @@ export function AdminScreen() {
                     const usage = usageSummary.find(
                       (u) => u.user_id === user.user_id,
                     );
+                    const cost30 = usage30d.find(
+                      (u) => u.user_id === user.user_id,
+                    );
                     return (
                       <tr key={user.user_id}>
                         <td>{user.email}</td>
-                        <td>{user.app_version ?? "—"}</td>
-                        <td>
-                          {new Date(user.created_at).toLocaleDateString()}
-                        </td>
                         {usage ? (
                           <>
                             <td>{usage.total_queries.toLocaleString()}</td>
@@ -595,37 +603,41 @@ export function AdminScreen() {
                                 usage.sonnet_input_tokens +
                                 usage.sonnet_output_tokens
                               ).toLocaleString()}
-                            </td>
-                            <td>
-                              {formatCost(
-                                calculateCostPerQuery(
-                                  usage.sonnet_queries,
-                                  usage.sonnet_input_tokens,
-                                  usage.sonnet_output_tokens,
-                                  SONNET_INPUT_COST,
-                                  SONNET_OUTPUT_COST,
-                                ),
-                              )}
+                              {" "}
+                              <span className="cost-inline">
+                                {formatCost(
+                                  calculateCostPerQuery(
+                                    usage.sonnet_queries,
+                                    usage.sonnet_input_tokens,
+                                    usage.sonnet_output_tokens,
+                                    SONNET_INPUT_COST,
+                                    SONNET_OUTPUT_COST,
+                                  ),
+                                )}/q
+                              </span>
                             </td>
                             <td>
                               {(
                                 usage.opus_input_tokens +
                                 usage.opus_output_tokens
                               ).toLocaleString()}
+                              {" "}
+                              <span className="cost-inline">
+                                {formatCost(
+                                  calculateCostPerQuery(
+                                    usage.opus_queries,
+                                    usage.opus_input_tokens,
+                                    usage.opus_output_tokens,
+                                    OPUS_INPUT_COST,
+                                    OPUS_OUTPUT_COST,
+                                  ),
+                                )}/q
+                              </span>
                             </td>
                             <td>
-                              {formatCost(
-                                calculateCostPerQuery(
-                                  usage.opus_queries,
-                                  usage.opus_input_tokens,
-                                  usage.opus_output_tokens,
-                                  OPUS_INPUT_COST,
-                                  OPUS_OUTPUT_COST,
-                                ),
-                              )}
-                            </td>
-                            <td>
-                              {usage.deep_analysis_count.toLocaleString()}
+                              {cost30
+                                ? formatCost(calculateTotalCost(cost30))
+                                : "—"}
                             </td>
                             <td>
                               {new Date(usage.last_active).toLocaleDateString()}
@@ -633,11 +645,14 @@ export function AdminScreen() {
                           </>
                         ) : (
                           <>
-                            <td colSpan={8} className="no-usage">
+                            <td colSpan={5} className="no-usage">
                               No usage data
                             </td>
                           </>
                         )}
+                        <td>
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </td>
                       </tr>
                     );
                   })}
