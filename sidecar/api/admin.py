@@ -3,10 +3,13 @@
 Web-only (REQUIRE_AUTH) — requires a valid JWT and admin privileges.
 """
 
+import csv
+import io
 import logging
 import os
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import Response
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +83,7 @@ async def admin_list_users(request: Request):
 @router.get("/audit-log")
 async def admin_audit_log(
     request: Request,
+    fmt: str = Query("json", alias="format"),
     since: str = Query(None),
     user_id: str = Query(None),
     action: str = Query(None),
@@ -120,6 +124,37 @@ async def admin_audit_log(
     pool = await _get_pool()
 
     async with pool.acquire() as conn:
+        # CSV export: return all matching rows (no pagination)
+        if fmt == "csv":
+            rows = await conn.fetch(
+                f"""SELECT p.id, p.user_id, u.email, p.action, p.resource_type,
+                           p.resource_id, p.ip_address, p.user_agent, p.created_at
+                    FROM phi_access_log p
+                    LEFT JOIN users u ON u.id = p.user_id
+                    {where}
+                    ORDER BY p.created_at DESC""",
+                *params,
+            )
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(["email", "action", "resource_type", "resource_id", "ip_address", "user_agent", "created_at"])
+            for row in rows:
+                r = dict(row)
+                writer.writerow([
+                    r.get("email", ""),
+                    r.get("action", ""),
+                    r.get("resource_type", ""),
+                    r.get("resource_id", ""),
+                    r.get("ip_address", ""),
+                    r.get("user_agent", ""),
+                    str(r.get("created_at", "")),
+                ])
+            return Response(
+                content=buf.getvalue(),
+                media_type="text/csv",
+                headers={"Content-Disposition": 'attachment; filename="phi-access-log.csv"'},
+            )
+
         count_row = await conn.fetchrow(
             f"SELECT COUNT(*) as cnt FROM phi_access_log p{where}", *params,
         )
@@ -140,6 +175,75 @@ async def admin_audit_log(
         "total": total,
         "items": [dict(row) for row in rows],
     }
+
+
+@router.get("/baa-acceptances")
+async def admin_baa_acceptances(
+    request: Request,
+    fmt: str = Query("json", alias="format"),
+    since: str = Query(None),
+    user_id: str = Query(None),
+):
+    """BAA acceptance records for HIPAA compliance audits."""
+    if not REQUIRE_AUTH:
+        raise HTTPException(status_code=404, detail="Not available in desktop mode.")
+
+    await _require_admin(request)
+
+    from datetime import datetime
+
+    conditions = []
+    params: list = []
+    idx = 1
+
+    if since:
+        since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        conditions.append(f"b.accepted_at >= ${idx}::TIMESTAMPTZ")
+        params.append(since_dt)
+        idx += 1
+
+    if user_id:
+        conditions.append(f"b.user_id = ${idx}::uuid")
+        params.append(user_id)
+        idx += 1
+
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    from storage.pg_database import _get_pool
+    pool = await _get_pool()
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            f"""SELECT u.email, b.baa_version, b.accepted_at,
+                       b.ip_address, b.user_agent
+                FROM baa_acceptances b
+                LEFT JOIN users u ON u.id = b.user_id
+                {where}
+                ORDER BY b.accepted_at DESC""",
+            *params,
+        )
+
+    items = [dict(row) for row in rows]
+
+    if fmt == "csv":
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["email", "baa_version", "accepted_at", "ip_address", "user_agent"])
+        for item in items:
+            writer.writerow([
+                item.get("email", ""),
+                item.get("baa_version", ""),
+                str(item.get("accepted_at", "")),
+                item.get("ip_address", ""),
+                item.get("user_agent", ""),
+            ])
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="baa-acceptances.csv"'},
+        )
+
+    return {"items": items}
 
 
 @router.post("/usage/log")

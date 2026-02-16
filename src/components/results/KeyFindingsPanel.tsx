@@ -74,6 +74,7 @@ export function KeyFindingsPanel({
               {isEditing ? (
                 <textarea
                   className="finding-edit-textarea"
+                  autoComplete="off"
                   value={editedFindings[i]?.explanation ?? f.explanation}
                   onChange={(e) => onEditFinding(i, "explanation", e.target.value)}
                   rows={3}

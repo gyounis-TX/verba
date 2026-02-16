@@ -83,6 +83,15 @@ export function AdminScreen() {
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
+  // HIPAA Compliance state
+  const [baaAcceptances, setBaaAcceptances] = useState<Record<string, unknown>[]>([]);
+  const [auditLogItems, setAuditLogItems] = useState<Record<string, unknown>[]>([]);
+  const [auditLogTotal, setAuditLogTotal] = useState(0);
+  const [hipaaLoading, setHipaaLoading] = useState(false);
+  const [hipaaError, setHipaaError] = useState<string | null>(null);
+  const [exportingBaa, setExportingBaa] = useState(false);
+  const [exportingAudit, setExportingAudit] = useState(false);
+
   // Billing admin state
   const [billingConfig, setBillingConfig] = useState<Record<string, string>>({});
   const [billingOverrides, setBillingOverrides] = useState<Record<string, unknown>[]>([]);
@@ -164,6 +173,55 @@ export function AdminScreen() {
     loadBilling();
     return () => { cancelled = true; };
   }, []);
+
+  // Load HIPAA compliance data
+  useEffect(() => {
+    let cancelled = false;
+    async function loadHipaa() {
+      setHipaaLoading(true);
+      setHipaaError(null);
+      try {
+        const [baa, audit] = await Promise.all([
+          sidecarApi.adminBAAAcceptances(),
+          sidecarApi.adminAuditLog({ limit: 100 }),
+        ]);
+        if (cancelled) return;
+        setBaaAcceptances(baa.items);
+        setAuditLogItems(audit.items);
+        setAuditLogTotal(audit.total);
+      } catch {
+        if (!cancelled) setHipaaError("Failed to load HIPAA compliance data.");
+      } finally {
+        if (!cancelled) setHipaaLoading(false);
+      }
+    }
+    loadHipaa();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleExportBaaCsv = useCallback(async () => {
+    setExportingBaa(true);
+    try {
+      await sidecarApi.adminExportCsv("baa-acceptances");
+      showToast("success", "BAA acceptances CSV downloaded.");
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Export failed.");
+    } finally {
+      setExportingBaa(false);
+    }
+  }, [showToast]);
+
+  const handleExportAuditCsv = useCallback(async () => {
+    setExportingAudit(true);
+    try {
+      await sidecarApi.adminExportCsv("audit-log");
+      showToast("success", "PHI access log CSV downloaded.");
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Export failed.");
+    } finally {
+      setExportingAudit(false);
+    }
+  }, [showToast]);
 
   const handleUpdateBillingConfig = useCallback(
     async (key: string, value: string) => {
@@ -831,6 +889,103 @@ export function AdminScreen() {
                         <td>{String(o.custom_tier || "—")}</td>
                         <td>{o.custom_trial_days != null ? String(o.custom_trial_days) : "—"}</td>
                         <td>{String(o.notes || "—")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* HIPAA Compliance */}
+      <section className="settings-section admin-dashboard-section">
+        <h3 className="settings-section-title">HIPAA Compliance</h3>
+
+        {hipaaLoading ? (
+          <p className="settings-description">Loading compliance data...</p>
+        ) : hipaaError ? (
+          <p className="save-error">{hipaaError}</p>
+        ) : (
+          <>
+            {/* BAA Acceptances */}
+            <h4 className="settings-section-title" style={{ marginTop: "var(--space-md)" }}>
+              BAA Acceptances
+            </h4>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
+              <p className="settings-description" style={{ margin: 0 }}>
+                {baaAcceptances.length} acceptance{baaAcceptances.length !== 1 ? "s" : ""} on record.
+              </p>
+              <button
+                className="dashboard-refresh-btn"
+                onClick={handleExportBaaCsv}
+                disabled={exportingBaa}
+              >
+                {exportingBaa ? "Exporting..." : "Export CSV"}
+              </button>
+            </div>
+            {baaAcceptances.length > 0 && (
+              <div className="usage-table-wrapper">
+                <table className="usage-table">
+                  <thead>
+                    <tr>
+                      <th>Email</th>
+                      <th>Version</th>
+                      <th>Accepted At</th>
+                      <th>IP Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {baaAcceptances.map((row, i) => (
+                      <tr key={i}>
+                        <td>{String(row.email ?? "")}</td>
+                        <td>{String(row.baa_version ?? "")}</td>
+                        <td>{row.accepted_at ? new Date(String(row.accepted_at)).toLocaleString() : ""}</td>
+                        <td>{String(row.ip_address ?? "")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* PHI Access Log */}
+            <h4 className="settings-section-title" style={{ marginTop: "var(--space-xl)" }}>
+              PHI Access Log
+            </h4>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
+              <p className="settings-description" style={{ margin: 0 }}>
+                Showing {auditLogItems.length} of {auditLogTotal.toLocaleString()} entries.
+              </p>
+              <button
+                className="dashboard-refresh-btn"
+                onClick={handleExportAuditCsv}
+                disabled={exportingAudit}
+              >
+                {exportingAudit ? "Exporting..." : "Export CSV"}
+              </button>
+            </div>
+            {auditLogItems.length > 0 && (
+              <div className="usage-table-wrapper">
+                <table className="usage-table">
+                  <thead>
+                    <tr>
+                      <th>Email</th>
+                      <th>Action</th>
+                      <th>Resource</th>
+                      <th>Timestamp</th>
+                      <th>IP Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogItems.map((row, i) => (
+                      <tr key={i}>
+                        <td>{String(row.email ?? "")}</td>
+                        <td>{String(row.action ?? "")}</td>
+                        <td>{row.resource_type ? `${row.resource_type}/${row.resource_id ?? ""}` : ""}</td>
+                        <td>{row.created_at ? new Date(String(row.created_at)).toLocaleString() : ""}</td>
+                        <td>{String(row.ip_address ?? "")}</td>
                       </tr>
                     ))}
                   </tbody>

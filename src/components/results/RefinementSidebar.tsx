@@ -178,6 +178,7 @@ export function RefinementSidebar({
         <h3>Refine Context</h3>
         <textarea
           className="refine-textarea"
+          autoComplete="off"
           placeholder={letterMode
             ? "e.g., Make it shorter, add more detail, emphasize dietary changes..."
             : "e.g., Emphasize the elevated LDL given patient's cardiac history"}

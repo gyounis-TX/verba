@@ -171,6 +171,7 @@ export function TeachingPointsPanel({
         <div className="teaching-point-input-row">
           <textarea
             className="teaching-point-input"
+            autoComplete="off"
             placeholder={letterMode
               ? "e.g. Always use a warm, conversational tone"
               : "e.g. Always mention diastolic dysfunction grading"}

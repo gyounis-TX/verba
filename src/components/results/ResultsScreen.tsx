@@ -1047,6 +1047,7 @@ export function ResultsScreen() {
                 {isEditingCombined ? (
                   <textarea
                     className="summary-textarea"
+                    autoComplete="off"
                     value={editedCombinedSummary}
                     onChange={(e) => setEditedCombinedSummary(e.target.value)}
                     rows={12}
@@ -1265,6 +1266,7 @@ export function ResultsScreen() {
               <input
                 type="text"
                 className="type-modal-other-input"
+                autoComplete="off"
                 placeholder='e.g. "calcium score", "renal ultrasound"'
                 value={modalCustomType}
                 onChange={(e) => {

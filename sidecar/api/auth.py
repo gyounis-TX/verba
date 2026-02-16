@@ -20,6 +20,12 @@ COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID", "")
 COGNITO_REGION = os.getenv("AWS_REGION", "us-east-1")
 COGNITO_CLIENT_ID = os.getenv("COGNITO_CLIENT_ID", "")
 
+if REQUIRE_AUTH:
+    if not COGNITO_USER_POOL_ID:
+        raise ValueError("COGNITO_USER_POOL_ID must be set when REQUIRE_AUTH=true")
+    if not COGNITO_CLIENT_ID:
+        raise ValueError("COGNITO_CLIENT_ID must be set when REQUIRE_AUTH=true")
+
 # Computed from pool ID
 _COGNITO_ISSUER = (
     f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
@@ -37,7 +43,7 @@ _provisioned_users: set[str] = set()
 # Entries expire after _PRACTICE_CACHE_TTL seconds to prevent stale authorization.
 import time as _time
 
-_PRACTICE_CACHE_TTL = 300  # 5 minutes
+_PRACTICE_CACHE_TTL = 30  # 30 seconds
 _practice_cache: dict[str, tuple[float, dict | None]] = {}
 
 
@@ -157,7 +163,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             except Exception as exc:
                 _logger.exception("Unhandled error on %s %s", request.method, request.url.path)
                 return JSONResponse(
-                    {"detail": f"Internal server error: {type(exc).__name__}: {exc}"},
+                    {"detail": "Internal server error"},
                     status_code=500,
                 )
 
@@ -185,7 +191,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse({"detail": "Token expired"}, status_code=401)
         except jwt.InvalidTokenError as e:
             return JSONResponse(
-                {"detail": f"Invalid token: {e}"}, status_code=401
+                {"detail": "Invalid token"}, status_code=401
             )
 
         # Auto-provision user in the database on first request
@@ -205,6 +211,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
         except Exception as exc:
             _logger.exception("Unhandled error on %s %s", request.method, request.url.path)
             return JSONResponse(
-                {"detail": f"Internal server error: {type(exc).__name__}: {exc}"},
+                {"detail": "Internal server error"},
                 status_code=500,
             )

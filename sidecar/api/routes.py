@@ -302,6 +302,9 @@ async def scrub_preview(request: Request, body: dict = Body(...)):
         raise HTTPException(status_code=400, detail="full_text is required.")
 
     user_id = _get_user_id(request)
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "preview_scrub", "report")
     settings = await settings_store.get_settings(user_id=user_id)
     providers = list(settings.practice_providers) if settings.practice_providers else None
 
@@ -460,6 +463,10 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
     import logging
     _logger = logging.getLogger(__name__)
 
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "detect_type", "report")
+
     try:
         extraction_result = ExtractionResult.model_validate(body.extraction_result)
     except Exception as e:
@@ -529,8 +536,9 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
             _det_providers = list(settings.practice_providers) if settings.practice_providers else None
             _det_scrubbed = scrub_phi(extraction_result.full_text, provider_names=_det_providers).scrubbed_text
 
+            _det_user_hint = scrub_phi(body.user_hint, provider_names=_det_providers).scrubbed_text if body.user_hint else None
             llm_type_id, llm_confidence, llm_display = await llm_detect_test_type(
-                client, _det_scrubbed, body.user_hint,
+                client, _det_scrubbed, _det_user_hint,
                 registry_types=available,
                 tables=tables_for_llm,
                 keyword_candidates=keyword_candidates,
@@ -601,6 +609,10 @@ async def log_detection_correction(request: Request, body: dict = Body(...)):
 @limiter.limit(ANALYZE_RATE_LIMIT)
 async def classify_input(request: Request, body: dict = Body(...)):
     """Classify whether input text is a medical report or a question/request."""
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "classify_input", "report")
+
     import re as _re
 
     text = body.get("text", "").strip()
@@ -680,8 +692,11 @@ async def classify_input(request: Request, body: dict = Body(...)):
 
 
 @router.post("/analyze/parse", response_model=ParsedReport)
-async def parse_report(request: ParseRequest = Body(...)):
+async def parse_report(http_request: Request, request: ParseRequest = Body(...)):
     """Parse extraction results into structured medical report."""
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(http_request, "parse_report", "report")
     try:
         extraction_result = ExtractionResult.model_validate(request.extraction_result)
     except Exception as e:
@@ -722,7 +737,7 @@ class PatientFingerprintRequest(BaseModel):
 
 
 @router.post("/analyze/patient-fingerprints")
-async def compute_patient_fingerprints(request: PatientFingerprintRequest = Body(...)):
+async def compute_patient_fingerprints(http_request: Request, request: PatientFingerprintRequest = Body(...)):
     """Compute patient identity fingerprints for a list of report texts.
 
     Used during batch upload to detect when reports may belong to different
@@ -730,6 +745,10 @@ async def compute_patient_fingerprints(request: PatientFingerprintRequest = Body
     patient identity is found).  The frontend compares the hashes — if they
     don't all match, it shows a warning modal.
     """
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(http_request, "compute_fingerprints", "report")
+
     from phi.scrubber import compute_patient_fingerprint
 
     fingerprints = [compute_patient_fingerprint(t) for t in request.texts]
@@ -741,6 +760,10 @@ async def compute_patient_fingerprints(request: PatientFingerprintRequest = Body
 async def explain_report(request: Request, body: ExplainRequest = Body(...)):
     """Full analysis pipeline: detect type -> parse -> PHI scrub -> LLM explain."""
     user_id = _get_user_id(request)
+
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "generate_explanation", "report")
 
     # 1. Parse extraction result
     try:
@@ -977,7 +1000,10 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
 
     # Resolve which physician name to use in the LLM prompt
     if body.physician_name_override is not None:
-        active_physician = body.physician_name_override or None
+        active_physician = (
+            scrub_phi(body.physician_name_override, provider_names=providers).scrubbed_text
+            if body.physician_name_override else None
+        )
     else:
         source = settings.physician_name_source.value
         if source == "auto_extract":
@@ -1163,6 +1189,34 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
         if lp not in all_custom_phrases:
             all_custom_phrases.append(lp)
 
+    # 5c. PHI scrub free-text fields before LLM
+    scrubbed_refinement = (
+        scrub_phi(body.refinement_instruction, provider_names=providers).scrubbed_text
+        if body.refinement_instruction else None
+    )
+    scrubbed_quick_reasons = (
+        [scrub_phi(qr, provider_names=providers).scrubbed_text for qr in body.quick_reasons]
+        if body.quick_reasons else None
+    )
+    scrubbed_custom_phrases = (
+        [scrub_phi(cp, provider_names=providers).scrubbed_text for cp in all_custom_phrases]
+        if all_custom_phrases else []
+    )
+    scrubbed_next_steps = (
+        [scrub_phi(ns, provider_names=providers).scrubbed_text for ns in body.next_steps]
+        if body.next_steps else None
+    )
+    scrubbed_batch_summaries = None
+    if body.batch_prior_summaries:
+        scrubbed_batch_summaries = []
+        _text_keys = {'summary', 'notes', 'comment', 'context', 'label', 'text'}
+        for item in body.batch_prior_summaries:
+            scrubbed_item = {**item}
+            for k in _text_keys:
+                if k in scrubbed_item and scrubbed_item[k]:
+                    scrubbed_item[k] = scrub_phi(str(scrubbed_item[k]), provider_names=providers).scrubbed_text
+            scrubbed_batch_summaries.append(scrubbed_item)
+
     # Merge reference ranges and glossary from secondary types
     merged_ref_ranges = handler.get_reference_ranges() if handler else {}
     merged_glossary = handler.get_glossary() if handler else {}
@@ -1185,17 +1239,17 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
         clinical_context=scrubbed_clinical_context,
         template_instructions=template_instructions,
         closing_text=template_closing,
-        refinement_instruction=body.refinement_instruction,
+        refinement_instruction=scrubbed_refinement,
         liked_examples=liked_examples,
-        next_steps=body.next_steps,
+        next_steps=scrubbed_next_steps,
         teaching_points=teaching_points,
         short_comment=bool(body.short_comment) or is_sms,
         prior_results=prior_results,
         recent_edits=recent_edits,
         patient_age=patient_age,
         patient_gender=patient_gender,
-        quick_reasons=body.quick_reasons,
-        custom_phrases=all_custom_phrases,
+        quick_reasons=scrubbed_quick_reasons,
+        custom_phrases=scrubbed_custom_phrases,
         report_date=report_date,
         no_edit_ratio=no_edit_ratio,
         edit_corrections=edit_corrections,
@@ -1203,7 +1257,7 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
         lab_reference_ranges_section=lab_ref_section or None,
         vocabulary_preferences=vocab_prefs,
         style_profile=style_profile,
-        batch_prior_summaries=body.batch_prior_summaries,
+        batch_prior_summaries=scrubbed_batch_summaries,
         preferred_signoff=preferred_signoff,
         term_preferences=term_preferences,
         conditional_rules=conditional_rules,
@@ -1354,7 +1408,7 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
         try:
             extraction_result = ExtractionResult.model_validate(explain_request.extraction_result)
         except Exception as e:
-            yield _sse_event({"stage": "error", "message": f"Invalid extraction result: {str(e)}"})
+            yield _sse_event({"stage": "error", "message": "Invalid extraction result."})
             return
 
         test_type = explain_request.test_type
@@ -1403,7 +1457,7 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             try:
                 parsed_report = handler.parse(extraction_result, gender=patient_gender, age=patient_age)
             except Exception as e:
-                yield _sse_event({"stage": "error", "message": f"Failed to parse report: {str(e)}"})
+                yield _sse_event({"stage": "error", "message": "Failed to parse report."})
                 return
         else:
             from test_types.generic import GenericTestType
@@ -1500,7 +1554,10 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
         extracted_physician = extract_physician_name(extraction_result.full_text)
 
         if explain_request.physician_name_override is not None:
-            active_physician = explain_request.physician_name_override or None
+            active_physician = (
+                scrub_phi(explain_request.physician_name_override, provider_names=providers).scrubbed_text
+                if explain_request.physician_name_override else None
+            )
         else:
             source = settings.physician_name_source.value
             if source == "auto_extract":
@@ -1564,7 +1621,7 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             anxiety_level=explain_request.anxiety_level or 0,
             use_analogies=use_analogies,
             include_lifestyle_recommendations=include_lifestyle,
-            avoid_openings=explain_request.avoid_openings or None,
+            avoid_openings=scrubbed_avoid_openings,
             humanization_level=humanization_level,
         )
 
@@ -1674,6 +1731,38 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             if lp not in all_custom_phrases:
                 all_custom_phrases.append(lp)
 
+        # PHI scrub free-text fields before LLM
+        scrubbed_refinement = (
+            scrub_phi(explain_request.refinement_instruction, provider_names=providers).scrubbed_text
+            if explain_request.refinement_instruction else None
+        )
+        scrubbed_quick_reasons = (
+            [scrub_phi(qr, provider_names=providers).scrubbed_text for qr in explain_request.quick_reasons]
+            if explain_request.quick_reasons else None
+        )
+        scrubbed_custom_phrases = (
+            [scrub_phi(cp, provider_names=providers).scrubbed_text for cp in all_custom_phrases]
+            if all_custom_phrases else []
+        )
+        scrubbed_next_steps = (
+            [scrub_phi(ns, provider_names=providers).scrubbed_text for ns in explain_request.next_steps]
+            if explain_request.next_steps else None
+        )
+        scrubbed_avoid_openings = (
+            [scrub_phi(ao, provider_names=providers).scrubbed_text for ao in explain_request.avoid_openings]
+            if explain_request.avoid_openings else None
+        )
+        scrubbed_batch_summaries = None
+        if explain_request.batch_prior_summaries:
+            scrubbed_batch_summaries = []
+            _text_keys = {'summary', 'notes', 'comment', 'context', 'label', 'text'}
+            for item in explain_request.batch_prior_summaries:
+                scrubbed_item = {**item}
+                for k in _text_keys:
+                    if k in scrubbed_item and scrubbed_item[k]:
+                        scrubbed_item[k] = scrub_phi(str(scrubbed_item[k]), provider_names=providers).scrubbed_text
+                scrubbed_batch_summaries.append(scrubbed_item)
+
         # Merge reference ranges and glossary from secondary types
         merged_ref_ranges = handler.get_reference_ranges() if handler else {}
         merged_glossary = handler.get_glossary() if handler else {}
@@ -1696,17 +1785,17 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             clinical_context=scrubbed_clinical_context,
             template_instructions=template_instructions,
             closing_text=template_closing,
-            refinement_instruction=explain_request.refinement_instruction,
+            refinement_instruction=scrubbed_refinement,
             liked_examples=liked_examples,
-            next_steps=explain_request.next_steps,
+            next_steps=scrubbed_next_steps,
             teaching_points=teaching_points,
             short_comment=bool(explain_request.short_comment) or is_sms,
             prior_results=prior_results,
             recent_edits=recent_edits,
             patient_age=patient_age,
             patient_gender=patient_gender,
-            quick_reasons=explain_request.quick_reasons,
-            custom_phrases=all_custom_phrases,
+            quick_reasons=scrubbed_quick_reasons,
+            custom_phrases=scrubbed_custom_phrases,
             report_date=report_date,
             no_edit_ratio=no_edit_ratio,
             edit_corrections=edit_corrections,
@@ -1714,7 +1803,7 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
             lab_reference_ranges_section=lab_ref_section or None,
             vocabulary_preferences=vocab_prefs,
             style_profile=style_profile,
-            batch_prior_summaries=explain_request.batch_prior_summaries,
+            batch_prior_summaries=scrubbed_batch_summaries,
             preferred_signoff=preferred_signoff,
             term_preferences=term_preferences,
             conditional_rules=conditional_rules,
@@ -1759,10 +1848,10 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
                 max_attempts=2,
             )
         except LLMRetryError as e:
-            yield _sse_event({"stage": "error", "message": f"LLM API call failed after retries: {e.last_error}"})
+            yield _sse_event({"stage": "error", "message": "LLM API call failed after retries. Please try again."})
             return
         except Exception as e:
-            yield _sse_event({"stage": "error", "message": f"LLM API call failed: {e}"})
+            yield _sse_event({"stage": "error", "message": "LLM API call failed. Please try again."})
             return
 
         # Stage 4: Validate
@@ -1775,7 +1864,7 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
                 humanization_level=humanization_level,
             )
         except ValueError as e:
-            yield _sse_event({"stage": "error", "message": f"LLM response validation failed: {e}"})
+            yield _sse_event({"stage": "error", "message": "LLM response validation failed. Please try again."})
             return
 
         # Stage 5: Done
@@ -1812,7 +1901,7 @@ async def _explain_stream_gen(explain_request: ExplainRequest, user_id: str | No
 
     except Exception as e:
         _logger.exception("Unexpected error in explain stream")
-        yield _sse_event({"stage": "error", "message": str(e)})
+        yield _sse_event({"stage": "error", "message": "An unexpected error occurred. Please try again."})
 
 
 @router.post("/analyze/interpret", response_model=InterpretResponse)
@@ -1822,6 +1911,10 @@ async def interpret_report(request: Request, body: InterpretRequest = Body(...))
     import logging
     _logger = logging.getLogger(__name__)
     user_id = _get_user_id(request)
+
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "generate_interpretation", "report")
 
     try:
         extraction_result = ExtractionResult.model_validate(body.extraction_result)
@@ -1927,6 +2020,11 @@ async def interpret_report(request: Request, body: InterpretRequest = Body(...))
 async def explain_report_stream(request: Request, body: ExplainRequest = Body(...)):
     """Full analysis pipeline with SSE progress events."""
     user_id = _get_user_id(request)
+
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "generate_explanation", "report")
+
     return StreamingResponse(
         _explain_stream_gen(body, user_id=user_id),
         media_type="text/event-stream",
@@ -1941,6 +2039,10 @@ async def explain_report_stream(request: Request, body: ExplainRequest = Body(..
 @limiter.limit(ANALYZE_RATE_LIMIT)
 async def compare_reports(request: Request, body: dict = Body(...)):
     """Generate a trend summary comparing two reports of the same type."""
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "compare_reports", "report")
+
     newer_response = body.get("newer_response")
     older_response = body.get("older_response")
     newer_date = body.get("newer_date", "recent")
@@ -2040,6 +2142,10 @@ async def compare_reports(request: Request, body: dict = Body(...)):
 @limiter.limit(ANALYZE_RATE_LIMIT)
 async def synthesize_reports(request: Request, body: dict = Body(...)):
     """Generate a unified summary synthesizing multiple reports."""
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "synthesize_reports", "report")
+
     responses = body.get("responses", [])
     labels = body.get("labels", [])
     clinical_context = body.get("clinical_context", "")
@@ -2183,6 +2289,10 @@ async def get_glossary(test_type: str):
 @router.post("/export/pdf")
 async def export_pdf(request: Request):
     """Generate a PDF report from an ExplainResponse."""
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "export_pdf", "report")
+
     try:
         from report_gen import render_pdf
     except ImportError:
@@ -2357,6 +2467,9 @@ async def list_history_test_types(request: Request):
     dropdown never shows stale entries like 'Cardiac PET / PET-CT'.
     """
     user_id = _get_user_id(request)
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "list_test_types", "history")
     raw: list[dict] = await _db_call("list_history_test_types", user_id=user_id)
     seen: set[str] = set()
     out: list[dict] = []
@@ -2383,6 +2496,10 @@ async def list_history(
 ):
     """Return paginated history list, newest first."""
     user_id = _get_user_id(request)
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "list_reports", "history")
+
     items, total = await _db_call(
         "list_history",
         offset=offset, limit=limit, search=search, liked_only=liked_only,
@@ -2416,6 +2533,10 @@ async def get_history_detail(request: Request, history_id: str):
 async def create_history(request: Request, body: HistoryCreateRequest = Body(...)):
     """Save a new analysis history record."""
     user_id = _get_user_id(request)
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "save_report", "history")
+
     # Extract severity_score from full_response if available
     _sev_score = None
     if isinstance(body.full_response, dict):
@@ -2483,6 +2604,10 @@ async def toggle_history_liked(
 ):
     """Toggle the liked status of a history record."""
     user_id = _get_user_id(request)
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "like_report", "history", history_id)
+
     updated = await _db_call("update_history_liked", history_id, body.liked, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
@@ -2756,6 +2881,10 @@ async def update_teaching_point(request: Request, point_id: str, body: dict = Bo
 async def generate_letter(request: Request, body: LetterGenerateRequest = Body(...)):
     """Generate a patient-facing letter/explanation from free-text input."""
     user_id = _get_user_id(request)
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "generate_letter", "letter")
+
     settings = await settings_store.get_settings(user_id=user_id)
     provider_str = settings.llm_provider.value
     api_key = settings_store.get_api_key_for_provider(provider_str)
@@ -2920,6 +3049,10 @@ async def list_letters(
 ):
     """Return generated letters with pagination, newest first."""
     user_id = _get_user_id(request)
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "list_letters", "letter")
+
     items, total = await _db_call(
         "list_letters",
         offset=offset,
@@ -2993,6 +3126,10 @@ async def toggle_letter_liked(request: Request, letter_id: str, body: LetterLike
 async def sync_export_all(request: Request, table: str):
     """Return all local rows for a table (for sync push)."""
     user_id = _get_user_id(request)
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "export_table", table)
+
     rows = await _db_call("export_table", table, user_id=user_id)
     return rows
 
@@ -3001,6 +3138,10 @@ async def sync_export_all(request: Request, table: str):
 async def sync_export_record(request: Request, table: str, record_id: str):
     """Return a single row by local id (with sync_id)."""
     user_id = _get_user_id(request)
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "export_record", table, record_id)
+
     record = await _db_call("export_record", table, record_id, user_id=user_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Record not found.")

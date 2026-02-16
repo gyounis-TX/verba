@@ -806,6 +806,30 @@ class SidecarApi {
     return response.json();
   }
 
+  // --- BAA ---
+
+  async getBAAStatus(): Promise<{ accepted: boolean; version: string }> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(`${baseUrl}/baa/status`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async acceptBAA(): Promise<{ accepted: boolean }> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(`${baseUrl}/baa/accept`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
   // --- Letters ---
 
   async generateLetter(
@@ -1326,6 +1350,60 @@ class SidecarApi {
       await this.handleErrorResponse(response);
     }
     return response.json();
+  }
+
+  async adminBAAAcceptances(): Promise<{ items: Record<string, unknown>[] }> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(
+      `${baseUrl}/admin/baa-acceptances`,
+      { cache: "no-store" },
+    );
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async adminAuditLog(params?: {
+    since?: string;
+    user_id?: string;
+    action?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ total: number; items: Record<string, unknown>[] }> {
+    const baseUrl = await this.ensureInitialized();
+    const qs = new URLSearchParams();
+    if (params?.since) qs.set("since", params.since);
+    if (params?.user_id) qs.set("user_id", params.user_id);
+    if (params?.action) qs.set("action", params.action);
+    if (params?.limit != null) qs.set("limit", String(params.limit));
+    if (params?.offset != null) qs.set("offset", String(params.offset));
+    const query = qs.toString();
+    const response = await this.fetchWithAuth(
+      `${baseUrl}/admin/audit-log${query ? `?${query}` : ""}`,
+      { cache: "no-store" },
+    );
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    return response.json();
+  }
+
+  async adminExportCsv(endpoint: "baa-acceptances" | "audit-log"): Promise<void> {
+    const baseUrl = await this.ensureInitialized();
+    const response = await this.fetchWithAuth(
+      `${baseUrl}/admin/${endpoint}?format=csv`,
+    );
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${endpoint}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // --- Practice ---

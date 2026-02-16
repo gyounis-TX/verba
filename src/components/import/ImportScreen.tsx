@@ -774,6 +774,7 @@ export function ImportScreen() {
                     <div className="text-entry-header">
                       <input
                         className="text-entry-label"
+                        autoComplete="off"
                         value={entry.label}
                         onChange={(e) => {
                           setTextEntries((prev) =>
@@ -816,6 +817,7 @@ export function ImportScreen() {
                     <textarea
                       className="text-entry-textarea"
                       placeholder="Paste report text here..."
+                      autoComplete="off"
                       value={entry.text}
                       onChange={(e) => {
                         setTextEntries((prev) =>
@@ -868,6 +870,7 @@ export function ImportScreen() {
                 <textarea
                   className="text-input"
                   placeholder={"\u2022 Paste a test result. Include header with title of test or lab\n\u2022 Drag and drop a PDF, JPG, PNG, TIF, or TXT file (up to 50 MB)\n\u2022 Ask for help explaining a question, topic, or situation to a patient"}
+                  autoComplete="off"
                   value={pastedText}
                   onChange={(e) => {
                     setPastedText(e.target.value);
@@ -1381,6 +1384,7 @@ export function ImportScreen() {
             <textarea
               className="import-field-textarea"
               placeholder="Paste the patient's office note, HPI, or relevant history here. Example: chest pain, follow up pericardial effusion, or full clinic note text."
+              autoComplete="off"
               value={clinicalContext}
               onChange={(e) => {
                 setClinicalContext(e.target.value);
@@ -1412,6 +1416,7 @@ export function ImportScreen() {
               <input
                 type="text"
                 className="import-field-textarea"
+                autoComplete="off"
                 style={{ resize: "none", minHeight: "auto" }}
                 placeholder='e.g., "echocardiogram", "lipid panel", "stress test"'
                 value={testTypeHint}
@@ -1487,6 +1492,7 @@ export function ImportScreen() {
               <input
                 type="text"
                 className="type-modal-other-input"
+                autoComplete="off"
                 placeholder='e.g. "calcium score", "renal ultrasound"'
                 value={modalCustomType}
                 onChange={(e) => {

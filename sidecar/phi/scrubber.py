@@ -103,10 +103,16 @@ _PHI_PATTERNS: list[tuple[str, re.Pattern, str]] = [
         ),
         "[SSN REDACTED]",
     ),
-    # SSN: bare pattern without label
+    # SSN: bare pattern without label (with hyphens)
     (
         "ssn",
         re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
+        "[SSN REDACTED]",
+    ),
+    # SSN: bare 9-digit without hyphens (must not be inside a longer number)
+    (
+        "ssn",
+        re.compile(r"(?<!\d)\d{9}(?!\d)"),
         "[SSN REDACTED]",
     ),
     # Phone: "(555) 123-4567", "555-123-4567", "555.123.4567"
@@ -233,6 +239,31 @@ _PHI_PATTERNS: list[tuple[str, re.Pattern, str]] = [
             r"https?://[^\s<>\"']+|www\.[^\s<>\"']+"
         ),
         "[URL REDACTED]",
+    ),
+    # Certificate / license numbers: "License #: MD123456", "Cert No: CA-12345"
+    (
+        "certificate",
+        re.compile(
+            r"(?i)(?:certificate|license|cert|lic|registration)\s*"
+            r"(?:number|#|no\.?|id)?\s*[:=]\s*"
+            r"[A-Z0-9\-]{5,20}"
+        ),
+        "[CERTIFICATE REDACTED]",
+    ),
+    # Device / equipment serial numbers: "Serial: ABC-123456", "SN: 12345"
+    (
+        "device_serial",
+        re.compile(
+            r"(?i)(?:serial|SN|s\.n\.)\s*(?:number|#|no\.?)?\s*[:=]\s*"
+            r"[A-Z0-9\-]{5,20}"
+        ),
+        "[SERIAL REDACTED]",
+    ),
+    # IP addresses: "192.168.1.1" (HIPAA Safe Harbor identifier #18)
+    (
+        "ip_address",
+        re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
+        "[IP REDACTED]",
     ),
     # Physician names: "Ordering Physician: Dr. John Smith"
     (

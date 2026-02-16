@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { useSidecar } from "../../hooks/useSidecar";
+import { useIdleTimeout } from "../../hooks/useIdleTimeout";
 import { sidecarApi } from "../../services/sidecarApi";
-import { getSession, onAuthStateChange, isAuthConfigured } from "../../services/supabase";
+import { getSession, onAuthStateChange, isAuthConfigured, signOut } from "../../services/supabase";
 import { ConsentDialog } from "../shared/ConsentDialog";
+import { BAADialog } from "../shared/BAADialog";
 import { OnboardingWizard } from "../onboarding/OnboardingWizard";
 import { AuthScreen } from "../auth/AuthScreen";
 import "./AppShell.css";
@@ -23,6 +25,10 @@ export function AppShell() {
   // Auth gate state
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // BAA gate state (web mode only)
+  const [baaChecked, setBaaChecked] = useState(false);
+  const [baaAccepted, setBaaAccepted] = useState(false);
 
   // Check existing session and listen for auth changes
   useEffect(() => {
@@ -87,9 +93,37 @@ export function AppShell() {
       });
   }, [isReady]);
 
-  // Check onboarding status after consent is given and user is authenticated
+  // Check BAA status after authentication (web mode only)
   useEffect(() => {
-    if (!isReady || !consentGiven || !isAuthenticated) return;
+    if (!isReady || !isAuthenticated) return;
+    if (!isAuthConfigured()) {
+      // Desktop/Tauri mode — no BAA needed
+      setBaaAccepted(true);
+      setBaaChecked(true);
+      return;
+    }
+    let cancelled = false;
+    sidecarApi
+      .getBAAStatus()
+      .then((res) => {
+        if (!cancelled) {
+          setBaaAccepted(res.accepted);
+          setBaaChecked(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          // BAA API failed — allow through gracefully
+          setBaaAccepted(true);
+          setBaaChecked(true);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [isReady, isAuthenticated]);
+
+  // Check onboarding status after consent is given, user is authenticated, and BAA accepted
+  useEffect(() => {
+    if (!isReady || !consentGiven || !isAuthenticated || !baaAccepted) return;
     let cancelled = false;
     sidecarApi
       .getOnboarding()
@@ -106,17 +140,41 @@ export function AppShell() {
         }
       });
     return () => { cancelled = true; };
-  }, [isReady, consentGiven, isAuthenticated]);
+  }, [isReady, consentGiven, isAuthenticated, baaAccepted]);
 
   const handleConsent = () => {
     sidecarApi.grantConsent().catch(() => {});
     setConsentGiven(true);
   };
 
+  const handleBAAAccept = () => {
+    sidecarApi.acceptBAA().catch(() => {});
+    setBaaAccepted(true);
+  };
+
+  const handleBAADecline = () => {
+    signOut().catch(() => {});
+    setIsAuthenticated(false);
+  };
+
   const handleOnboardingComplete = () => {
     sidecarApi.completeOnboarding().catch(() => {});
     setOnboardingCompleted(true);
   };
+
+  // HIPAA §164.312(a)(2)(iii) — auto-logoff after 30 min idle (web mode only)
+  useIdleTimeout({
+    timeoutMs: 30 * 60_000,
+    enabled: isAuthConfigured() && isAuthenticated,
+    onWarn: () => {
+      // Could show a toast/modal here; for now just console
+      console.warn("Session will expire in 1 minute due to inactivity.");
+    },
+    onLogout: () => {
+      signOut().catch(() => {});
+      setIsAuthenticated(false);
+    },
+  });
 
   return (
     <div className="app-shell">
@@ -142,6 +200,12 @@ export function AppShell() {
             setIsAuthenticated(true);
             navigate("/import");
           }} />
+        ) : !baaChecked ? (
+          <div className="sidecar-loading">
+            <p>Loading...</p>
+          </div>
+        ) : !baaAccepted ? (
+          <BAADialog onAccept={handleBAAAccept} onDecline={handleBAADecline} />
         ) : !onboardingChecked ? (
           <div className="sidecar-loading">
             <p>Loading...</p>

@@ -105,6 +105,7 @@ export function CommentPanel({
           <input
             className="feedback-input"
             type="text"
+            autoComplete="off"
             placeholder="What could be improved?"
             value={feedbackNote}
             onChange={(e) => setFeedbackNote(e.target.value)}
@@ -147,6 +148,7 @@ export function CommentPanel({
       {isEditing && (
         <textarea
           className="summary-textarea"
+          autoComplete="off"
           value={editedSummary}
           onChange={(e) => {
             setEditedSummary(e.target.value);

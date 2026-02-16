@@ -317,7 +317,7 @@ async def _get_or_create_stripe_customer(user_id: str) -> str:
 
 _ADMIN_EMAILS: set[str] = set(
     e.strip()
-    for e in os.getenv("ADMIN_EMAILS", "gyounis@youniscardiology.com").split(",")
+    for e in os.getenv("ADMIN_EMAILS", "").split(",")
     if e.strip()
 )
 
@@ -333,7 +333,7 @@ async def _is_admin_user(user_id: str) -> bool:
         )
         if not row:
             return False
-        return row["email"].lower() in _ADMIN_EMAILS
+        return row["email"].lower() in {e.lower() for e in _ADMIN_EMAILS}
 
 
 # ---------------------------------------------------------------------------

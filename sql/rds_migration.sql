@@ -845,3 +845,17 @@ CREATE TABLE IF NOT EXISTS phi_access_log (
 
 CREATE INDEX IF NOT EXISTS idx_phi_access_log_user ON phi_access_log(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_phi_access_log_resource ON phi_access_log(resource_type, resource_id);
+
+-- =============================================================================
+-- BAA Acceptances — track Business Associate Agreement acceptance per user
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS baa_acceptances (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    baa_version TEXT NOT NULL,
+    accepted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ip_address TEXT,
+    user_agent TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_baa_acceptances_user ON baa_acceptances(user_id);
