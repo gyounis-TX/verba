@@ -167,8 +167,8 @@
 /* How It Works */
 .landing-steps {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2.5rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2rem;
   margin-top: 3rem;
 }
 
@@ -351,7 +351,10 @@
     font-size: 2rem;
   }
 
-  .landing-steps,
+  .landing-steps {
+    grid-template-columns: 1fr;
+  }
+
   .landing-features,
   .landing-pricing {
     grid-template-columns: 1fr;

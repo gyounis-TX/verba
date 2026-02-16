@@ -33,7 +33,7 @@ _VISION_CONFIDENCE_THRESHOLD = 0.5
 # Keyed by extraction_id; entries expire after _CACHE_TTL seconds.
 # ---------------------------------------------------------------------------
 _page_image_cache: dict[str, dict] = {}
-_CACHE_TTL = 600  # 10 minutes
+_CACHE_TTL = 60  # 1 minute — minimise PHI exposure window
 
 
 def _cache_page_images(extraction_id: str, images: dict[int, Image.Image]) -> None:

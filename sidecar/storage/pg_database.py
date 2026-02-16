@@ -150,7 +150,15 @@ async def enforce_data_retention():
         r3 = await conn.execute(
             "DELETE FROM detection_corrections WHERE created_at < NOW() - INTERVAL '12 months'"
         )
-    logger.info("Retention enforcement: usage=%s, audit=%s, corrections=%s", r1, r2, r3)
+        # 4. Letter prompts older than 12 months (may contain clinical context)
+        r4 = await conn.execute(
+            "UPDATE letters SET prompt = '[REDACTED]' "
+            "WHERE created_at < NOW() - INTERVAL '12 months' AND prompt != '[REDACTED]'"
+        )
+    logger.info(
+        "Retention enforcement: usage=%s, audit=%s, corrections=%s, letter_prompts=%s",
+        r1, r2, r3, r4,
+    )
 
 
 class PgDatabase:

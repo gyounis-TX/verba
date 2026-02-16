@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 try:
     import keyring as _keyring_module
@@ -14,8 +15,15 @@ logger = logging.getLogger(__name__)
 _SERVICE_NAME = "explify"
 
 
+_REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "").lower() == "true"
+
+
 class KeychainManager:
-    """Store and retrieve API keys via OS keychain, with in-memory fallback."""
+    """Store and retrieve API keys via OS keychain, with in-memory fallback.
+
+    In web mode (REQUIRE_AUTH=true) the in-memory fallback is NOT allowed
+    because it provides no persistence or encryption for secrets.
+    """
 
     def __init__(self) -> None:
         self._available = False
@@ -26,10 +34,20 @@ class KeychainManager:
                 self._available = True
                 logger.info("OS keychain is available")
             except Exception:
+                if _REQUIRE_AUTH:
+                    raise RuntimeError(
+                        "OS keychain is required in web mode (REQUIRE_AUTH=true) "
+                        "but is unavailable. Refusing to start with in-memory fallback."
+                    )
                 logger.warning(
                     "OS keychain unavailable; API keys will be stored in memory only"
                 )
         else:
+            if _REQUIRE_AUTH:
+                raise RuntimeError(
+                    "keyring package is required in web mode (REQUIRE_AUTH=true) "
+                    "but is not installed. Install it with: pip install keyring"
+                )
             logger.warning(
                 "keyring package not installed; API keys will be stored in memory only"
             )

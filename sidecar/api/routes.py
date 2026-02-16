@@ -2874,7 +2874,7 @@ async def generate_letter(request: Request, body: LetterGenerateRequest = Body(.
 
     letter_id = await _db_call(
         "save_letter",
-        prompt=body.prompt,
+        prompt=scrubbed_prompt,
         content=content,
         letter_type=body.letter_type,
         model_used=getattr(llm_response, "model", None),

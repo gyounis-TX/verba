@@ -10,23 +10,33 @@ const HOW_IT_WORKS = [
   },
   {
     step: "2",
+    title: "Add clinical context",
+    desc: "Add a one-liner or paste the last progress note to personalize the explanation.",
+  },
+  {
+    step: "3",
     title: "AI identifies the test type",
     desc: "Automatically detects labs, imaging, cardiac tests, and 40+ more.",
   },
   {
-    step: "3",
+    step: "4",
     title: "Get a clear explanation",
     desc: "Receive a jargon-free summary tailored to your patient's reading level.",
+  },
+  {
+    step: "5",
+    title: "Share with your patient",
+    desc: "Paste directly into your EHR or send as a message to your patient.",
   },
 ];
 
 const FEATURES = [
   { title: "40+ Test Types", desc: "Labs, echo, stress, PET/CT, MRI, CT, X-ray, and more" },
-  { title: "Patient Letters", desc: "Generate personalized letters your patients can take home" },
-  { title: "Trend Analysis", desc: "Compare reports over time to track patient progress" },
-  { title: "Custom Templates", desc: "Save and reuse your preferred explanation formats" },
-  { title: "Batch Processing", desc: "Process multiple reports at once for efficiency" },
-  { title: "Teaching Points", desc: "Add recurring educational content to explanations" },
+  { title: "Clinical Context", desc: "The more context you provide, the more personalized the response. Add a one-liner or paste the last progress note." },
+  { title: "Tailored Responses", desc: "Sliders to tailor every response by education level, detail, level of concern, and patient anxiety." },
+  { title: "Teaching Points", desc: "Teach Explify how you want specific results interpreted or conveyed to patients." },
+  { title: "Continuously Improving", desc: "By tracking which responses you like and why, as well as edits you make, Explify learns your style over time." },
+  { title: "Custom Templates", desc: "Save and reuse your preferred explanation formats for any given test type." },
 ];
 
 export function LandingPage() {
@@ -54,7 +64,7 @@ export function LandingPage() {
       {/* Hero */}
       <section className="landing-hero">
         <h1 className="landing-hero-title">
-          Understand Any Medical Report in Seconds
+          Explain Any Medical Report in Seconds
         </h1>
         <p className="landing-hero-subtitle">
           AI-powered explanations that make lab results, imaging, and cardiac tests

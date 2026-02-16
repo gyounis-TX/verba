@@ -4,16 +4,30 @@ LLM client abstraction supporting Claude (primary) and OpenAI (secondary).
 Both providers use their respective structured output mechanisms:
 - Claude: tool_use (tools parameter)
 - OpenAI: function calling (tools parameter with type "function")
+
+BAA (Business Associate Agreement) compliance:
+  Vendors with signed BAAs: bedrock (AWS BAA covers Bedrock).
+  In production (REQUIRE_AUTH=true), only BAA-covered providers may be used.
+  Set BAA_PROVIDERS env var to override (comma-separated provider names).
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
+
+# Providers with signed BAAs — only these may transmit PHI in production.
+_BAA_PROVIDERS: set[str] = set(
+    p.strip().lower()
+    for p in os.getenv("BAA_PROVIDERS", "bedrock").split(",")
+    if p.strip()
+)
+_REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "").lower() == "true"
 
 CLAUDE_DEEP_MODEL = "claude-opus-4-20250514"
 
@@ -93,6 +107,13 @@ class LLMClient:
         api_key: str | dict,
         model: Optional[str] = None,
     ):
+        # BAA guard: in production, block providers without a signed BAA
+        if _REQUIRE_AUTH and provider.value.lower() not in _BAA_PROVIDERS:
+            raise ValueError(
+                f"Provider '{provider.value}' is not BAA-compliant. "
+                f"Allowed providers: {', '.join(sorted(_BAA_PROVIDERS))}. "
+                f"Set BAA_PROVIDERS env var to update."
+            )
         self.provider = provider
         self.api_key = api_key
         self.model = model or self._default_model()
