@@ -7,6 +7,7 @@ import type { HistoryListItem, LetterResponse } from "../../types/sidecar";
 import "./HistoryScreen.css";
 
 type Tab = "reports" | "letters";
+type ItemId = string | number;
 
 export function HistoryScreen() {
   const navigate = useNavigate();
@@ -19,12 +20,12 @@ export function HistoryScreen() {
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<ItemId | null>(null);
   const [likedOnly, setLikedOnly] = useState(false);
   const [testTypeFilter, setTestTypeFilter] = useState("");
   const [availableTestTypes, setAvailableTestTypes] = useState<string[]>([]);
   const [compareMode, setCompareMode] = useState(false);
-  const [selectedForCompare, setSelectedForCompare] = useState<Set<number>>(new Set());
+  const [selectedForCompare, setSelectedForCompare] = useState<Set<ItemId>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const limit = 20;
 
@@ -143,7 +144,7 @@ export function HistoryScreen() {
     fetchLetters(lettersSearch, newOffset, lettersLikedOnly);
   };
 
-  const handleCardClick = async (id: number) => {
+  const handleCardClick = async (id: ItemId) => {
     try {
       const detail = await sidecarApi.getHistoryDetail(id);
       navigate("/results", {
@@ -159,13 +160,13 @@ export function HistoryScreen() {
     }
   };
 
-  const handleLetterClick = (letterId: number) => {
+  const handleLetterClick = (letterId: ItemId) => {
     navigate("/letters", { state: { letterId } });
   };
 
-  const pendingDeleteRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingDeleteRef = useRef<Map<ItemId, ReturnType<typeof setTimeout>>>(new Map());
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: ItemId) => {
     const item = items.find((i) => i.id === id);
     if (!item) return;
     setDeletingId(null);
@@ -216,7 +217,7 @@ export function HistoryScreen() {
     setSelectedForCompare(new Set());
   };
 
-  const handleToggleCompareSelect = (id: number) => {
+  const handleToggleCompareSelect = (id: ItemId) => {
     setSelectedForCompare((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -230,11 +231,11 @@ export function HistoryScreen() {
 
   const handleCompare = () => {
     if (selectedForCompare.size !== 2) return;
-    const ids = [...selectedForCompare] as [number, number];
+    const ids = [...selectedForCompare] as [ItemId, ItemId];
     navigate("/comparison", { state: { historyIds: ids } });
   };
 
-  const handleToggleLike = async (id: number, currentLiked: boolean) => {
+  const handleToggleLike = async (id: ItemId, currentLiked: boolean) => {
     try {
       const newLiked = !currentLiked;
       await sidecarApi.toggleHistoryLiked(id, newLiked);
@@ -250,7 +251,7 @@ export function HistoryScreen() {
     }
   };
 
-  const handleToggleLetterLike = async (id: number, currentLiked: boolean) => {
+  const handleToggleLetterLike = async (id: ItemId, currentLiked: boolean) => {
     try {
       const newLiked = !currentLiked;
       await sidecarApi.toggleLetterLiked(id, newLiked);
