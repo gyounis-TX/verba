@@ -114,7 +114,7 @@ async def _db_call(method_name: str, *args, user_id=None, **kwargs):
         _db_logger.exception("Database error in %s: %s", method_name, exc)
         raise HTTPException(
             status_code=500,
-            detail=f"Database error in {method_name}: {type(exc).__name__}: {exc}",
+            detail=f"Database error in {method_name}: {type(exc).__name__}",
         )
 
 
@@ -164,7 +164,7 @@ async def extract_pdf(request: Request, file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(
             status_code=422,
-            detail=f"Failed to extract text from PDF: {str(e)}",
+            detail="Failed to extract text from PDF.",
         )
     finally:
         if tmp_path and os.path.exists(tmp_path):
@@ -225,7 +225,7 @@ async def extract_file(request: Request, file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(
             status_code=422,
-            detail=f"Failed to extract text from file: {str(e)}",
+            detail="Failed to extract text from file.",
         )
     finally:
         if tmp_path and os.path.exists(tmp_path):
@@ -269,7 +269,7 @@ async def detect_pdf_type(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(
             status_code=422,
-            detail=f"Failed to detect PDF type: {str(e)}",
+            detail="Failed to detect PDF type.",
         )
     finally:
         if tmp_path and os.path.exists(tmp_path):
@@ -448,7 +448,7 @@ async def detect_test_type(request: Request, body: DetectTypeRequest = Body(...)
     except Exception as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid extraction result: {str(e)}",
+            detail="Invalid extraction result.",
         )
 
     available = registry.list_types()
@@ -665,7 +665,7 @@ async def parse_report(request: ParseRequest = Body(...)):
     except Exception as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid extraction result: {str(e)}",
+            detail="Invalid extraction result.",
         )
 
     test_type = request.test_type
@@ -691,7 +691,7 @@ async def parse_report(request: ParseRequest = Body(...)):
     except Exception as e:
         raise HTTPException(
             status_code=422,
-            detail=f"Failed to parse report: {str(e)}",
+            detail="Failed to parse report.",
         )
 
 
@@ -726,7 +726,7 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
     except Exception as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid extraction result: {str(e)}",
+            detail="Invalid extraction result.",
         )
 
     # 2. Detect test type
@@ -759,7 +759,7 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
         except Exception as e:
             raise HTTPException(
                 status_code=422,
-                detail=f"Failed to parse report: {str(e)}",
+                detail="Failed to parse report.",
             )
     else:
         # Unknown / user-specified test type -- build a minimal parsed report
@@ -873,7 +873,7 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
                 max_attempts=2,
             )
         except (LLMRetryError, Exception) as e:
-            raise HTTPException(status_code=502, detail=f"Quick normal LLM call failed: {e}")
+            raise HTTPException(status_code=502, detail="Quick normal LLM call failed.")
 
         try:
             explanation, issues = parse_and_validate_response(
@@ -882,7 +882,7 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
                 humanization_level=3,
             )
         except ValueError as e:
-            raise HTTPException(status_code=502, detail=f"Quick normal response validation failed: {e}")
+            raise HTTPException(status_code=502, detail="Quick normal response validation failed.")
 
         return ExplainResponse(
             explanation=explanation,
@@ -1236,12 +1236,12 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
     except LLMRetryError as e:
         raise HTTPException(
             status_code=502,
-            detail=f"LLM API call failed after retries: {e.last_error}",
+            detail="LLM API call failed after retries.",
         )
     except Exception as e:
         raise HTTPException(
             status_code=502,
-            detail=f"LLM API call failed: {e}",
+            detail="LLM API call failed.",
         )
 
     # 8. Parse and validate response
@@ -1254,7 +1254,7 @@ async def explain_report(request: Request, body: ExplainRequest = Body(...)):
     except ValueError as e:
         raise HTTPException(
             status_code=502,
-            detail=f"LLM response validation failed: {e}",
+            detail="LLM response validation failed.",
         )
 
     return ExplainResponse(
@@ -1803,7 +1803,7 @@ async def interpret_report(request: Request, body: InterpretRequest = Body(...))
     try:
         extraction_result = ExtractionResult.model_validate(body.extraction_result)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid extraction result: {e}")
+        raise HTTPException(status_code=400, detail="Invalid extraction result.")
 
     # Detect / resolve test type
     test_type = body.test_type
@@ -1887,7 +1887,7 @@ async def interpret_report(request: Request, body: InterpretRequest = Body(...))
             max_attempts=2,
         )
     except (LLMRetryError, Exception) as e:
-        raise HTTPException(status_code=502, detail=f"Interpret LLM call failed: {e}")
+        raise HTTPException(status_code=502, detail="Interpret LLM call failed.")
 
     return InterpretResponse(
         interpretation=llm_response.text_content.strip(),
@@ -2003,7 +2003,7 @@ async def compare_reports(request: Request, body: dict = Body(...)):
             max_tokens=1024,
         )
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"LLM API call failed: {e}")
+        raise HTTPException(status_code=502, detail="LLM API call failed.")
 
     return {
         "trend_summary": llm_response.text_content,
@@ -2138,7 +2138,7 @@ async def synthesize_reports(request: Request, body: dict = Body(...)):
             max_tokens=2048,
         )
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"LLM API call failed: {e}")
+        raise HTTPException(status_code=502, detail="LLM API call failed.")
 
     return {
         "combined_summary": llm_response.text_content,
@@ -2175,7 +2175,7 @@ async def export_pdf(request: Request):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"PDF generation failed: {e}",
+            detail="PDF generation failed.",
         )
 
     return Response(
@@ -2487,6 +2487,9 @@ async def mark_history_copied(request: Request, history_id: str):
     updated = await _db_call("mark_copied", history_id, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History record not found.")
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "copy_report", "history", history_id)
     # Trigger conditional pattern analysis (non-blocking)
     try:
         record = await _db_call("get_history", history_id, user_id=user_id)
@@ -2864,7 +2867,7 @@ async def generate_letter(request: Request, body: LetterGenerateRequest = Body(.
     except Exception as e:
         raise HTTPException(
             status_code=502,
-            detail=f"LLM API call failed: {e}",
+            detail="LLM API call failed.",
         )
 
     content = llm_response.text_content
@@ -2940,6 +2943,9 @@ async def update_letter(request: Request, letter_id: str, body: LetterUpdateRequ
     record = await _db_call("update_letter", letter_id, body.content, user_id=user_id)
     if not record:
         raise HTTPException(status_code=404, detail="Letter not found.")
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "edit_letter", "letter", letter_id)
     return LetterResponse(**record)
 
 
@@ -2950,6 +2956,9 @@ async def toggle_letter_liked(request: Request, letter_id: str, body: LetterLike
     updated = await _db_call("toggle_letter_liked", letter_id, body.liked, user_id=user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Letter not found.")
+    if _USE_PG:
+        from api.phi_audit import log_phi_access
+        await log_phi_access(request, "like_letter", "letter", letter_id)
     return {"id": letter_id, "liked": body.liked}
 
 
