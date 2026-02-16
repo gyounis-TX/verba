@@ -45,13 +45,16 @@ async def admin_usage_summary(request: Request, since: str = Query(...)):
 
     await _require_admin(request)
 
+    from datetime import datetime
+    since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+
     from storage.pg_database import _get_pool
     pool = await _get_pool()
 
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT * FROM admin_usage_summary($1::TIMESTAMPTZ)",
-            since,
+            since_dt,
         )
 
     return [dict(row) for row in rows]
