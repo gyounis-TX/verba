@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { sidecarApi } from "../../services/sidecarApi";
 import { useToast } from "../shared/Toast";
 import type { ExtractionResult, Template, SharedTemplate, DetectTypeResponse } from "../../types/sidecar";
-import QuickNormalModal from "./QuickNormalModal";
 import InterpretModal from "./InterpretModal";
 import { TypeSelectionModal } from "./TypeSelectionModal";
 import { isAdmin } from "../../services/adminAuth";
@@ -170,9 +169,6 @@ export function ImportScreen() {
   const [modalSelectedType, setModalSelectedType] = useState<string | null>(null);
   const [modalCustomType, setModalCustomType] = useState("");
   const [modalEditingKey, setModalEditingKey] = useState<string | null>(null);
-
-  // Quick Normal modal state
-  const [showQuickNormal, setShowQuickNormal] = useState(false);
 
   // Interpret modal state (admin-only)
   const [showInterpret, setShowInterpret] = useState(false);
@@ -1311,7 +1307,7 @@ export function ImportScreen() {
               {(() => {
                 const successEntries = [...extractionResults.values()].filter(e => e.status === "success");
                 const isSingleReport = successEntries.length <= 1;
-                const isLikelyNormal = isSingleReport && detectionStatus === "success" && detectionResult?.is_likely_normal === true;
+
                 const isBatch = successEntries.length > 1;
                 const batchMissingType = isBatch
                   ? successEntries.filter(e => !resolveEntryTestType(e)).length
@@ -1340,21 +1336,12 @@ export function ImportScreen() {
                         Interpret
                       </button>
                     )}
-                    {isLikelyNormal && (
-                      <button
-                        className="proceed-btn--quick-normal"
-                        onClick={() => setShowQuickNormal(true)}
-                        disabled={proceedDisabled}
-                      >
-                        Quick Normal
-                      </button>
-                    )}
                     <button
                       className="proceed-btn"
                       onClick={handleProceed}
                       disabled={proceedDisabled}
                     >
-                      {isLikelyNormal ? "Full Explanation" : "Continue to Explanation"}
+                      Continue to Explanation
                     </button>
                   </div>
                 );
@@ -1540,26 +1527,6 @@ export function ImportScreen() {
           />
         );
       })()}
-
-      {/* Quick Normal Modal */}
-      {showQuickNormal && result && resolvedTestType && (
-        <QuickNormalModal
-          extractionResult={result}
-          testType={resolvedTestType}
-          testTypeDisplay={
-            detectionResult?.available_types?.find(
-              (t) => t.test_type_id === resolvedTestType,
-            )?.display_name ?? resolvedTestType
-          }
-          clinicalContext={clinicalContext.trim() || undefined}
-          quickReasons={selectedReasons.size > 0 ? Array.from(selectedReasons) : undefined}
-          onClose={() => setShowQuickNormal(false)}
-          onViewFullAnalysis={() => {
-            setShowQuickNormal(false);
-            handleProceed();
-          }}
-        />
-      )}
 
       {/* Interpret Modal (admin-only) */}
       {showInterpret && result && resolvedTestType && (
