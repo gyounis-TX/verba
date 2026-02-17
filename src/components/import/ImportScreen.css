@@ -384,10 +384,23 @@
 /* Progress */
 .extraction-progress {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-md);
   padding: var(--space-lg);
   color: var(--color-text-secondary);
+}
+
+.extraction-reassurance {
+  width: 100%;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .spinner {

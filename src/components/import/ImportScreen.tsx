@@ -12,6 +12,17 @@ import { isAuthConfigured } from "../../services/supabase";
 import "./ImportScreen.css";
 import "../shared/TypeModal.css";
 
+const EXTRACTING_MESSAGES = [
+  "Reading through the document...",
+  "Extracting key findings and measurements...",
+  "Identifying report structure...",
+  "Still working — parsing clinical details...",
+  "Almost there — finalizing extraction...",
+  "Complex document — taking a bit longer...",
+  "Hang tight — carefully reading every detail...",
+  "Still processing — thank you for your patience...",
+];
+
 type ImportMode = "pdf" | "text";
 type ImportStatus = "idle" | "extracting" | "success" | "error";
 type DetectionStatus = "idle" | "detecting" | "success" | "low_confidence" | "failed" | "error";
@@ -166,6 +177,22 @@ export function ImportScreen() {
   // Interpret modal state (admin-only)
   const [showInterpret, setShowInterpret] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // Extraction elapsed timer for reassuring messages
+  const [extractElapsed, setExtractElapsed] = useState(0);
+  const extractStartRef = useRef(Date.now());
+
+  useEffect(() => {
+    if (status !== "extracting") {
+      setExtractElapsed(0);
+      return;
+    }
+    extractStartRef.current = Date.now();
+    const interval = setInterval(() => {
+      setExtractElapsed((Date.now() - extractStartRef.current) / 1000);
+    }, 100);
+    return () => clearInterval(interval);
+  }, [status]);
 
   // Single-report preview collapse state
   const [singlePreviewExpanded, setSinglePreviewExpanded] = useState(false);
@@ -949,6 +976,16 @@ export function ImportScreen() {
             <div className="extraction-progress">
               <div className="spinner" />
               <p>Analyzing document...</p>
+              {extractElapsed >= 10 && (
+                <p className="extraction-reassurance">
+                  {EXTRACTING_MESSAGES[
+                    Math.min(
+                      Math.floor(extractElapsed / 10) - 1,
+                      EXTRACTING_MESSAGES.length - 1,
+                    )
+                  ]}
+                </p>
+              )}
             </div>
           )}
 
