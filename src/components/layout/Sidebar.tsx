@@ -51,7 +51,7 @@ interface UpdateInfo {
   available: boolean;
 }
 
-export function Sidebar() {
+export function Sidebar({ className = "" }: { className?: string }) {
   const navigate = useNavigate();
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
@@ -139,7 +139,7 @@ export function Sidebar() {
   const navItems = useMemo(() => getNavItems(userEmail, isSignedIn), [userEmail, isSignedIn]);
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${className}`.trim()}>
       <div className="sidebar-brand">
         {IS_TAURI && updateInfo?.available ? (
           <>

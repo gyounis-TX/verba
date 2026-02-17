@@ -1206,4 +1206,55 @@
   font-weight: 500;
 }
 
+/* Batch Type Warning */
+.batch-type-warning {
+  padding: var(--space-sm) var(--space-md);
+  background-color: #fffbeb;
+  border: 1px solid #fed7aa;
+  border-radius: var(--radius-md);
+  color: #92400e;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  width: 100%;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .import-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .import-right-panel {
+    order: -1;
+  }
+
+  .mode-toggle {
+    flex-wrap: wrap;
+  }
+
+  .drop-zone {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .extract-btn-row {
+    flex-direction: column;
+    gap: var(--space-sm);
+    align-items: stretch;
+  }
+
+  .proceed-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .proceed-actions .proceed-btn,
+  .proceed-actions .proceed-btn--quick-normal {
+    width: 100%;
+  }
+
+  .batch-add-buttons {
+    flex-direction: column;
+  }
+}
+
 /* Type Selection Modal — shared styles imported from TypeModal.css */

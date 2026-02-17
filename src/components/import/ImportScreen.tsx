@@ -1275,16 +1275,25 @@ export function ImportScreen() {
                 const successEntries = [...extractionResults.values()].filter(e => e.status === "success");
                 const isSingleReport = successEntries.length <= 1;
                 const isLikelyNormal = isSingleReport && detectionStatus === "success" && detectionResult?.is_likely_normal === true;
+                const isBatch = successEntries.length > 1;
+                const batchMissingType = isBatch
+                  ? successEntries.filter(e => !resolveEntryTestType(e)).length
+                  : 0;
                 const proceedDisabled = (() => {
                   if (hasProceeded) return true;
-                  if (successEntries.length > 1) {
-                    return successEntries.some(e => e.detectionStatus === "detecting");
+                  if (isBatch) {
+                    return successEntries.some(e => e.detectionStatus === "detecting") || batchMissingType > 0;
                   }
                   return !resolvedTestType || detectionStatus === "detecting";
                 })();
 
                 return (
                   <div className="proceed-actions">
+                    {isBatch && batchMissingType > 0 && (
+                      <div className="batch-type-warning">
+                        {batchMissingType} of {successEntries.length} report{successEntries.length !== 1 ? "s" : ""} need{batchMissingType === 1 ? "s" : ""} a type selected
+                      </div>
+                    )}
                     {isAdmin(userEmail) && isSingleReport && (
                       <button
                         className="proceed-btn--quick-normal"

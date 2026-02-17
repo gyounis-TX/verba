@@ -21,6 +21,7 @@ export function AppShell() {
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const prevPathRef = useRef(location.pathname);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Auth gate state
   const [authChecked, setAuthChecked] = useState(false);
@@ -76,6 +77,8 @@ export function AppShell() {
     if (prev === "/settings" && location.pathname !== "/settings") {
       checkSpecialty();
     }
+    // Close mobile sidebar on navigation
+    setSidebarOpen(false);
   }, [location.pathname, checkSpecialty]);
 
   useEffect(() => {
@@ -178,7 +181,17 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      <Sidebar />
+      <button
+        className="mobile-menu-btn"
+        onClick={() => setSidebarOpen((v) => !v)}
+        aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+      >
+        {sidebarOpen ? "\u2715" : "\u2630"}
+      </button>
+      {sidebarOpen && (
+        <div className="sidebar-overlay sidebar-overlay--visible" onClick={() => setSidebarOpen(false)} />
+      )}
+      <Sidebar className={sidebarOpen ? "sidebar--open" : ""} />
       <main className="app-content">
         {error ? (
           <div className="sidecar-error">
