@@ -122,9 +122,9 @@ class LLMClient:
 
     def _default_model(self) -> str:
         if self.provider == LLMProvider.CLAUDE:
-            return "claude-sonnet-4-20250514"
+            return "claude-sonnet-4-6"
         if self.provider == LLMProvider.BEDROCK:
-            return "claude-sonnet-4-20250514"
+            return "claude-sonnet-4-6"
         return "gpt-4.1-mini"
 
     async def call_with_vision(

@@ -394,7 +394,7 @@ export function AdminScreen() {
               const providerLabel = settings.llm_provider === "claude" ? "Claude (Anthropic)" : settings.llm_provider === "bedrock" ? "AWS Bedrock" : "OpenAI";
               const modelId = settings.llm_provider === "openai"
                 ? (settings.openai_model || "gpt-4.1-mini")
-                : (settings.claude_model || "claude-sonnet-4-20250514");
+                : (settings.claude_model || "claude-sonnet-4-6");
               const modelName = MODEL_NAMES[modelId] || modelId;
               return `${providerLabel} — ${modelName}`;
             })()}</strong>

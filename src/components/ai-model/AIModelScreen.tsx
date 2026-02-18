@@ -124,7 +124,7 @@ export function AIModelScreen() {
                 "claude-3-5-sonnet-20241022": "Claude 3.5 Sonnet",
                 "claude-3-5-haiku-20241022": "Claude 3.5 Haiku",
               };
-              const modelId = settings?.claude_model || "claude-sonnet-4-20250514";
+              const modelId = settings?.claude_model || "claude-sonnet-4-6";
               const modelName = MODEL_NAMES[modelId] || modelId;
               return `AWS Bedrock — ${modelName} (cloud-managed)`;
             })()}
