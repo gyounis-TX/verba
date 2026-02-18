@@ -379,7 +379,25 @@ export function AdminScreen() {
         </div>
         {settings?.llm_provider && (
           <p className="admin-active-provider">
-            Currently active: <strong>{settings.llm_provider === "claude" ? "Claude (Anthropic)" : settings.llm_provider === "bedrock" ? "AWS Bedrock" : "OpenAI"}</strong>
+            Currently active: <strong>{(() => {
+              const MODEL_NAMES: Record<string, string> = {
+                "claude-sonnet-4-6": "Claude Sonnet 4.6",
+                "claude-sonnet-4-5": "Claude Sonnet 4.5",
+                "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
+                "claude-sonnet-4-20250514": "Claude Sonnet 4",
+                "claude-opus-4-20250514": "Claude Opus 4",
+                "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
+                "claude-haiku-4-20250514": "Claude Haiku 4",
+                "claude-3-5-sonnet-20241022": "Claude 3.5 Sonnet",
+                "claude-3-5-haiku-20241022": "Claude 3.5 Haiku",
+              };
+              const providerLabel = settings.llm_provider === "claude" ? "Claude (Anthropic)" : settings.llm_provider === "bedrock" ? "AWS Bedrock" : "OpenAI";
+              const modelId = settings.llm_provider === "openai"
+                ? (settings.openai_model || "gpt-4.1-mini")
+                : (settings.claude_model || "claude-sonnet-4-6");
+              const modelName = MODEL_NAMES[modelId] || modelId;
+              return `${providerLabel} — ${modelName}`;
+            })()}</strong>
           </p>
         )}
         {provider === "bedrock" && (

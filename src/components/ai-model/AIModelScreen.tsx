@@ -112,7 +112,22 @@ export function AIModelScreen() {
         <section className="settings-section">
           <h3 className="settings-section-title">LLM Provider</h3>
           <p className="settings-description">
-            AWS Bedrock (cloud-managed)
+            {(() => {
+              const MODEL_NAMES: Record<string, string> = {
+                "claude-sonnet-4-6": "Claude Sonnet 4.6",
+                "claude-sonnet-4-5": "Claude Sonnet 4.5",
+                "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
+                "claude-sonnet-4-20250514": "Claude Sonnet 4",
+                "claude-opus-4-20250514": "Claude Opus 4",
+                "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
+                "claude-haiku-4-20250514": "Claude Haiku 4",
+                "claude-3-5-sonnet-20241022": "Claude 3.5 Sonnet",
+                "claude-3-5-haiku-20241022": "Claude 3.5 Haiku",
+              };
+              const modelId = settings?.claude_model || "claude-sonnet-4-6";
+              const modelName = MODEL_NAMES[modelId] || modelId;
+              return `AWS Bedrock — ${modelName} (cloud-managed)`;
+            })()}
           </p>
         </section>
       ) : (
