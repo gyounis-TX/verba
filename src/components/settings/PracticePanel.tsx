@@ -36,8 +36,8 @@ export function PracticePanel() {
     try {
       const data = await sidecarApi.getMyPractice();
       setInfo(data);
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.error("Failed to fetch practice:", err);
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,9 @@ function NoPracticeView({ onJoined }: { onJoined: () => void }) {
       showToast("success", "Joined practice successfully!");
       onJoined();
     } catch (err) {
-      showToast("error", err instanceof Error ? err.message : "Failed to join.");
+      const msg = err instanceof Error ? err.message : "Failed to join.";
+      console.error("Join practice error:", err);
+      showToast("error", msg);
     } finally {
       setSubmitting(false);
     }
@@ -89,10 +91,14 @@ function NoPracticeView({ onJoined }: { onJoined: () => void }) {
     setSubmitting(true);
     try {
       await sidecarApi.createPractice(name.trim(), specialty || undefined);
-      showToast("success", "Practice created!");
-      onJoined();
+      showToast("success", "Practice created! Loading...");
+      // Small delay to ensure DB commit is visible, then refresh
+      await new Promise((r) => setTimeout(r, 300));
+      await onJoined();
     } catch (err) {
-      showToast("error", err instanceof Error ? err.message : "Failed to create.");
+      const msg = err instanceof Error ? err.message : "Failed to create practice.";
+      console.error("Create practice error:", err);
+      showToast("error", msg);
     } finally {
       setSubmitting(false);
     }
@@ -326,6 +332,22 @@ function AdminView({ info, onUpdate }: { info: PracticeInfo; onUpdate: () => voi
     }
   }, [showToast, fetchMembers]);
 
+  const handleShareContentToggle = useCallback(async (userId: string, newValue: boolean) => {
+    // Optimistic update
+    setMembers((prev) =>
+      prev.map((m) => (m.user_id === userId ? { ...m, share_content: newValue } : m)),
+    );
+    try {
+      await sidecarApi.updateMemberShareContent(userId, newValue);
+    } catch (err) {
+      // Revert on error
+      setMembers((prev) =>
+        prev.map((m) => (m.user_id === userId ? { ...m, share_content: !newValue } : m)),
+      );
+      showToast("error", err instanceof Error ? err.message : "Failed to update contributor status.");
+    }
+  }, [showToast]);
+
   const handleCopyCode = useCallback(() => {
     navigator.clipboard.writeText(info.practice.join_code);
     showToast("success", "Join code copied!");
@@ -380,7 +402,7 @@ function AdminView({ info, onUpdate }: { info: PracticeInfo; onUpdate: () => voi
             <span className="checkbox-label-text">
               Content Sharing
               <span className="checkbox-label-hint">
-                When enabled, all members' teaching points and templates are shared within the practice
+                Master switch for practice sharing. Use the Contributor column below to control which members' content is auto-applied.
               </span>
             </span>
           </label>
@@ -417,6 +439,7 @@ function AdminView({ info, onUpdate }: { info: PracticeInfo; onUpdate: () => voi
             <div className="practice-members-header">
               <span>Email</span>
               <span>Role</span>
+              <span>Contributor</span>
               <span>Reports</span>
               <span>Last Active</span>
               <span></span>
@@ -433,6 +456,14 @@ function AdminView({ info, onUpdate }: { info: PracticeInfo; onUpdate: () => voi
                     <option value="admin">Admin</option>
                     <option value="member">Member</option>
                   </select>
+                </span>
+                <span className="practice-member-contributor">
+                  <input
+                    type="checkbox"
+                    checked={m.share_content}
+                    onChange={(e) => handleShareContentToggle(m.user_id, e.target.checked)}
+                    title={m.share_content ? "Content is auto-shared" : "Content is not shared"}
+                  />
                 </span>
                 <span>{m.report_count}</span>
                 <span className="practice-member-date">

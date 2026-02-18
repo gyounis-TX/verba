@@ -751,10 +751,17 @@ CREATE TABLE IF NOT EXISTS practice_members (
     practice_id UUID NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role TEXT NOT NULL DEFAULT 'member',
+    share_content BOOLEAN NOT NULL DEFAULT true,
     joined_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (practice_id, user_id),
     UNIQUE (user_id)
 );
+
+-- Backfill: add share_content column if table already exists without it
+DO $$ BEGIN
+    ALTER TABLE practice_members ADD COLUMN share_content BOOLEAN NOT NULL DEFAULT true;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_practice_members_user ON practice_members(user_id);
 
@@ -779,10 +786,11 @@ $$;
 -- List practice members with usage stats
 CREATE OR REPLACE FUNCTION list_practice_members(p_practice_id UUID)
 RETURNS TABLE(
-    user_id UUID, email TEXT, role TEXT, joined_at TIMESTAMPTZ,
+    user_id UUID, email TEXT, role TEXT, share_content BOOLEAN,
+    joined_at TIMESTAMPTZ,
     report_count BIGINT, last_active TIMESTAMPTZ
 ) LANGUAGE sql STABLE AS $$
-    SELECT pm.user_id, u.email, pm.role, pm.joined_at,
+    SELECT pm.user_id, u.email, pm.role, pm.share_content, pm.joined_at,
            COALESCE(up.report_count, 0)::BIGINT,
            u.last_sign_in_at
     FROM practice_members pm
