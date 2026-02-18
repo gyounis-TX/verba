@@ -784,6 +784,8 @@ RETURNS TABLE(
 $$;
 
 -- List practice members with usage stats
+-- DROP first: return type changed (added share_content) — CREATE OR REPLACE cannot alter return type
+DROP FUNCTION IF EXISTS list_practice_members(UUID);
 CREATE OR REPLACE FUNCTION list_practice_members(p_practice_id UUID)
 RETURNS TABLE(
     user_id UUID, email TEXT, role TEXT, share_content BOOLEAN,

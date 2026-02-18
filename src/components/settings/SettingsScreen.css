@@ -850,19 +850,19 @@
 
 .practice-btn {
   padding: var(--space-sm) var(--space-lg);
-  background-color: var(--color-gray-50, #f8fafc);
+  background-color: var(--color-gray-200, #e2e8f0);
   color: var(--color-text);
-  border: 1px solid var(--color-gray-300, #cbd5e1);
+  border: 2px solid var(--color-gray-400, #94a3b8);
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .practice-btn:hover:not(:disabled) {
-  background-color: var(--color-gray-100, #f1f5f9);
-  border-color: var(--color-gray-400, #94a3b8);
+  background-color: var(--color-gray-300, #cbd5e1);
+  border-color: var(--color-gray-500, #64748b);
 }
 
 .practice-btn:disabled {
