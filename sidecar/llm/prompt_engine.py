@@ -2209,6 +2209,538 @@ Apply these cardiac-specific interpretation rules:
   Total scar burden > 20% of LV mass carries significant prognostic
   weight. Frame viability findings in terms of treatment implications.
 
+### Disease States & Clinical Syndromes
+
+- HEART FAILURE PHENOTYPES: Differentiate the three phenotypes clearly:
+  - HFrEF (EF < 40%): systolic dysfunction — the heart muscle is weakened
+    and pumps less blood. Frame as "your heart's pumping strength is
+    reduced" and note that medications can often improve function.
+  - HFmrEF (EF 41-49%): mildly reduced — NOT "near normal." This is a
+    recognized intermediate phenotype with real prognostic implications.
+    Do NOT dismiss EF in this range as "borderline normal."
+  - HFpEF (EF >= 50% with diastolic dysfunction): the heart pumps
+    normally but is stiff and doesn't fill well. Do NOT tell these
+    patients "your heart is normal." Instead: "your heart pumps well
+    but has trouble relaxing and filling, which can cause symptoms like
+    shortness of breath." Integrate E/e', LAVI, and filling pressures
+    (LVEDP/PCWP if available) to support the diagnosis.
+
+- ATRIAL FIBRILLATION CONTEXT: When AFib is noted in the report or
+  clinical context, adjust interpretation accordingly:
+  - LA enlargement is EXPECTED in AFib — do not present it as a
+    surprising or alarming separate finding
+  - E/A ratio is UNRELIABLE in AFib (irregular filling pattern) —
+    acknowledge this limitation rather than grading diastolic function
+    from E/A alone. Use E/e' and LAVI instead.
+  - RVSP/TR velocity may be elevated from RV pressure loading during
+    AFib — distinguish from true pulmonary hypertension by correlating
+    with TAPSE and RV size
+  - LVEF may be falsely reduced by rapid ventricular rate — if HR was
+    elevated during the study, note that EF may improve with better
+    rate control
+
+- DILATED CARDIOMYOPATHY: LV dilation (LVIDd > 5.8 cm men / > 5.2 cm
+  women) + reduced EF without a primary valve or ischemic cause suggests
+  dilated cardiomyopathy. This is a distinct entity — explain as "the
+  heart muscle has stretched and weakened." On CMR, mid-wall LGE is
+  characteristic. Do NOT describe it as simply "a big weak heart."
+
+- RESTRICTIVE CARDIOMYOPATHY: Normal or small LV cavity + severely
+  elevated filling pressures (LVEDP > 20, E/e' > 15) + often preserved
+  or mildly reduced EF. Very different from dilated cardiomyopathy
+  despite sometimes similar EF. The heart muscle is stiff and
+  non-compliant. On cath, look for equalized diastolic pressures.
+  On CMR, diffuse T1/ECV elevation without focal LGE suggests
+  infiltrative disease (amyloidosis). Frame as "the heart muscle has
+  become stiff and cannot fill properly."
+
+- TAKOTSUBO (STRESS) CARDIOMYOPATHY: When apical ballooning or apical
+  akinesis is described with a clinical history of emotional/physical
+  stress and no obstructive CAD, this is likely takotsubo. CRITICAL:
+  this is typically TEMPORARY — most patients recover EF within weeks
+  to months. Do NOT describe this as permanent damage. Frame as "a
+  temporary condition where the heart muscle was stunned by stress,
+  and recovery is expected."
+
+- PERIPARTUM CARDIOMYOPATHY: When clinical context indicates pregnancy
+  or recent delivery with new LV dysfunction, note that this is a
+  recognized condition with potential for recovery. Many patients
+  recover EF within 6-12 months postpartum. Frame with cautious
+  optimism rather than alarm.
+
+- CHRONIC MITRAL REGURGITATION — EF TRAP: In chronic severe MR, the
+  ventricle ejects blood both forward and backward into the LA. This
+  means LVEF OVERESTIMATES true contractile function. An EF of 55-60%
+  with severe MR may actually represent IMPAIRED function — the
+  ventricle is struggling but appears normal because some blood takes
+  the easy path backward. Do NOT tell the patient their pumping
+  function is "normal" or "strong" when severe MR is present. Instead:
+  "while the ejection fraction number looks preserved, in the setting
+  of significant valve leakage, the heart muscle may not be working
+  as well as the number suggests."
+
+- LOW-FLOW LOW-GRADIENT AORTIC STENOSIS: When AVA < 1.0 cm2 (severe)
+  but mean gradient < 40 mmHg with reduced EF, this may be true severe
+  AS (weak heart cannot generate high gradient) or pseudo-severe AS
+  (valve appears severe only because stroke volume is low). This is a
+  recognized diagnostic dilemma. Frame as: "the narrowing of the valve
+  appears significant, but because the heart is not pumping strongly,
+  further testing may be needed to confirm the severity." Do NOT
+  definitively label as severe without noting the caveat.
+
+- FUNCTIONAL VS PRIMARY VALVE DISEASE:
+  - Functional (secondary) MR/TR: caused by chamber dilation stretching
+    the valve ring — the valve itself is structurally normal. May
+    improve with diuretics, heart failure treatment, or CRT. Frame as
+    "the valve leakage is related to the heart being enlarged."
+  - Primary (organic) MR/TR: structural valve disease (prolapse,
+    flail, rheumatic, endocarditis). Requires valve-specific management.
+    Frame as "there is a problem with the valve itself."
+  Same severity grade carries different prognosis and treatment path.
+
+- ATHLETIC HEART: In young, trained athletes (endurance or strength),
+  LV cavity dilation + mildly reduced EF (45-52%) + LV wall thickness
+  up to 1.3-1.4 cm + bradycardia can be PHYSIOLOGIC adaptation, not
+  disease. Key differentiators from cardiomyopathy: symmetric
+  hypertrophy, normal diastolic function, no wall motion abnormalities,
+  no scar on CMR, and excellent exercise capacity. When clinical context
+  suggests an athlete, note that these findings may represent normal
+  athletic adaptation rather than disease.
+
+### Post-Procedural & Device States
+
+- POST-PCI (STENT): When clinical context mentions prior stent
+  placement:
+  - In-stent restenosis: recurrent narrowing within the stent, usually
+    gradual — presents as recurrent angina or positive stress test in
+    the stented territory
+  - Target-lesion ischemia vs new-territory ischemia: ischemia in the
+    stented artery territory suggests restenosis; ischemia in a
+    different territory suggests new disease progression
+  Frame findings relative to the stented vessel when the context is
+  available.
+
+- POST-VALVE REPLACEMENT:
+  - Mechanical prosthesis: expected to have audible click, slightly
+    higher transvalvular gradients than native valve. Trace
+    paravalvular regurgitation is NORMAL — do not alarm.
+  - Bioprosthetic valve: lower gradients initially but degrades over
+    10-15 years. Increasing gradients over time suggest structural
+    valve deterioration.
+  - "Normal" gradient thresholds vary by valve type and size — a mean
+    gradient of 25 mmHg may be normal for a 19mm bioprosthesis but
+    elevated for a 27mm. When specific valve model is unknown, note
+    that gradient interpretation depends on the prosthesis type.
+  - Patient-prosthesis mismatch: small prosthesis in a large patient
+    creates inherently higher gradients — not valve dysfunction.
+
+- POST-DEVICE (ICD / CRT / PACEMAKER):
+  - RV pacing lead can cause dyssynchronous septal motion that mimics
+    wall motion abnormality — this is a pacing artifact, not ischemia
+  - CRT response: improvement in EF and reduction in LV volumes after
+    CRT implantation indicates positive remodeling. Lack of improvement
+    does not necessarily mean device failure.
+  - ICD presence indicates the patient has known risk for arrhythmia;
+    contextualize new findings relative to their underlying condition
+
+- POST-CABG (EARLY VS LATE):
+  - Early post-CABG (< 3 months): small pericardial effusion is common
+    and usually benign (post-operative inflammation). Mild wall motion
+    abnormalities may be due to surgical stunning.
+  - Late post-CABG (> 5 years): SVG degeneration is expected; new
+    ischemia may be graft disease or progression of native vessel
+    disease. LIMA grafts are more durable.
+  Frame early post-surgical findings as expected recovery rather than
+  new pathology.
+
+- POST-HEART TRANSPLANT: If clinical context mentions transplant:
+  - Rejection: on CMR, may show myocardial edema (T2 elevation),
+    reduced EF, or new wall motion abnormalities
+  - Cardiac allograft vasculopathy: diffuse, concentric narrowing of
+    all coronary arteries — differs from typical focal atherosclerosis.
+    May be angiographically subtle. PET/MBF may detect it earlier
+    than anatomy.
+  These are specialized findings — frame with appropriate nuance.
+
+### Normal Variants & Paradoxical Findings
+
+- MITRAL INFLOW IN SEVERE MR: In significant MR, rapid LA filling
+  during systole creates a pseudonormal mitral inflow pattern — E/A
+  ratio may appear normal or even elevated NOT because diastolic
+  function is normal, but because the regurgitant volume is driving
+  the filling pattern. Do NOT interpret E/A as reflecting true
+  diastolic function when severe MR is present.
+
+- EF METHOD DISCORDANCE: Different methods give different EF values
+  for the same patient:
+  - M-mode (Teichholz): least accurate, assumes symmetric contraction
+  - 2D Simpson biplane: standard echo method, more accurate
+  - 3D echo: better than 2D
+  - CMR: gold standard for volumetric assessment
+  When EF values differ between methods or studies, note the
+  measurement method. CMR values should be trusted over echo when
+  available. A 5% difference between methods is expected.
+
+- INDEXED VS ABSOLUTE VOLUMES: Body surface area (BSA) indexing can
+  mislead:
+  - Obese patients: large BSA makes indexed volumes appear falsely
+    "normal" even when the heart is dilated. Check absolute volumes.
+  - Very small patients: indexed volumes may appear falsely "elevated"
+    with normal absolute volumes.
+  When body habitus is extreme, mention both indexed and absolute
+  values and note the context.
+
+- PERICARDIAL EFFUSION — TAMPONADE PHYSIOLOGY: Tamponade depends on
+  RATE of accumulation, not just volume:
+  - Small effusion accumulating rapidly (e.g. post-procedural bleed)
+    can cause tamponade
+  - Large chronic effusion accumulating slowly (e.g. uremic, malignant)
+    may be well-tolerated
+  - Diastolic RV collapse on echo = hemodynamic compromise regardless
+    of effusion size
+  When the report describes RV diastolic collapse or respiratory
+  variation in mitral inflow, flag as significant even if the effusion
+  is described as "small" or "moderate."
+
+- RESTRICTIVE VS CONSTRICTIVE — DIFFERENTIATION: Both show elevated
+  and equalized diastolic pressures on cath, but they are different
+  diseases with different treatments:
+  - Constrictive pericarditis: thickened pericardium constraining the
+    heart. Characteristic septal bounce on echo, prominent Y-descent on
+    RA tracing, discordant ventricular pressure changes with
+    respiration. TREATABLE surgically (pericardiectomy).
+  - Restrictive cardiomyopathy: stiff heart muscle (amyloid, sarcoid,
+    radiation). Concordant ventricular pressure changes with
+    respiration. Medical management only.
+  When constrictive or restrictive physiology is described, frame the
+  distinction as important for treatment planning.
+
+- PSEUDONORMALIZATION OF DIASTOLIC PATTERN: A patient with known
+  diastolic dysfunction whose mitral inflow suddenly appears "normal"
+  (E/A 1-1.5) may have progressed from Grade I to Grade II
+  (pseudonormal) — this is WORSE, not better. Clues: elevated E/e'
+  > 14, enlarged LA, and symptoms despite "normal" E/A. Do not
+  describe pseudonormal pattern as improvement.
+
+- BUBBLE STUDY / CONTRAST STUDY — SHUNT DETECTION:
+  - Bubbles appearing in the left heart within 3-5 beats of right heart
+    opacification = right-to-left shunt (PFO or ASD)
+  - Bubbles appearing after 5+ beats = pulmonary AV malformation
+  - Clinical significance depends on shunt size and clinical context
+    (stroke workup, hypoxia). A small PFO is found in ~25% of the
+    population and is usually incidental.
+
+- LV APICAL THROMBUS VS TRABECULATIONS: When echo shows an apical
+  mass or density:
+  - Thrombus: associated with akinetic/dyskinetic apex, appears as
+    layered or mobile echodensity, confirmed by contrast echo or CMR
+  - Prominent trabeculations: normal variant (especially in young
+    patients or athletes), no associated wall motion abnormality
+  If the report identifies thrombus, explain that it may require blood
+  thinners; if trabeculations, explain as a normal structural variant.
+
+### Medication Effects on Test Interpretation
+
+- BETA-BLOCKER & HEART RATE RESPONSE: Patients on beta-blockers have
+  a BLUNTED heart rate response to exercise. Failure to reach 85% of
+  age-predicted max HR is EXPECTED on beta-blockers, not a sign of
+  chronotropic incompetence. Distinguish this from true inability to
+  raise HR due to sinus node disease. When stress test notes
+  "submaximal heart rate achieved" and patient is on beta-blocker,
+  explain: "The beta-blocker medication limits how fast the heart can
+  beat during exercise, which may reduce the test's ability to fully
+  assess blood flow."
+
+- DIURETIC EFFECTS ON FINDINGS: Diuretics can:
+  - Reduce or eliminate pericardial effusions (volume depletion)
+  - Lower filling pressures (LVEDP, PCWP) on cath
+  - Reduce LA size on echo
+  These changes reflect the medication effect, not necessarily disease
+  resolution. When comparing serial studies, note if diuretic therapy
+  changed between studies.
+
+- INOTROPIC SUPPORT & HEMODYNAMICS: When cath is performed while the
+  patient is on inotropes (dobutamine, milrinone):
+  - Cardiac output will be artificially improved
+  - Filling pressures may be lower than the patient's baseline
+  Note that hemodynamics on inotropic support do not reflect the
+  patient's native cardiac function.
+
+- ACE-I/ARB & REVERSE REMODELING: In patients on neurohormonal
+  blockade (ACE-I, ARB, ARNI, beta-blocker), serial imaging may show:
+  - Improved EF (remodeling response)
+  - Decreased LV volumes
+  - Improved T1/ECV on CMR (fibrosis regression)
+  These improvements are treatment effects — frame positively as
+  "the medications appear to be helping the heart recover."
+
+### Sex, Age & Demographic Context
+
+- SEX-SPECIFIC INTERPRETATION:
+  - Women have higher prevalence of microvascular disease (reduced CFR
+    without obstructive coronary stenosis) and HFpEF. A woman with
+    exertional symptoms, normal coronary anatomy, but reduced CFR
+    likely has microvascular dysfunction — not "nothing wrong."
+  - Women present with different CAD patterns: more plaque erosion
+    (acute events without severe stenosis) vs. plaque rupture in men.
+    A "clean" angiogram in a symptomatic woman does not exclude CAD.
+  - Reference ranges for chamber sizes are sex-specific — always use
+    the appropriate reference for the patient's sex.
+
+- PREGNANCY & CARDIAC INTERPRETATION: During pregnancy:
+  - Cardiac output increases 30-50%, heart rate increases
+  - Mild LV dilation and physiologic MR/TR are normal
+  - EF may appear mildly lower due to volume loading
+  - Pericardial effusion (small) is common in third trimester
+  Do not interpret pregnancy-related changes as pathologic. Post-partum
+  studies (> 6 months) better reflect true baseline cardiac function.
+
+- AGE-RELATED INTERPRETATION:
+  - Grade I diastolic dysfunction (impaired relaxation) is nearly
+    universal after age 60 — frame as age-appropriate rather than
+    alarming: "some stiffening of the heart muscle is expected with
+    age"
+  - Mild aortic sclerosis (thickening without stenosis) is common
+    after age 65 — frame as age-related wear, not disease
+  - Mild mitral annular calcification is common in elderly — benign
+    unless causing stenosis
+  - EF in the low-normal range (50-55%) in elderly patients should not
+    be flagged as concerning unless there is a decline from prior
+
+- CALCIUM SCORE IN ASYMPTOMATIC PATIENTS: A high calcium score in a
+  patient without symptoms or known heart disease should be framed as
+  a risk marker for future events, NOT an indication of imminent
+  danger. Explain: "Calcium in the coronary arteries shows there is
+  some buildup over time. This is a marker that helps guide preventive
+  treatment — things like cholesterol medication, blood pressure
+  control, and lifestyle changes — to reduce the chance of future
+  problems." Do NOT suggest catheterization based on calcium score
+  alone.
+
+### Patient Communication — Specific Pitfalls
+
+- MARGINAL STENOSIS (40-60%) PATIENT COMMUNICATION: Moderate stenosis
+  on CTA or angiography causes significant patient anxiety. Frame
+  clearly: "There is some narrowing in [artery], but it is not severe
+  enough to significantly limit blood flow. This is the type of finding
+  your doctor will monitor over time and manage with medications and
+  lifestyle changes rather than a procedure." Do NOT leave the severity
+  ambiguous — explicitly state it is NOT flow-limiting.
+
+- BALANCED ISCHEMIA COMMUNICATION: When PET/SPECT shows globally
+  reduced flow (low MBF or CFR in all territories) but relative
+  perfusion images appear normal, explain: "While the images comparing
+  different areas of the heart look similar, the overall amount of
+  blood flow to the heart muscle is reduced. This pattern can indicate
+  disease affecting multiple arteries evenly, which is an important
+  finding your doctor will want to discuss." Do not dismiss as normal
+  just because relative images look symmetric.
+
+- MICROVASCULAR DYSFUNCTION COMMUNICATION: When CFR is globally
+  reduced without obstructive coronary disease, explain: "The large
+  arteries of the heart appear open, but the smaller blood vessels
+  may not be delivering blood as effectively as they should. This
+  condition — sometimes called small vessel disease — can cause
+  symptoms like chest discomfort or shortness of breath and is
+  treatable with medications." Do NOT tell the patient "your arteries
+  are clean" and leave it at that.
+
+- BORDERLINE VIABILITY COMMUNICATION: When scar transmurality is
+  25-50% (borderline viable on CMR), avoid false precision. Frame as:
+  "There is some scar tissue in this area of the heart, but there also
+  appears to be some living muscle. Whether this area can recover
+  function with treatment is uncertain and something your doctor will
+  consider when planning next steps."
+
+- "NORMAL EF" WITH DIASTOLIC DYSFUNCTION: Do NOT equate preserved EF
+  with a normal heart. When EF is preserved but diastolic markers are
+  abnormal (elevated E/e', enlarged LA, elevated filling pressures),
+  explain: "Your heart's pumping strength is preserved, but the heart
+  muscle is stiffer than normal and has difficulty relaxing to fill
+  with blood. This can cause symptoms like shortness of breath,
+  especially with activity."
+
+### Strain / Global Longitudinal Strain (GLS)
+
+- GLS (GLOBAL LONGITUDINAL STRAIN): Measures myocardial deformation as a
+  percentage (negative value — more negative = better contraction).
+  - Normal: -18% to -22% (varies by vendor; always note the reference)
+  - Borderline: -16% to -18%
+  - Abnormal: > -16% (less negative, i.e. weaker contraction)
+  GLS detects subclinical LV dysfunction BEFORE ejection fraction drops. This
+  is critical in: chemotherapy cardiotoxicity monitoring (drop of > 15%
+  relative change from baseline is significant), HFpEF (EF preserved but GLS
+  reduced), early cardiomyopathy detection, and infiltrative disease.
+  When EF is normal but GLS is reduced, explain: "While the overall pumping
+  percentage is normal, the detailed strain measurement shows the heart muscle
+  is not contracting as efficiently as expected — this can be an early sign
+  of changes before the pumping percentage drops."
+
+- REGIONAL STRAIN: Reduced strain in specific segments maps to coronary
+  territories similarly to wall motion abnormalities. Apical sparing pattern
+  (preserved apical strain with reduced basal strain) is characteristic of
+  cardiac amyloidosis.
+
+### Valvular Severity Criteria — Complete
+
+- MITRAL STENOSIS SEVERITY:
+  - Mild: MVA > 1.5 cm², mean gradient < 5 mmHg
+  - Moderate: MVA 1.0-1.5 cm², mean gradient 5-10 mmHg
+  - Severe: MVA < 1.0 cm², mean gradient > 10 mmHg
+  Context: MVA by planimetry is most reliable. Gradient is flow-dependent
+  (increases with tachycardia, pregnancy, exercise).
+
+- MITRAL REGURGITATION — QUANTITATIVE SEVERITY:
+  - Mild: EROA < 0.20 cm², regurgitant volume < 30 mL, vena contracta < 3mm
+  - Moderate: EROA 0.20-0.39 cm², regurgitant volume 30-59 mL, VC 3-6.9mm
+  - Severe: EROA >= 0.40 cm², regurgitant volume >= 60 mL, VC >= 7mm
+  For primary (degenerative) MR, surgical thresholds are well-established.
+  For secondary (functional) MR, EROA >= 0.20 cm² may already be prognostically
+  significant. Always specify primary vs secondary when the report distinguishes.
+
+- TRICUSPID REGURGITATION SEVERITY:
+  - Mild: vena contracta < 3mm, small central jet
+  - Moderate: vena contracta 3-6.9mm, intermediate jet
+  - Severe: vena contracta >= 7mm, large jet with hepatic vein flow reversal
+  - Massive/Torrential: very wide vena contracta, free-flowing regurgitation
+  TR is often secondary to RV dilation or pulmonary hypertension. When TR
+  is secondary, RVSP estimated from TR jet reflects pulmonary pressures.
+
+- PULMONIC VALVE DISEASE: Pulmonic stenosis is almost always congenital.
+  - Mild: peak gradient < 36 mmHg
+  - Moderate: peak gradient 36-64 mmHg
+  - Severe: peak gradient > 64 mmHg
+  Pulmonic regurgitation is common and physiological (trace to mild).
+  Significant PR suggests pulmonary hypertension or post-surgical (repaired
+  Tetralogy of Fallot).
+
+### Cardiac Amyloidosis
+
+- ATTR vs AL AMYLOIDOSIS: Two main types with very different implications.
+  - ATTR (transthyretin): More common, especially in elderly. Diagnosed by
+    pyrophosphate (PYP/DPD/HMDP) nuclear scan showing Grade 2-3 cardiac
+    uptake with negative serum/urine light chains. Increasingly treatable
+    with tafamidis. Wild-type ATTR is age-related; hereditary ATTR has
+    genetic mutations (V122I common in African Americans).
+  - AL (light chain): Less common, caused by plasma cell dyscrasia. More
+    aggressive, requires chemotherapy. Diagnosed by serum/urine light chains,
+    bone marrow biopsy, and endomyocardial biopsy.
+  Echo/CMR clues: increased wall thickness without voltage on EKG (voltage-
+  mass mismatch), diastolic dysfunction, apical sparing strain pattern,
+  pericardial effusion, biatrial enlargement, restrictive filling.
+  CMR: diffuse subendocardial or transmural LGE, difficulty nulling
+  myocardium, elevated native T1 and ECV.
+
+### Adult Congenital Heart Disease
+
+- BICUSPID AORTIC VALVE: Present in 1-2% of the population. Associated with
+  aortopathy (ascending aortic dilation) independent of valve function.
+  Monitor aortic root AND ascending aorta dimensions even if valve function
+  is normal. Surgical threshold for ascending aorta: 5.5 cm (or 5.0 cm if
+  planning valve surgery, rapid growth > 5mm/year, or family history of
+  dissection).
+
+- REPAIRED ASD/VSD: After surgical or percutaneous closure, look for
+  residual shunting, RV size normalization (may take months), and device
+  position. Persistent RV dilation post-repair may indicate residual shunt,
+  elevated pulmonary pressures, or irreversible RV remodeling.
+
+- TETRALOGY OF FALLOT (REPAIRED): Key long-term issues: pulmonary
+  regurgitation (from patch repair), RV dilation, RV dysfunction, residual
+  RVOT obstruction, arrhythmias. RV volumes on CMR guide timing of
+  pulmonary valve replacement (RVEDVi > 150 mL/m² or RVESVi > 80 mL/m²).
+
+- COARCTATION OF AORTA: Even after repair, monitor for re-coarctation
+  (upper-to-lower extremity BP gradient > 20 mmHg), hypertension, bicuspid
+  aortic valve (50% coexistence), and aortic aneurysm at repair site.
+
+- FONTAN PHYSIOLOGY: Single-ventricle patients with Fontan circulation have
+  unique hemodynamics — no subpulmonary ventricle, passive pulmonary blood
+  flow. "Normal" values do not apply. Systemic ventricular EF is typically
+  lower, CVP is elevated, and exercise capacity is limited.
+
+### Structural Heart Imaging (CT Planning)
+
+- TAVR CT PLANNING: CT provides aortic annulus sizing (area-derived diameter),
+  coronary heights, access route assessment (femoral, subclavian, transapical),
+  calcium distribution, and LVOT dimensions. Explain that this CT is a
+  planning study to determine the best approach and valve size, not a
+  diagnostic study for coronary artery disease.
+
+- LAA OCCLUSION (WATCHMAN) CT: Evaluates left atrial appendage morphology
+  (chicken wing, windsock, cactus, cauliflower), LAA orifice dimensions,
+  depth, and relationship to surrounding structures. Landing zone measurements
+  determine device sizing.
+
+### EP Study / Ablation
+
+- EP STUDY FINDINGS: Evaluate inducibility of arrhythmias (VT, SVT),
+  conduction intervals (AH, HV), sinus node function (SNRT), and AV nodal
+  properties. HV interval > 70ms suggests infranodal conduction disease.
+  Non-inducibility of clinical arrhythmia after ablation is the typical
+  endpoint.
+
+- ABLATION RESULTS: Report the target arrhythmia, ablation strategy (point-
+  by-point, cryoablation, PFA), lesion location, acute success (non-
+  inducibility or isolation), and any complications. For atrial fibrillation
+  ablation, pulmonary vein isolation is the cornerstone — report which veins
+  were isolated and whether entrance/exit block was achieved.
+
+### Holter Monitor / Event Monitor / Ambulatory Monitoring
+
+- PVC BURDEN: Total PVCs as percentage of all beats over recording period.
+  - < 1%: Normal, very common
+  - 1-10%: Mild to moderate; usually benign if heart structure is normal
+  - > 10%: Consider PVC-induced cardiomyopathy — correlate with LV function
+  - > 20%: High burden, significant risk of cardiomyopathy if sustained
+  Frequency alone does not determine significance — morphology (mono- vs
+  polymorphic), coupling interval, and presence of runs matter.
+
+- ATRIAL FIBRILLATION BURDEN: Percentage of time in AFib during monitoring.
+  Any AFib (even brief paroxysms) may warrant anticoagulation assessment
+  using CHA2DS2-VASc score. Burden > 6-12% may correlate with symptoms
+  and stroke risk.
+
+- PAUSES: Longest RR interval. Pauses > 3 seconds during wakefulness are
+  significant and may warrant pacemaker evaluation. Nocturnal pauses up to
+  2-3 seconds can be normal (vagal tone). Context of symptoms during
+  documented pauses is crucial.
+
+- HEART RATE VARIABILITY: Reduced HRV may indicate autonomic dysfunction.
+  Not routinely reported but may appear in some Holter analyses.
+
+- SUPRAVENTRICULAR RUNS: Brief SVT runs (3-30 beats) are very common and
+  usually benign. Sustained SVT (> 30 seconds or symptomatic) warrants
+  evaluation.
+
+### Pacemaker / ICD / CRT Device Interrogation
+
+- PACING PERCENTAGES: Atrial pacing % and ventricular pacing %. High
+  unnecessary RV pacing (> 40%) can worsen heart failure in some patients.
+  CRT devices aim for biventricular pacing > 98% for optimal benefit.
+
+- BATTERY STATUS: Reported as voltage and estimated longevity.
+  - BOL (beginning of life): Full battery
+  - ERI (elective replacement indicator): Generator replacement recommended
+    within months
+  - EOL (end of life): Urgent replacement needed
+  Typical device longevity is 7-12 years depending on pacing needs.
+
+- IMPEDANCE: Lead impedances reflect lead integrity.
+  - Normal: 200-2000 ohms (varies by lead type)
+  - High impedance: May indicate lead fracture
+  - Low impedance: May indicate insulation break
+  Trending is more important than absolute values.
+
+- ARRHYTHMIA LOG: Review stored episodes — VT/VF episodes treated with
+  ATP (anti-tachycardia pacing) or shocks. Inappropriate shocks (for SVT
+  or lead noise misclassified as VT) require programming adjustment.
+  Episode electrograms help classify appropriateness.
+
+- THRESHOLD TESTING: Capture threshold (minimum energy to pace the heart).
+  Rising thresholds over time may indicate lead maturation, dislodgement,
+  or fibrosis. Sudden increase warrants evaluation.
+
 ### Cross-Test Rules (All Cardiac Types)
 
 - COMPARISON TO PRIOR STUDIES: When comparing to a previous report:
@@ -2234,6 +2766,27 @@ Apply these cardiac-specific interpretation rules:
     to review carefully with you"
   NEVER use the word "risk" in patient-facing text. Instead, frame
   findings in terms of importance and what the doctor will discuss.
+
+- CROSS-MODAL DISCORDANCE: When anatomy and function disagree (e.g.
+  70% stenosis on CTA but FFR > 0.80 on cath, or normal relative
+  perfusion on SPECT but reduced absolute MBF on PET):
+  - Explain that different tests measure different things — anatomy
+    vs. blood flow function
+  - "The narrowing visible on imaging does not appear to be
+    significantly limiting blood flow based on the functional testing"
+  - Functional assessment generally guides treatment decisions more
+    than anatomy alone
+  Do NOT present discordance as contradictory or confusing. Frame it
+  as complementary information that helps the doctor make better
+  decisions.
+
+- MULTI-MODALITY HFpEF SYNTHESIS: When echo shows preserved EF +
+  abnormal diastolic markers AND cath shows elevated LVEDP/PCWP AND/OR
+  CMR shows elevated T1/ECV, synthesize these findings into a unified
+  HFpEF picture. Do not describe each test's findings in isolation —
+  connect them: "Multiple tests confirm that while the heart pumps
+  normally, the heart muscle is stiffer than it should be, leading to
+  elevated pressures."
 
 ## Abbreviation Expansion — Always Spell Out for Patients
 
@@ -2692,6 +3245,203 @@ When you identify a pattern, lead with the pattern name and then explain how
 the individual values support it. This is how physicians think — patterns first,
 individual values second.
 
+### Arterial Blood Gas (ABG) Interpretation
+
+- SYSTEMATIC ABG APPROACH:
+  1. Assess oxygenation: PaO2 (normal 80-100 mmHg on room air). PaO2 < 60 = hypoxemia.
+  2. Assess pH: Normal 7.35-7.45. < 7.35 = acidemia. > 7.45 = alkalemia.
+  3. Identify primary disorder:
+     - Respiratory acidosis: pH low, pCO2 high (> 45 mmHg)
+     - Respiratory alkalosis: pH high, pCO2 low (< 35 mmHg)
+     - Metabolic acidosis: pH low, HCO3 low (< 22 mEq/L)
+     - Metabolic alkalosis: pH high, HCO3 high (> 26 mEq/L)
+  4. Assess compensation (the body's attempt to normalize pH):
+     - Metabolic acidosis: expected pCO2 = (1.5 × HCO3) + 8 ± 2 (Winter's formula)
+     - Metabolic alkalosis: expected pCO2 rises ~0.7 for each 1 mEq/L rise in HCO3
+     - Respiratory acidosis (acute): HCO3 rises 1 for each 10 rise in pCO2
+     - Respiratory acidosis (chronic): HCO3 rises 3.5 for each 10 rise in pCO2
+     - Respiratory alkalosis (acute): HCO3 falls 2 for each 10 fall in pCO2
+     - Respiratory alkalosis (chronic): HCO3 falls 5 for each 10 fall in pCO2
+  5. If metabolic acidosis, calculate anion gap: Na - (Cl + HCO3). Normal 8-12.
+     - High AG (> 12): MUDPILES — Methanol, Uremia, DKA, Propylene glycol,
+       Isoniazid/Iron, Lactic acidosis, Ethylene glycol, Salicylates
+     - Normal AG (hyperchloremic): diarrhea, RTA, saline infusion, ureteral diversion
+  6. If high AG, calculate delta-delta: (AG - 12) / (24 - HCO3).
+     - Ratio > 2: concurrent metabolic alkalosis
+     - Ratio < 1: concurrent non-AG metabolic acidosis
+
+- A-a GRADIENT: PAO2 - PaO2. Normal = (Age/4) + 4. Elevated A-a gradient
+  with hypoxemia suggests V/Q mismatch (PE, pneumonia), shunt, or diffusion
+  impairment. Normal A-a gradient with hypoxemia suggests hypoventilation.
+
+- LACTATE: Normal < 2 mmol/L. Elevated lactate indicates tissue hypoxia,
+  sepsis, seizures, ischemia, or medications (metformin, linezolid).
+  Lactate > 4 mmol/L is associated with significantly increased mortality.
+
+### Body Fluid Analysis
+
+- PLEURAL FLUID (LIGHT'S CRITERIA): Determines exudate vs transudate.
+  Exudate if ANY of: protein ratio > 0.5 (fluid/serum), LDH ratio > 0.6
+  (fluid/serum), or fluid LDH > 2/3 upper limit of normal serum LDH.
+  - Transudates: heart failure, cirrhosis, nephrotic syndrome
+  - Exudates: infection, malignancy, PE, autoimmune, pancreatitis
+  Additional fluid analysis: glucose (< 60 suggests infection, rheumatoid,
+  malignancy), pH (< 7.2 suggests empyema if infectious), cell count
+  (neutrophil-predominant = bacterial; lymphocyte-predominant = TB, malignancy),
+  cytology, cultures, adenosine deaminase (ADA) for TB.
+
+- PERITONEAL FLUID / PARACENTESIS (SAAG):
+  Serum-ascites albumin gradient = serum albumin - ascites albumin.
+  - SAAG >= 1.1 g/dL: portal hypertension (cirrhosis, heart failure, Budd-Chiari)
+  - SAAG < 1.1 g/dL: non-portal hypertension (malignancy, TB, pancreatitis, nephrotic)
+  Cell count: > 250 PMN/µL = spontaneous bacterial peritonitis (SBP).
+  Total protein in ascites: < 1.0 g/dL higher SBP risk. Culture in blood culture
+  bottles at bedside increases yield.
+
+- CEREBROSPINAL FLUID (CSF):
+  - Normal: WBC < 5 (all lymphocytes), protein 15-45 mg/dL, glucose 40-70 mg/dL
+    (or > 60% of serum glucose)
+  - Bacterial meningitis: high WBC (>1000, neutrophil-predominant), high protein,
+    low glucose (< 40% of serum)
+  - Viral meningitis: moderate WBC (10-500, lymphocyte-predominant), mildly
+    elevated protein, normal glucose
+  - TB/fungal: moderate WBC (lymphocyte-predominant), high protein, low glucose
+  - Guillain-Barré (AIDP): elevated protein with normal cell count
+    (albuminocytologic dissociation)
+  Opening pressure: normal 6-25 cm H2O. Elevated in IIH, meningitis, mass effect.
+
+- JOINT FLUID (SYNOVIAL FLUID):
+  - Normal: clear, viscous, WBC < 200
+  - Non-inflammatory (osteoarthritis): clear, WBC < 2000
+  - Inflammatory (RA, gout, pseudogout): cloudy, WBC 2000-50,000
+  - Septic: turbid/purulent, WBC > 50,000 (often > 100,000), low glucose
+  Crystal analysis: needle-shaped negative birefringent = gout (monosodium urate).
+  Rhomboid-shaped positive birefringent = pseudogout (CPPD).
+
+### Autoimmune & Rheumatologic Panels — Detailed
+
+- ANA (ANTINUCLEAR ANTIBODY):
+  - Titers: 1:40 common in healthy individuals (up to 30%). 1:160 more
+    clinically significant. Higher titers (1:320+) warrant further workup.
+  - Patterns and associations:
+    - Homogeneous: SLE, drug-induced lupus
+    - Speckled: SLE, Sjögren's, mixed connective tissue disease (MCTD)
+    - Nucleolar: scleroderma (systemic sclerosis)
+    - Centromere: limited scleroderma (CREST)
+    - Peripheral (rim): SLE (correlates with anti-dsDNA)
+  A positive ANA alone does NOT diagnose lupus. Many healthy people and
+  patients with other conditions have positive ANA.
+
+- SPECIFIC ANTIBODIES:
+  - Anti-dsDNA: Highly specific for SLE. Titers correlate with disease activity,
+    especially lupus nephritis.
+  - Anti-Smith: Very specific for SLE (but only ~30% sensitive).
+  - Anti-RNP: High titers suggest MCTD. Also present in SLE.
+  - Anti-SSA (Ro) / Anti-SSB (La): Sjögren's syndrome, subacute cutaneous lupus,
+    neonatal lupus. Anti-SSA positive mothers: monitor fetus for congenital heart block.
+  - Anti-Scl-70 (topoisomerase I): Diffuse systemic sclerosis with ILD risk.
+  - Anti-centromere: Limited systemic sclerosis (CREST), pulmonary hypertension risk.
+  - Anti-Jo-1 (and other synthetases): Antisynthetase syndrome — myositis + ILD +
+    mechanic's hands + arthritis.
+
+- ANCA (ANTI-NEUTROPHIL CYTOPLASMIC ANTIBODY):
+  - c-ANCA (anti-PR3): Granulomatosis with polyangiitis (GPA, formerly Wegener's)
+  - p-ANCA (anti-MPO): Microscopic polyangiitis (MPA), eosinophilic GPA (Churg-Strauss)
+  - ANCA-associated vasculitis can affect kidneys (rapidly progressive GN), lungs
+    (hemorrhage), sinuses, and skin. Positive ANCA in the right clinical context
+    is highly significant.
+
+- ANTI-PHOSPHOLIPID ANTIBODIES:
+  - Anticardiolipin IgG/IgM, anti-beta-2 glycoprotein I IgG/IgM, lupus anticoagulant
+  - Antiphospholipid syndrome: recurrent thrombosis + pregnancy loss + persistently
+    positive antibodies (must confirm positive on 2 occasions >= 12 weeks apart).
+  - Lupus anticoagulant paradoxically PROLONGS aPTT in vitro but INCREASES
+    thrombosis risk in vivo.
+
+- COMPLEMENT (C3, C4):
+  - Low C3 + low C4: active SLE (especially nephritis), cryoglobulinemia
+  - Low C4 only: hereditary angioedema, cryoglobulinemia, hepatitis C
+  - Normal complement with positive ANA: less likely to be active lupus
+  Complement is consumed during active immune complex disease. Trending
+  complement levels helps monitor lupus disease activity.
+
+- RHEUMATOID FACTOR (RF) / ANTI-CCP:
+  - RF: sensitive but not specific — elevated in many conditions (infections,
+    liver disease, Sjögren's, sarcoid). ~5% of healthy elderly are RF positive.
+  - Anti-CCP: much more specific for RA (~95% specificity). Positive anti-CCP
+    with RF is strongly predictive of RA. Anti-CCP positive RA has higher risk
+    of erosive disease.
+
+### Endocrine Testing — Expanded
+
+- PTH (PARATHYROID HORMONE):
+  - High PTH + high calcium: Primary hyperparathyroidism (adenoma most common)
+  - High PTH + low calcium: Secondary hyperparathyroidism (CKD, vitamin D deficiency)
+  - High PTH + normal calcium: Normocalcemic hyperparathyroidism (early/mild)
+  - Low/suppressed PTH + high calcium: Malignancy (PTHrP), granulomatous disease,
+    vitamin D toxicity, milk-alkali syndrome
+  Intact PTH is the standard assay. PTHrP is a separate test for malignancy workup.
+
+- ACTH STIMULATION TEST (COSYNTROPIN):
+  - Normal response: cortisol >= 18 µg/dL at 30 or 60 minutes post-cosyntropin
+  - Failed response (< 18): adrenal insufficiency confirmed
+  - Does NOT distinguish primary (adrenal) from secondary (pituitary) — need
+    baseline ACTH: high ACTH = primary (Addison's), low ACTH = secondary
+
+- DEXAMETHASONE SUPPRESSION TEST:
+  - Overnight 1mg DST: cortisol < 1.8 µg/dL at 8am = normal (Cushing's excluded)
+  - Failed suppression (>= 1.8): proceed to confirmatory testing (24-hr urine
+    cortisol, late-night salivary cortisol)
+  - High-dose DST (8mg): helps distinguish pituitary Cushing's (suppresses) from
+    ectopic ACTH or adrenal adenoma (does not suppress)
+
+- ALDOSTERONE / RENIN RATIO (ARR):
+  - ARR > 30 with aldosterone > 15 ng/dL: screen positive for primary aldosteronism
+  - Confirm with salt loading test, fludrocortisone suppression, or saline infusion
+  - Medications affect results: hold spironolactone 6 weeks, ACE-I/ARBs 2 weeks,
+    beta-blockers affect renin. Adjust medications before testing.
+
+- SEX HORMONES:
+  - Male hypogonadism: total testosterone < 300 ng/dL (confirm with 2 morning draws).
+    Low T + low/normal LH/FSH = secondary (pituitary). Low T + high LH/FSH = primary.
+  - Female PCOS workup: elevated total/free testosterone, DHEA-S, 17-OH progesterone
+    (to exclude late-onset CAH). LH:FSH ratio > 2:1 suggestive but not diagnostic.
+  - AMH (anti-Müllerian hormone): reflects ovarian reserve. Low AMH (< 1.0 ng/mL)
+    suggests diminished ovarian reserve.
+
+- IGF-1: Screening for acromegaly (elevated) or GH deficiency (low).
+  Age-adjusted normal ranges are essential. Elevated IGF-1 → confirm with
+  oral glucose tolerance test (GH should suppress to < 1 ng/mL; failure to
+  suppress confirms acromegaly).
+
+### Drug Levels / Therapeutic Drug Monitoring
+
+- DIGOXIN: Therapeutic range 0.8-2.0 ng/mL (heart failure target: 0.5-0.9 ng/mL).
+  Toxicity symptoms: nausea, visual changes, arrhythmias. Draw trough level
+  >= 6 hours after dose. Toxicity potentiated by hypokalemia, hypomagnesemia,
+  hypothyroidism, and renal impairment.
+
+- VANCOMYCIN: AUC/MIC-based dosing now preferred over trough-based.
+  Traditional troughs: 15-20 µg/mL for serious infections. Nephrotoxicity
+  risk increases with supratherapeutic levels. Monitor renal function concurrently.
+
+- PHENYTOIN: Total therapeutic range 10-20 µg/mL. In hypoalbuminemia, correct
+  using Sheiner-Tozer equation: adjusted level = measured / (0.2 × albumin + 0.1).
+  Free (unbound) phenytoin is more reliable in critically ill, hypoalbuminemic,
+  or uremic patients.
+
+- LITHIUM: Therapeutic range 0.6-1.2 mEq/L (acute mania: 0.8-1.2; maintenance:
+  0.6-0.8). Toxicity > 1.5 mEq/L. Narrow therapeutic index — dehydration, NSAIDs,
+  ACE-I, and diuretics can precipitate toxicity. Monitor TSH and creatinine.
+
+- VALPROIC ACID: Therapeutic range 50-100 µg/mL. Free level important when total
+  is borderline (protein-binding is saturable). Monitor ammonia (can cause
+  hyperammonemia even at therapeutic levels), LFTs, and platelets.
+
+- AMINOGLYCOSIDES (gentamicin, tobramycin): Peak 5-10 µg/mL, trough < 2 µg/mL
+  (conventional dosing). Extended-interval dosing uses single daily dose with
+  level-based nomograms. Nephrotoxicity and ototoxicity are cumulative.
+
 """
 
 _CLINICAL_DOMAIN_KNOWLEDGE_IMAGING = """\
@@ -2903,12 +3653,195 @@ Apply these imaging-specific interpretation rules:
   "Suspicious" or "pleomorphic" calcifications warrant biopsy. "Scattered
   benign-appearing calcifications" is a common, benign finding.
 
+### CT Abdomen/Pelvis — Acute Findings
+
+- APPENDICITIS: Enlarged appendix (> 6mm diameter), periappendiceal fat
+  stranding, appendicolith (calcified stone in appendix). Perforation if
+  extraluminal air/fluid or abscess. A normal-caliber appendix with no
+  surrounding inflammation effectively excludes appendicitis.
+
+- SMALL BOWEL OBSTRUCTION (SBO): Dilated small bowel (> 3cm) with
+  decompressed distal bowel. Transition point identifies the level.
+  - Causes: adhesions (post-surgical, most common), hernia, mass, stricture
+  - Closed loop: C-shaped or U-shaped dilated loop with converging mesentery —
+    surgical emergency (risk of strangulation/ischemia)
+  - Signs of ischemia: bowel wall thickening, mesenteric haziness, reduced
+    enhancement, pneumatosis (air in bowel wall)
+
+- MESENTERIC ISCHEMIA: Occlusion or thrombosis of SMA/IMA/celiac artery.
+  CT findings: bowel wall thickening or paper-thin bowel wall, reduced
+  enhancement, mesenteric fat stranding, pneumatosis, portal venous gas.
+  "Pain out of proportion to exam" is the classic clinical scenario.
+
+- DIVERTICULITIS vs DIVERTICULOSIS: Diverticulosis = outpouchings without
+  inflammation (extremely common, incidental). Diverticulitis = inflamed
+  diverticulum with pericolic fat stranding, wall thickening, +/- abscess,
+  perforation, or fistula. Complicated diverticulitis (abscess, perforation,
+  fistula) may require intervention.
+
+### Ultrasound-Specific Imaging
+
+- THYROID ULTRASOUND (TI-RADS — ACR Thyroid Imaging Reporting and Data System):
+  - TR1: Benign — no FNA needed
+  - TR2: Not suspicious — no FNA needed
+  - TR3: Mildly suspicious — FNA if >= 2.5 cm, follow if >= 1.5 cm
+  - TR4: Moderately suspicious — FNA if >= 1.5 cm, follow if >= 1.0 cm
+  - TR5: Highly suspicious — FNA if >= 1.0 cm, follow if >= 0.5 cm
+  Suspicious features: solid composition, hypoechogenicity, irregular margins,
+  taller-than-wide shape, punctate echogenic foci (microcalcifications).
+  Purely cystic and spongiform nodules are almost always benign.
+
+- RENAL ULTRASOUND:
+  - Kidney size: normal 9-12 cm. Small kidneys (< 9 cm) suggest chronic disease.
+    Asymmetry > 2 cm warrants investigation (renal artery stenosis, reflux).
+  - Echogenicity: increased cortical echogenicity (brighter than liver) suggests
+    medical renal disease (CKD, diabetes, hypertension).
+  - Hydronephrosis grading: mild (pelvic dilation only), moderate (calyceal
+    dilation), severe (cortical thinning). Bilateral hydronephrosis suggests
+    distal obstruction (bladder outlet, bilateral stones, mass).
+  - Simple cysts: anechoic, thin-walled, posterior enhancement = benign (Bosniak I).
+    Complex cysts with septations, calcifications, or solid components need
+    further evaluation (Bosniak classification).
+
+- HEPATOBILIARY ULTRASOUND:
+  - Fatty liver (steatosis): increased echogenicity compared to kidney.
+    Mild/moderate/severe grading. Very common — prevalence ~25% in adults.
+    MASLD (formerly NAFLD) requires exclusion of significant alcohol use.
+  - Portal hypertension signs: splenomegaly, portal vein diameter > 13mm,
+    reversed portal flow, ascites, varices, recanalized umbilical vein.
+  - Gallbladder: gallstones are extremely common and usually incidental.
+    Cholecystitis = stones + wall thickening (> 3mm) + pericholecystic fluid +
+    sonographic Murphy's sign. Polyps > 10mm warrant further evaluation.
+  - Common bile duct: normal < 6mm (< 8-10mm if post-cholecystectomy).
+    Dilation suggests distal obstruction (stone, stricture, mass).
+
+- PELVIC ULTRASOUND:
+  - Endometrial thickness: premenopausal varies by cycle. Postmenopausal:
+    > 4mm on tamoxifen or > 4-5mm without tamoxifen warrants evaluation for
+    endometrial pathology (if bleeding is present).
+  - Ovarian findings (O-RADS — Ovarian-Adnexal Reporting and Data System):
+    - O-RADS 1: Normal
+    - O-RADS 2: Almost certainly benign (simple cyst, hemorrhagic cyst,
+      endometrioma, dermoid with classic features)
+    - O-RADS 3: Low risk of malignancy (< 5%)
+    - O-RADS 4: Intermediate risk (10-50%)
+    - O-RADS 5: High risk (> 50%)
+  - Uterine fibroids: extremely common (up to 80% of women by age 50).
+    Size, location (submucosal, intramural, subserosal), and symptoms
+    determine clinical significance.
+
+### MRI Organ-Specific Interpretation
+
+- MRI LIVER (LI-RADS — Liver Imaging Reporting and Data System):
+  For patients at risk for HCC (cirrhosis, chronic hepatitis B):
+  - LR-1: Definitely benign
+  - LR-2: Probably benign
+  - LR-3: Intermediate probability of HCC
+  - LR-4: Probably HCC
+  - LR-5: Definitely HCC (arterial enhancement + washout + capsule)
+  - LR-M: Probably malignant but not HCC-specific (cholangiocarcinoma, metastasis)
+  Key features: arterial phase hyperenhancement (APHE), non-peripheral washout,
+  enhancing capsule, threshold growth (>= 50% increase in < 6 months).
+  Proton density fat fraction (PDFF) by MRI quantifies hepatic steatosis more
+  accurately than ultrasound. PDFF > 5% = steatosis.
+
+- MRI PROSTATE (PI-RADS — Prostate Imaging Reporting and Data System):
+  - PI-RADS 1: Very low (clinically significant cancer is highly unlikely)
+  - PI-RADS 2: Low
+  - PI-RADS 3: Intermediate (equivocal)
+  - PI-RADS 4: High (clinically significant cancer is likely)
+  - PI-RADS 5: Very high (clinically significant cancer is highly likely)
+  Dominant sequence differs by zone: DWI/ADC for peripheral zone, T2W for
+  transition zone. Extraprostatic extension (EPE) and seminal vesicle invasion
+  upstage the finding.
+
+- MR ENTEROGRAPHY (Crohn's Disease Assessment):
+  - Active inflammation: bowel wall thickening (> 3mm), mural hyperenhancement,
+    restricted diffusion, mesenteric fat stranding, vasa recta engorgement
+    ("comb sign")
+  - Fibrotic stricture: wall thickening WITHOUT significant enhancement
+  - Distinguishing active inflammation (treatable with medication) from fibrosis
+    (may need surgery) is a key MRI role. T2 signal helps: high T2 = edema/
+    inflammation, low T2 = fibrosis.
+  - Fistulas and abscesses: MR is excellent for mapping perianal fistulas and
+    detecting inter-loop abscesses.
+
+### Nuclear Medicine — Non-Cardiac
+
+- V/Q SCAN (VENTILATION-PERFUSION):
+  Evaluates for pulmonary embolism. Read as:
+  - Normal: matched ventilation and perfusion, no defects → PE excluded
+  - Low probability: small subsegmental mismatches
+  - Intermediate: non-diagnostic — cannot confirm or exclude PE
+  - High probability: >= 2 large segmental mismatches (perfusion defect with
+    normal ventilation) → PE likely (>= 80% probability)
+  V/Q preferred over CTA when: contrast allergy, renal insufficiency, pregnancy
+  (lower radiation to breast tissue), young patients.
+
+- BONE SCAN (SKELETAL SCINTIGRAPHY):
+  Detects areas of increased bone turnover (osteoblastic activity). Uses Tc-99m MDP.
+  - Metastatic disease: multiple randomly distributed foci ("hot spots")
+  - Degenerative disease: uptake at joints (knees, spine, hands) — very common
+  - Fracture: focal linear uptake at fracture site
+  - Paget's disease: intense uptake involving entire bone(s)
+  - "Superscan": diffusely increased skeletal uptake with absent kidney activity —
+    suggests widespread metastatic disease (prostate, breast).
+  SPECT/CT improves specificity by co-localizing with anatomy.
+
+- THYROID SCAN / UPTAKE:
+  - Diffusely increased uptake: Graves' disease
+  - Focally increased uptake ("hot" nodule): toxic adenoma (usually benign)
+  - Decreased/absent uptake ("cold" nodule): higher malignancy risk (~15-20%)
+  - Diffusely decreased uptake: thyroiditis (subacute, postpartum, silent)
+  RAIU (radioactive iodine uptake): elevated in Graves', normal/low in
+  thyroiditis, low in exogenous thyroid hormone or iodine excess.
+
+- PET/CT ONCOLOGY (FDG-PET):
+  - SUV (standardized uptake value): Semi-quantitative measure of metabolic
+    activity. Higher SUV generally suggests more metabolically active tissue
+    (malignancy), but is not specific.
+  - SUV thresholds vary by tumor type. No universal "normal" cutoff.
+  - False positives: infection, inflammation, granulomatous disease (sarcoid),
+    recent surgery, brown fat (supraclavicular uptake in cold weather).
+  - False negatives: low-grade tumors (some lymphomas, bronchoalveolar carcinoma),
+    hyperglycemia (glucose competes with FDG), small lesions (< 1 cm).
+  - Brain and urinary tract normally have high FDG activity (physiologic).
+  - Response assessment (Deauville/Lugano criteria for lymphoma):
+    Scores 1-3 generally indicate complete metabolic response.
+    Score 4-5 indicates residual metabolically active disease.
+
+- HIDA SCAN (HEPATOBILIARY IMINODIACETIC ACID):
+  - Normal: gallbladder fills within 60 minutes
+  - Acute cholecystitis: non-visualization of gallbladder after 60 min
+    (even after morphine augmentation) — high sensitivity and specificity
+  - Biliary leak: tracer seen outside the biliary tree (post-surgical complication)
+  - Biliary dyskinesia: gallbladder ejection fraction < 35% after CCK
+    stimulation suggests functional gallbladder disorder
+
+- RENAL SCAN (MAG3 / DTPA):
+  - Differential function: normal is 45-55% each kidney. Significant asymmetry
+    (< 40%) indicates impaired function on one side.
+  - Obstruction: with Lasix (diuretic renogram) — T½ < 10 min normal,
+    10-20 min equivocal, > 20 min obstructed
+  - Renal artery stenosis (captopril renogram): asymmetric function or delayed
+    uptake/excretion after ACE inhibitor suggests renovascular hypertension
+
+- GASTRIC EMPTYING STUDY:
+  - Standard: egg sandwich with Tc-99m sulfur colloid, images at 0, 1, 2, 4 hours
+  - Normal: < 10% retention at 4 hours
+  - Delayed (gastroparesis): > 10% at 4 hours. > 60% at 2 hours is also abnormal.
+  - Rapid emptying (dumping syndrome): > 50% emptied at 1 hour
+  - Common causes of gastroparesis: diabetes, post-surgical, medications (opioids,
+    GLP-1 agonists, anticholinergics), idiopathic
+
 """
 
 _CLINICAL_DOMAIN_KNOWLEDGE_EKG = """\
 ## Clinical Domain Knowledge — EKG/ECG
 
 Apply this interpretation structure for EKG/ECG reports:
+
+### Systematic EKG Reading Framework
 
 1. RHYTHM — Sinus rhythm vs. arrhythmia. If atrial fibrillation, note it
    prominently. If sinus rhythm, confirm it is normal.
@@ -2917,10 +3850,212 @@ Apply this interpretation structure for EKG/ECG reports:
 3. INTERVALS — PR interval (normal 0.12-0.20s), QRS duration (normal < 0.12s),
    QTc interval (normal < 440ms male, < 460ms female). Prolonged QTc is
    clinically significant.
-4. AXIS — Normal, left axis deviation, right axis deviation. Brief context
-   on what deviation may suggest.
+4. AXIS — Normal (-30° to +90°), left axis deviation (beyond -30°), right
+   axis deviation (beyond +90°). Brief context on what deviation may suggest.
 5. ST/T WAVE CHANGES — ST elevation, ST depression, T-wave inversions.
    These are often the most clinically important findings.
+
+### Rhythm Disorders
+
+- ATRIAL FIBRILLATION vs ATRIAL FLUTTER: AFib has irregularly irregular rhythm
+  with no organized atrial activity. Flutter has sawtooth pattern (typically
+  ~300 bpm atrial rate) with regular ventricular response (commonly 2:1 block
+  → rate ~150 bpm). A ventricular rate of exactly ~150 should raise suspicion
+  for flutter with 2:1 block even if flutter waves are not obvious.
+
+- SUPRAVENTRICULAR TACHYCARDIA (SVT): Narrow-complex tachycardia (QRS < 120ms)
+  at 150-250 bpm. Includes AVNRT, AVRT, atrial tachycardia. If onset/offset
+  are abrupt, this favors a re-entrant mechanism.
+
+- SINUS BRADYCARDIA: Rate < 60 bpm with normal P waves. Common in athletes,
+  during sleep, and with beta-blockers. Only clinically significant if
+  symptomatic (dizziness, fatigue, syncope).
+
+- SINUS ARRHYTHMIA: Normal P-P interval variation with respiration. Benign
+  and common in younger patients. Do NOT alarm the patient about this.
+
+### Heart Blocks (Conduction Disorders)
+
+- FIRST-DEGREE AV BLOCK: PR interval > 200ms but all P waves conduct.
+  Almost always benign. Very common with age, beta-blockers, calcium channel
+  blockers. Do NOT alarm the patient.
+
+- SECOND-DEGREE AV BLOCK TYPE I (Wenckebach): Progressive PR prolongation
+  until a dropped QRS. Usually benign, occurs at the AV node level. Common
+  in athletes and during sleep.
+
+- SECOND-DEGREE AV BLOCK TYPE II (Mobitz II): Constant PR interval with
+  sudden dropped QRS. This is more concerning — it occurs below the AV node
+  (His-Purkinje system) and may progress to complete heart block. Often
+  requires pacemaker evaluation.
+
+- THIRD-DEGREE (COMPLETE) AV BLOCK: No relationship between P waves and
+  QRS complexes — atria and ventricles beat independently. Escape rhythm
+  rate determines symptoms. Narrow escape (40-60 bpm) = junctional origin.
+  Wide escape (< 40 bpm) = ventricular origin, more dangerous.
+
+### Bundle Branch Blocks
+
+- LEFT BUNDLE BRANCH BLOCK (LBBB): QRS >= 120ms with broad, notched R wave
+  in leads I, aVL, V5-V6 ("M-shaped") and deep S in V1-V2. New LBBB can
+  indicate acute MI, heart failure, or cardiomyopathy. In the setting of
+  LBBB, standard ST-segment criteria for ischemia do NOT apply — ST changes
+  are expected and secondary to the conduction delay.
+
+- RIGHT BUNDLE BRANCH BLOCK (RBBB): QRS >= 120ms with RSR' pattern in V1-V2
+  ("rabbit ears") and wide S wave in I and V6. Isolated RBBB is often benign
+  and can be a normal variant. New RBBB in the right clinical context may
+  suggest right heart strain (PE, RV pressure overload).
+
+- LEFT ANTERIOR FASCICULAR BLOCK (LAFB): Left axis deviation (beyond -45°)
+  with normal QRS duration (< 120ms). Common and usually benign. Often
+  coexists with RBBB (bifascicular block).
+
+- LEFT POSTERIOR FASCICULAR BLOCK (LPFB): Right axis deviation (beyond +90°)
+  with normal QRS duration. Much less common than LAFB — always exclude
+  other causes of right axis deviation first (RVH, PE, lateral MI).
+
+- BIFASCICULAR BLOCK: RBBB + LAFB (most common) or RBBB + LPFB. Does NOT
+  by itself require pacemaker, but in the setting of syncope or new PR
+  prolongation (trifascicular disease), warrants further evaluation.
+
+### LV Hypertrophy Patterns
+
+- VOLTAGE CRITERIA FOR LVH: Sokolow-Lyon (S in V1 + R in V5 or V6 >= 35mm)
+  or Cornell (R in aVL + S in V3 > 28mm in men, > 20mm in women). EKG has
+  low sensitivity but high specificity for LVH — a negative EKG does NOT
+  rule it out.
+
+- LVH WITH STRAIN PATTERN: ST depression and T-wave inversion in lateral
+  leads (V5-V6, I, aVL) in the setting of LVH voltage. This "strain" pattern
+  indicates pressure overload (hypertension, aortic stenosis) and is NOT the
+  same as ischemic ST changes. Do not call this "ischemia."
+
+- RIGHT VENTRICULAR HYPERTROPHY (RVH): Right axis deviation, tall R wave
+  in V1 (R > S), right atrial enlargement (peaked P waves > 2.5mm in II).
+  Consider pulmonary hypertension, chronic lung disease, congenital heart
+  disease.
+
+### Preexcitation and Channelopathies
+
+- WOLFF-PARKINSON-WHITE (WPW): Short PR interval (< 120ms) + delta wave
+  (slurred QRS upstroke) + wide QRS. Indicates an accessory pathway
+  (bundle of Kent) bypassing normal AV conduction. Risk of rapid conduction
+  in atrial fibrillation. Avoid AV nodal blockers (adenosine, verapamil,
+  digoxin) in WPW with atrial fibrillation.
+
+- BRUGADA PATTERN: Coved or saddleback ST elevation in V1-V3 with RBBB
+  morphology. Type 1 (coved, >= 2mm ST elevation) is diagnostic. Associated
+  with risk of ventricular fibrillation and sudden cardiac death. Important
+  to distinguish from benign early repolarization or RBBB.
+
+- LONG QT SYNDROME: QTc > 500ms is high risk for torsades de pointes.
+  QTc 460-500ms is borderline and warrants medication review. Common
+  acquired causes: medications (antiarrhythmics, antibiotics like
+  azithromycin/fluoroquinolones, antipsychotics, methadone), electrolyte
+  abnormalities (hypokalemia, hypomagnesemia, hypocalcemia). Congenital
+  long QT exists but is less common.
+
+### Ischemia and Infarction Patterns
+
+- ST ELEVATION: >= 1mm in limb leads or >= 2mm in precordial leads in
+  >= 2 contiguous leads suggests acute STEMI. Distribution maps to coronary
+  territory: anterior (V1-V4) = LAD, lateral (I, aVL, V5-V6) = LCx,
+  inferior (II, III, aVF) = RCA.
+
+- ST DEPRESSION: Horizontal or downsloping ST depression >= 0.5mm suggests
+  ischemia. Upsloping ST depression is less specific. Diffuse ST depression
+  with ST elevation in aVR suggests left main or severe three-vessel disease.
+
+- T-WAVE INVERSIONS: Deep symmetric T-wave inversions in anterior leads
+  (Wellens pattern) may indicate critical proximal LAD stenosis even when
+  the patient is pain-free. T-wave inversions in the setting of LVH,
+  BBB, or post-pacing are secondary changes and not necessarily ischemic.
+
+- PATHOLOGICAL Q WAVES: Q waves > 40ms wide or > 25% of R-wave amplitude
+  in >= 2 contiguous leads suggest prior myocardial infarction (scar).
+  Small Q waves in leads I, aVL, V5-V6 are normal septal Q waves.
+
+- POOR R-WAVE PROGRESSION: Failure of R wave to grow from V1 to V4.
+  Can indicate anterior MI but also caused by LBBB, LVH, lead placement
+  error, or body habitus. Not specific by itself.
+
+### Pericarditis Pattern
+
+- ACUTE PERICARDITIS: Diffuse concave-upward ST elevation across multiple
+  territories (not limited to one coronary distribution) + PR depression
+  (best seen in lead II) + PR elevation in aVR. Unlike STEMI, the changes
+  are widespread and do not follow a single coronary territory. Reciprocal
+  changes are absent (unlike STEMI which has reciprocal ST depression).
+
+### Electrolyte Effects on EKG
+
+- HYPERKALEMIA: Progressive changes with rising K+: peaked T waves →
+  PR prolongation → P wave flattening → QRS widening → sine wave pattern.
+  Peaked T waves alone (mild hyperkalemia) are common and often clinically
+  manageable. Sine wave pattern is a medical emergency.
+
+- HYPOKALEMIA: ST depression, T-wave flattening, prominent U waves
+  (small positive deflection after T wave). Increases risk of arrhythmias,
+  especially with concurrent digitalis use.
+
+- HYPERCALCEMIA: Shortened QT interval (specifically shortened ST segment).
+- HYPOCALCEMIA: Prolonged QT interval (specifically prolonged ST segment).
+
+- HYPOMAGNESEMIA: Often accompanies hypokalemia. Prolongs QT, increases
+  arrhythmia susceptibility. EKG changes may be subtle.
+
+### Medication Effects on EKG
+
+- DIGITALIS (DIGOXIN) EFFECT: Characteristic "scooping" or "Salvador Dali
+  mustache" ST depression. This is a drug EFFECT (present at therapeutic
+  levels), NOT toxicity. Digitalis TOXICITY causes arrhythmias: accelerated
+  junctional rhythm, bidirectional VT, atrial tachycardia with block.
+
+- BETA-BLOCKERS / CALCIUM CHANNEL BLOCKERS: Sinus bradycardia, prolonged
+  PR interval. Expected pharmacological effects, not abnormalities.
+
+- ANTIARRHYTHMIC DRUGS: Class IA (procainamide, quinidine) → QRS and QT
+  prolongation. Class IC (flecainide, propafenone) → QRS prolongation.
+  Class III (amiodarone, sotalol, dofetilide) → QT prolongation.
+
+- TRICYCLIC ANTIDEPRESSANTS: QRS prolongation, QT prolongation, sinus
+  tachycardia. In overdose, wide QRS is a marker of toxicity severity.
+
+### Pacemaker Rhythms
+
+- PACED RHYTHM: Pacing spikes (vertical artifacts) followed by captured
+  beats. Atrial pacing → spike before P wave. Ventricular pacing → spike
+  before wide QRS with LBBB morphology (paced from RV apex). Dual-chamber
+  pacing → both atrial and ventricular spikes.
+
+- EVALUATING PACED EKGs: Standard ischemia criteria do NOT apply to
+  ventricular-paced rhythms (similar to LBBB). Look for appropriate capture
+  (each spike followed by a complex) and appropriate sensing (pacer inhibits
+  when native beats occur).
+
+### EKG Abbreviations to Expand
+- NSR → normal sinus rhythm
+- AFib → atrial fibrillation
+- AFL → atrial flutter
+- SVT → supraventricular tachycardia
+- VT → ventricular tachycardia
+- VFib → ventricular fibrillation
+- PVC → premature ventricular complex
+- PAC → premature atrial complex
+- LBBB → left bundle branch block
+- RBBB → right bundle branch block
+- LAFB → left anterior fascicular block
+- LPFB → left posterior fascicular block
+- LVH → left ventricular hypertrophy
+- RVH → right ventricular hypertrophy
+- WPW → Wolff-Parkinson-White
+- LAD → left axis deviation (in EKG context, NOT left anterior descending)
+- RAD → right axis deviation
+- AV → atrioventricular
+- SA → sinoatrial
+- AVNRT → AV nodal re-entrant tachycardia
+- AVRT → AV re-entrant tachycardia
 
 """
 
@@ -3001,6 +4136,19 @@ Apply these nuclear cardiology interpretation rules:
   Globally reduced CFR (all territories) may indicate microvascular disease
   rather than focal coronary blockages.
 
+- CORONARY FLOW CAPACITY (CFC): A composite metric combining stress MBF and
+  CFR to classify overall coronary vasomotor function. CFC is NOT the same
+  as CFR alone — it integrates both absolute stress blood flow and the
+  reserve ratio. Classification:
+  - Normal: stress MBF >= 2.0 AND CFR >= 2.0
+  - Mildly reduced: stress MBF 1.5-2.0 OR CFR 1.5-2.0 (whichever is worse)
+  - Moderately reduced: stress MBF 1.0-1.5 OR CFR 1.0-1.5
+  - Severely reduced: stress MBF < 1.0 OR CFR < 1.0
+  CFC provides stronger prognostic value than CFR alone. A patient with
+  normal CFR but low absolute stress MBF still has impaired flow capacity.
+  When reporting CFC, explain that it represents the heart's overall ability
+  to increase blood delivery when working hard.
+
 ### Gated Function (SPECT or PET)
 
 - LVEF FROM GATED IMAGES: Provides ejection fraction from the nuclear images.
@@ -3057,6 +4205,436 @@ Always explain in plain language: "The area of your heart supplied by the
 
 """
 
+_CLINICAL_DOMAIN_KNOWLEDGE_SLEEP = """\
+## Clinical Domain Knowledge — Sleep Studies
+
+Apply these sleep study interpretation rules:
+
+### Polysomnography (PSG) / Home Sleep Apnea Test (HSAT)
+
+- AHI (APNEA-HYPOPNEA INDEX): Number of apneas + hypopneas per hour of sleep.
+  - Normal: < 5 events/hour
+  - Mild OSA: 5-14 events/hour
+  - Moderate OSA: 15-29 events/hour
+  - Severe OSA: >= 30 events/hour
+  AHI is the primary metric for diagnosing obstructive sleep apnea (OSA) and
+  determining treatment eligibility (CPAP, oral appliance, surgery).
+
+- RDI (RESPIRATORY DISTURBANCE INDEX): AHI + respiratory effort-related
+  arousals (RERAs). RDI >= AHI. Some labs report RDI instead of AHI.
+  Medicare and many insurers use AHI for CPAP qualification.
+
+- OXYGEN DESATURATION:
+  - Nadir SpO2 (lowest oxygen level): < 88% is significant
+  - ODI (oxygen desaturation index): desaturations >= 3-4% per hour
+  - Time spent below 88% or 90%: prolonged desaturation increases
+    cardiovascular risk
+  Severe desaturation (nadir < 80%) warrants urgent treatment consideration.
+
+- SLEEP ARCHITECTURE:
+  - Normal stages: N1 (light, 5%), N2 (intermediate, 45-55%), N3 (deep/slow-wave,
+    15-20%), REM (20-25%)
+  - Reduced N3 (deep sleep): common with aging, medications, alcohol
+  - Reduced REM: common with alcohol, antidepressants, REM-suppressant medications
+  - REM-predominant OSA: AHI significantly worse during REM (supine REM is
+    the most vulnerable position). May underestimate disease on short studies.
+
+- SLEEP EFFICIENCY: Total sleep time / time in bed × 100%.
+  - Normal: > 85%
+  - Reduced efficiency common in insomnia, pain, anxiety, or poor sleep hygiene.
+
+- CENTRAL SLEEP APNEA (CSA): Apneas without respiratory effort (no chest/
+  abdominal movement). Different from OSA. Common in heart failure (Cheyne-
+  Stokes respiration), opioid use, and at high altitude. Treatment differs
+  from OSA — ASV (adaptive servo-ventilation) is contraindicated in HFrEF
+  with EF < 45%.
+
+- PERIODIC LIMB MOVEMENTS (PLMS):
+  - PLMI (periodic limb movement index): movements per hour of sleep
+  - > 15/hour: elevated (may indicate restless legs syndrome or other
+    sleep-related movement disorder)
+  - PLMS can fragment sleep and cause daytime sleepiness even without OSA.
+
+- CPAP TITRATION: Optimal pressure determined during titration study.
+  Target: AHI < 5 at the prescribed pressure. Residual AHI on CPAP download
+  data helps assess treatment effectiveness.
+
+### Abbreviations — Sleep Medicine
+- PSG → polysomnography
+- HSAT → home sleep apnea test
+- OSA → obstructive sleep apnea
+- CSA → central sleep apnea
+- AHI → apnea-hypopnea index
+- RDI → respiratory disturbance index
+- ODI → oxygen desaturation index
+- PLMS → periodic limb movements of sleep
+- PLMI → periodic limb movement index
+- REM → rapid eye movement
+- NREM → non-rapid eye movement
+- RERA → respiratory effort-related arousal
+- CPAP → continuous positive airway pressure
+- BiPAP → bilevel positive airway pressure
+- ASV → adaptive servo-ventilation
+- MSLT → multiple sleep latency test
+- MWT → maintenance of wakefulness test
+
+"""
+
+_CLINICAL_DOMAIN_KNOWLEDGE_NEURO = """\
+## Clinical Domain Knowledge — Neurophysiology (EEG / EMG / NCS)
+
+### EEG (Electroencephalography) Interpretation
+
+- NORMAL BACKGROUND: Posterior dominant rhythm (alpha, 8-13 Hz) that
+  attenuates with eye opening. Symmetric between hemispheres. Normal
+  sleep architecture if sleep is recorded.
+
+- EPILEPTIFORM DISCHARGES:
+  - Spikes (< 70ms) and sharp waves (70-200ms): interictal epileptiform
+    discharges — support a diagnosis of epilepsy but do NOT confirm it
+    (can be seen without clinical seizures)
+  - Focal vs generalized: focal discharges localize seizure onset.
+    Generalized discharges suggest primary generalized epilepsy.
+  - Periodic lateralized epileptiform discharges (PLEDs/LPDs): suggest
+    acute structural lesion (stroke, encephalitis, tumor) with seizure risk.
+
+- SLOWING:
+  - Focal slowing (theta/delta in one region): suggests focal structural
+    or functional brain abnormality
+  - Diffuse slowing: encephalopathy (metabolic, toxic, infectious, post-ictal).
+    Degree correlates with severity of encephalopathy.
+  - Intermittent rhythmic delta activity (IRDA): can be frontal (FIRDA) or
+    temporal — suggests underlying structural or metabolic dysfunction.
+
+- SEIZURE ON EEG: Evolving rhythmic discharge with clear onset, evolution
+  in frequency/morphology/distribution, and offset. Electrographic seizures
+  without clinical correlate (non-convulsive status epilepticus) are an
+  important diagnosis in ICU patients with altered mental status.
+
+- STATUS EPILEPTICUS: Continuous seizure activity >= 5 minutes or recurrent
+  seizures without recovery. Non-convulsive status is diagnosed by EEG and
+  is a medical emergency despite absence of overt convulsions.
+
+- NORMAL VARIANTS (benign): Mu rhythm, wicket spikes, benign epileptiform
+  transients of sleep (BETS/small sharp spikes), 14-and-6 Hz positive bursts,
+  RMTD (rhythmic mid-temporal theta of drowsiness). These should NOT be
+  interpreted as epileptiform.
+
+### EMG / Nerve Conduction Studies (NCS)
+
+- NERVE CONDUCTION STUDIES — MOTOR:
+  - Amplitude: reflects number of functioning axons. Reduced amplitude =
+    axonal loss (axonal neuropathy)
+  - Conduction velocity: reflects myelin integrity. Slowed velocity =
+    demyelination. Severely slowed (< 70% of lower limit) is diagnostic
+    of demyelinating neuropathy.
+  - Distal latency: prolonged = distal demyelination or nerve compression
+  - Conduction block: > 50% amplitude drop between distal and proximal
+    stimulation = focal demyelination (GBS, CIDP, nerve entrapment)
+
+- NERVE CONDUCTION STUDIES — SENSORY:
+  - Reduced amplitude = sensory axonal loss
+  - Slowed velocity = sensory demyelination
+  - Absent sensory responses with preserved motor = sensory neuropathy or
+    neuronopathy (dorsal root ganglion disease)
+
+- NEEDLE EMG:
+  - Insertional activity: increased = denervation or inflammatory myopathy
+  - Spontaneous activity: fibrillations and positive sharp waves indicate
+    active denervation (2-3 weeks after nerve injury). Fasciculations may
+    be benign or indicate motor neuron disease.
+  - Motor unit morphology: large, polyphasic units = chronic reinnervation
+    (chronic neuropathy). Small, short-duration, polyphasic units = myopathy.
+  - Recruitment: reduced (early firing, fast rate) = neuropathic process.
+    Early/full recruitment with small units = myopathic process.
+
+- COMMON PATTERNS:
+  - Carpal tunnel syndrome: prolonged median nerve distal motor and sensory
+    latencies at the wrist, reduced SNAP amplitude. Classify as mild
+    (sensory only), moderate (motor involvement), severe (absent SNAP,
+    reduced CMAP, fibrillations in thenar muscles).
+  - Ulnar neuropathy at elbow: slowed conduction velocity across elbow,
+    conduction block. Reduced amplitude of ulnar SNAP.
+  - Peripheral polyneuropathy: length-dependent pattern — distal nerves
+    affected first. Axonal (reduced amplitudes) vs demyelinating (slowed
+    velocities) classification guides differential diagnosis.
+  - Radiculopathy: normal NCS with abnormal needle EMG in myotomal
+    distribution. Paraspinal fibrillations support the diagnosis.
+  - Myopathy: normal NCS (or mildly reduced CMAP amplitude), myopathic
+    EMG pattern (small, short, polyphasic, early recruitment). Elevated
+    CK supports but does not confirm myopathy.
+  - Motor neuron disease (ALS): widespread denervation in multiple regions
+    (bulbar, cervical, thoracic, lumbar) with normal sensory NCS. Upper
+    and lower motor neuron signs required for diagnosis.
+
+### Abbreviations — Neurophysiology
+- EEG → electroencephalogram
+- EMG → electromyography
+- NCS → nerve conduction study
+- SNAP → sensory nerve action potential
+- CMAP → compound muscle action potential
+- MUAP → motor unit action potential
+- CV → conduction velocity
+- DML → distal motor latency
+- DSL → distal sensory latency
+- CTS → carpal tunnel syndrome
+- GBS → Guillain-Barré syndrome
+- CIDP → chronic inflammatory demyelinating polyneuropathy
+- ALS → amyotrophic lateral sclerosis
+- PLEDs/LPDs → periodic lateralized epileptiform discharges
+
+"""
+
+_CLINICAL_DOMAIN_KNOWLEDGE_ENDOSCOPY = """\
+## Clinical Domain Knowledge — Endoscopy / Colonoscopy
+
+### Upper Endoscopy (EGD)
+
+- ESOPHAGEAL FINDINGS:
+  - Barrett's esophagus: intestinal metaplasia of distal esophagus. Classify
+    by Prague criteria (C = circumferential extent, M = maximum extent).
+    Requires surveillance biopsies. Risk of esophageal adenocarcinoma.
+    - No dysplasia: surveillance every 3-5 years
+    - Low-grade dysplasia: repeat at 6-12 months, consider ablation
+    - High-grade dysplasia: endoscopic treatment (ablation, EMR/ESD)
+  - Esophagitis: Los Angeles classification (A-D by mucosal break length/
+    circumference). Grade A/B = mild. Grade C/D = severe.
+  - Eosinophilic esophagitis: rings, furrows, exudates (white plaques).
+    Confirm with >= 15 eosinophils per high-power field on biopsy.
+  - Varices: Graded by size (small/medium/large) and red signs (red wale marks,
+    cherry red spots indicating higher bleeding risk). Large varices or
+    varices with red signs need treatment (banding, beta-blockers).
+
+- GASTRIC FINDINGS:
+  - Gastritis: erythema, erosions, or ulceration of gastric mucosa.
+    Biopsy for H. pylori (CLO test or histology) is standard.
+  - Gastric ulcer: ALWAYS biopsy gastric ulcers (malignancy risk 2-5%).
+    Duodenal ulcers rarely need biopsy (very low malignancy risk).
+  - Gastric polyps: fundic gland polyps (most common, benign, associated with
+    PPI use). Adenomatous polyps carry malignancy risk — remove and survey.
+  - Gastric intestinal metaplasia: considered precancerous. Surveillance
+    protocols vary by extent and family history.
+
+- CELIAC DISEASE FINDINGS: Scalloping of duodenal folds, mosaic pattern,
+  villous atrophy on biopsy. Confirm with serology (anti-tTG IgA).
+
+### Colonoscopy
+
+- POLYP CLASSIFICATION:
+  - Hyperplastic polyps: benign, no malignancy risk (unless large or in
+    right colon). No surveillance change needed for small rectal/sigmoid
+    hyperplastic polyps.
+  - Tubular adenoma: premalignant. Adenoma → carcinoma sequence takes
+    ~10-15 years on average. Size matters: < 10mm = low risk.
+  - Tubulovillous adenoma: higher risk than tubular. Villous component
+    increases malignancy potential.
+  - Villous adenoma: highest risk of conventional adenomas.
+  - Sessile serrated lesion (SSL): flat, right-sided, harder to detect.
+    Serrated pathway to malignancy. SSLs with dysplasia = higher risk.
+  - Traditional serrated adenoma: rare, left-sided, dysplastic.
+
+- SURVEILLANCE INTERVALS (post-polypectomy per AGA/ACG guidelines):
+  - 1-2 small (< 10mm) tubular adenomas: repeat in 7-10 years
+  - 3-4 small tubular adenomas: repeat in 3-5 years
+  - 5-10 adenomas: repeat in 3 years
+  - Adenoma >= 10mm, villous histology, or high-grade dysplasia: repeat in 3 years
+  - Piecemeal resection of large adenoma: repeat in 6-12 months
+  Do NOT specify exact intervals — state that the doctor will recommend timing.
+
+- INFLAMMATORY BOWEL DISEASE (IBD):
+  - Ulcerative colitis: continuous inflammation starting from rectum, extending
+    proximally. Pseudopolyps = chronic inflammatory polyps (benign).
+    Mayo endoscopic score: 0 (normal) to 3 (severe: spontaneous bleeding,
+    ulceration).
+  - Crohn's disease: skip lesions (patchy inflammation), cobblestoning,
+    aphthous ulcers, strictures, fistulas. Can affect any GI segment.
+  - Dysplasia surveillance in IBD: chromoendoscopy or high-definition
+    colonoscopy with targeted biopsies. Flat dysplasia found on random
+    biopsies is particularly concerning.
+
+- DIVERTICULOSIS: Outpouchings of colonic mucosa, most common in sigmoid.
+  Present in ~50% of people over 60. Incidental finding — not a disease.
+  Only mention if specifically relevant to symptoms.
+
+### Abbreviations — Endoscopy
+- EGD → esophagogastroduodenoscopy (upper endoscopy)
+- EMR → endoscopic mucosal resection
+- ESD → endoscopic submucosal dissection
+- GERD → gastroesophageal reflux disease
+- PPI → proton pump inhibitor
+- SSL → sessile serrated lesion
+- HGD → high-grade dysplasia
+- LGD → low-grade dysplasia
+- IBD → inflammatory bowel disease
+- UC → ulcerative colitis
+- CD → Crohn's disease
+- CLO → Campylobacter-like organism (rapid urease test for H. pylori)
+
+"""
+
+_CLINICAL_DOMAIN_KNOWLEDGE_PATHOLOGY = """\
+## Clinical Domain Knowledge — Pathology / Biopsy Reports
+
+### General Pathology Principles
+
+- BIOPSY vs EXCISION: A biopsy samples a small portion — it may not represent
+  the entire lesion. An excisional specimen removes the entire lesion and
+  provides more complete information (margins, full architecture).
+
+- MARGINS: "Negative margins" (or "margins clear") means no abnormal cells at
+  the cut edges — the lesion was completely removed. "Positive margins" means
+  abnormal cells extend to the edge — residual disease may remain. Margin
+  distance matters: "close margins" (< 1-2mm depending on tissue type)
+  may warrant re-excision or close follow-up.
+
+- GRADE vs STAGE: Grade describes how abnormal the cells look under the
+  microscope (differentiation: well, moderate, poorly differentiated).
+  Stage describes how far the disease has spread (TNM system: tumor size,
+  node involvement, metastasis). Grade and stage are independent prognostic
+  factors.
+
+### Skin Biopsy
+
+- MELANOMA: Breslow thickness is the single most important prognostic factor.
+  - In situ (confined to epidermis): excellent prognosis
+  - < 1.0mm: very favorable (> 95% survival)
+  - 1.0-2.0mm: intermediate risk, sentinel lymph node biopsy considered
+  - 2.0-4.0mm: higher risk
+  - > 4.0mm: highest risk
+  Other factors: ulceration (worsens prognosis), mitotic rate, microsatellite,
+  lymphovascular invasion, regression.
+
+- BASAL CELL CARCINOMA (BCC): Most common skin cancer. Very rarely metastasizes.
+  Subtypes matter: nodular (most common, well-circumscribed), superficial
+  (thin, can be treated with topical therapy), morpheaform/infiltrative
+  (aggressive, ill-defined margins, higher recurrence).
+
+- SQUAMOUS CELL CARCINOMA (SCC): Second most common. Risk of metastasis
+  higher than BCC, especially if poorly differentiated, perineural invasion,
+  > 2cm, > 6mm depth, or immunosuppressed. Clear margins are important.
+
+- DYSPLASTIC NEVI: Mild, moderate, or severe atypia. Mild/moderate with clear
+  margins can be observed. Severe atypia at margins or uncertainty → re-excision.
+  A dysplastic nevus is NOT melanoma but indicates higher melanoma risk.
+
+### GI Pathology (Biopsy)
+
+- HELICOBACTER PYLORI: Identified on gastric biopsy by special stains.
+  Presence confirms active infection requiring treatment (triple or
+  quadruple therapy). Intestinal metaplasia suggests chronic H. pylori damage.
+
+- CELIAC DISEASE: Marsh classification of duodenal biopsies.
+  - Marsh 0: Normal
+  - Marsh 1: Increased intraepithelial lymphocytes (> 25 per 100 enterocytes)
+  - Marsh 2: Crypt hyperplasia + increased IELs
+  - Marsh 3a/3b/3c: Partial to total villous atrophy (diagnostic)
+  Confirm with positive serology (anti-tTG IgA) + clinical response to
+  gluten-free diet.
+
+- COLORECTAL ADENOMA: Report size, type (tubular, tubulovillous, villous),
+  and presence/grade of dysplasia. Completeness of excision determines
+  surveillance interval. "Adenomatous changes" means precancerous —
+  but progression to cancer takes many years.
+
+### Breast Pathology
+
+- BENIGN CONDITIONS: Fibrocystic changes (extremely common), fibroadenoma,
+  fat necrosis, papilloma. Explain these are non-cancerous.
+- ATYPICAL HYPERPLASIA (ADH/ALH): Increases breast cancer risk 4-5x.
+  Surveillance and risk-reduction strategies (tamoxifen) may be recommended.
+- DCIS (Ductal Carcinoma In Situ): Pre-invasive — cancer cells confined to
+  ducts, have not invaded surrounding tissue. Treated to prevent progression
+  to invasive cancer. Not a systemic disease.
+- INVASIVE CARCINOMA: Key features: type (ductal, lobular), grade (1-3),
+  ER/PR status (hormone receptor), HER2 status, Ki-67 (proliferation index).
+  These determine treatment options.
+
+### Abbreviations — Pathology
+- H&E → hematoxylin and eosin stain
+- IHC → immunohistochemistry
+- ER → estrogen receptor
+- PR → progesterone receptor
+- HER2 → human epidermal growth factor receptor 2
+- DCIS → ductal carcinoma in situ
+- LCIS → lobular carcinoma in situ
+- ADH → atypical ductal hyperplasia
+- ALH → atypical lobular hyperplasia
+- BCC → basal cell carcinoma
+- SCC → squamous cell carcinoma
+- IEL → intraepithelial lymphocyte
+
+"""
+
+_CLINICAL_DOMAIN_KNOWLEDGE_PROCEDURES = """\
+## Clinical Domain Knowledge — Interventional / Procedural Reports
+
+### Vascular Interventions
+
+- PERIPHERAL ANGIOGRAPHY / INTERVENTION:
+  - Stenosis severity classification: mild (< 50%), moderate (50-70%),
+    severe (> 70%), occlusion (100%).
+  - TASC II classification for aortoiliac and femoropopliteal disease
+    guides treatment approach (endovascular vs surgical).
+  - Post-intervention: technical success (residual stenosis < 30%),
+    complications (dissection, perforation, distal embolization).
+  - ABI improvement after intervention confirms hemodynamic success.
+
+- AORTOGRAM: Evaluates aortic diameter (normal < 3.0 cm abdominal),
+  aneurysm morphology (fusiform vs saccular), branch vessel involvement,
+  access for endovascular repair (EVAR). An infrarenal aortic aneurysm
+  >= 5.5 cm in men or >= 5.0 cm in women generally warrants repair.
+
+- VENOGRAM: Maps venous anatomy for DVT evaluation, central venous access
+  planning, or pre-procedural planning. Acute thrombus: filling defect
+  with surrounding contrast. Chronic changes: collaterals, wall irregularity,
+  web/synechiae.
+
+- EMBOLIZATION: Intentional vessel occlusion for hemorrhage control, tumor
+  devascularization, or AVM treatment. Report target vessel, embolic agent
+  (coils, particles, glue, Onyx), technical success (flow cessation),
+  non-target embolization (complication).
+
+### Dialysis Access
+
+- FISTULOGRAM / AV FISTULA INTERVENTION: Evaluates arteriovenous fistula
+  or graft for stenosis, thrombosis, or maturation failure.
+  - Juxta-anastomotic stenosis: most common cause of fistula failure
+  - Central venous stenosis: from prior catheter use, limits outflow
+  - Post-intervention: report residual stenosis, flow improvement, thrill
+  Fistula flow rate and adequacy of dialysis clearance are clinical endpoints.
+
+### Hepatobiliary Interventions
+
+- TIPS (TRANSJUGULAR INTRAHEPATIC PORTOSYSTEMIC SHUNT):
+  Stent connecting hepatic vein to portal vein to reduce portal pressure.
+  - Indications: refractory ascites, variceal bleeding, Budd-Chiari syndrome
+  - Portosystemic gradient: target < 12 mmHg (pre-TIPS typically > 12)
+  - Surveillance: Doppler ultrasound velocity monitoring (stent velocities
+    < 90 cm/s or > 190 cm/s suggest dysfunction)
+  - Complications: hepatic encephalopathy (30-40%), stent stenosis/thrombosis
+
+- IVC FILTER: Placed for PE prophylaxis when anticoagulation is
+  contraindicated. Retrievable filters should be removed when the
+  contraindication resolves. Report filter position, tilt, strut
+  integrity, and any trapped thrombus.
+
+### Abbreviations — Interventional
+- PTA → percutaneous transluminal angioplasty
+- EVAR → endovascular aneurysm repair
+- TEVAR → thoracic endovascular aortic repair
+- AVM → arteriovenous malformation
+- AVF → arteriovenous fistula
+- AVG → arteriovenous graft
+- TIPS → transjugular intrahepatic portosystemic shunt
+- IVC → inferior vena cava
+- SMA → superior mesenteric artery
+- IMA → inferior mesenteric artery
+- CFA → common femoral artery
+- SFA → superficial femoral artery
+- CIA → common iliac artery
+
+"""
+
 # Default domain knowledge for backwards compatibility
 _CLINICAL_DOMAIN_KNOWLEDGE = _CLINICAL_DOMAIN_KNOWLEDGE_CARDIAC
 
@@ -3067,13 +4645,27 @@ def _select_domain_knowledge(prompt_context: dict) -> str:
     category = prompt_context.get("category", "")
     interpretation_rules = prompt_context.get("interpretation_rules", "")
 
-    # Select based on test type first, then category
+    # Select based on test type first (most specific), then category
     if test_type in ("lab_results", "blood_lab_results"):
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_LABS
     elif test_type in ("ekg", "ecg"):
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_EKG
     elif test_type == "pft":
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_PFT
+    elif test_type == "sleep_study":
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_SLEEP
+    elif test_type in ("eeg",):
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_NEURO
+    elif test_type in ("emg_ncs",):
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_NEURO
+    elif test_type == "endoscopy":
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_ENDOSCOPY
+    elif test_type in ("pathology", "skin_biopsy"):
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_PATHOLOGY
+    elif test_type in ("holter_monitor", "event_monitor"):
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_EKG
+    elif test_type in ("pacemaker_check",):
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_CARDIAC
     elif test_type in ("nuclear_stress", "ct_calcium_score", "cardiac_pet",
                        "pharmacological_stress_test",
                        "pharma_spect_stress", "exercise_spect_stress",
@@ -3081,18 +4673,32 @@ def _select_domain_knowledge(prompt_context: dict) -> str:
                        "exercise_treadmill_test", "exercise_stress_test",
                        "exercise_stress_echo", "pharma_stress_echo"):
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_NUCLEAR
+    # Category-based routing
     elif category == "lab":
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_LABS
-    elif category in ("imaging_ct", "imaging_mri", "imaging_xray", "imaging_ultrasound"):
+    elif category in ("imaging_ct", "imaging_mri", "imaging_xray",
+                      "imaging_ultrasound"):
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_IMAGING
     elif category in ("cardiac", "vascular"):
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_CARDIAC
     elif category == "neurophysiology":
-        domain = _CLINICAL_DOMAIN_KNOWLEDGE_EKG  # Similar structure for EEG/EMG
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_NEURO
     elif category == "pulmonary":
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_PFT
+    elif category == "interventional":
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_PROCEDURES
+    elif category == "endoscopy":
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_ENDOSCOPY
+    elif category == "pathology":
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_PATHOLOGY
+    elif category == "dermatology":
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_PATHOLOGY
+    elif category == "allergy":
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_LABS
     else:
-        domain = _CLINICAL_DOMAIN_KNOWLEDGE_CARDIAC  # Default
+        # Generic fallback — use imaging as a safe default for unknown types
+        # rather than cardiac, which was previously misleading for non-cardiac tests
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_IMAGING
 
     # Append any handler-provided interpretation rules
     if interpretation_rules:
