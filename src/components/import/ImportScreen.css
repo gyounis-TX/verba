@@ -1,5 +1,7 @@
 .import-screen {
   max-width: 1600px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .import-header {
@@ -1237,12 +1239,32 @@
     grid-template-columns: 1fr;
   }
 
-  .import-right-panel {
+  .import-left-panel {
     order: -1;
+    min-width: 0;
+  }
+
+  .import-right-panel {
+    min-width: 0;
+  }
+
+  .text-input {
+    min-height: 160px;
   }
 
   .mode-toggle {
     flex-wrap: wrap;
+  }
+
+  .text-input-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
+
+  .text-input-footer-right {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .drop-zone {
