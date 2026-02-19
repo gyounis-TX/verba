@@ -8,6 +8,7 @@ import {
   type RegisteredUser,
 } from "../../services/adminUsageQueries";
 import { useToast } from "../shared/Toast";
+import { APP_VERSION, GIT_SHA, BUILD_TIME } from "../../services/platform";
 import type { AppSettings, LLMProvider } from "../../types/sidecar";
 import "../settings/SettingsScreen.css";
 import "./AdminScreen.css";
@@ -353,6 +354,27 @@ export function AdminScreen() {
           Manage LLM provider settings and deploy shared API keys.
         </p>
       </header>
+
+      {/* App Information */}
+      <section className="settings-section">
+        <h3 className="settings-section-title">App Information</h3>
+        <div className="admin-info-grid">
+          <div className="admin-info-row">
+            <span className="admin-info-label">Version</span>
+            <span className="admin-info-value">{APP_VERSION}</span>
+          </div>
+          <div className="admin-info-row">
+            <span className="admin-info-label">Build</span>
+            <span className="admin-info-value" style={{ fontFamily: "monospace" }}>{GIT_SHA}</span>
+          </div>
+          {BUILD_TIME && (
+            <div className="admin-info-row">
+              <span className="admin-info-label">Built At</span>
+              <span className="admin-info-value">{new Date(BUILD_TIME).toLocaleString()}</span>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Provider Selection */}
       <section className="settings-section">

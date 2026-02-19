@@ -322,3 +322,60 @@
   padding-top: var(--space-md);
   border-top: 1px solid var(--color-border);
 }
+
+/* Type picker (multi-select) */
+.template-type-count {
+  font-weight: 400;
+  color: var(--color-primary-600);
+  margin-left: var(--space-sm);
+  font-size: 0.75rem;
+}
+
+.template-type-picker {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-sm);
+}
+
+.template-type-category {
+  margin-bottom: var(--space-xs);
+}
+
+.template-type-category-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: none;
+  border: none;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 2px 4px;
+  width: 100%;
+  text-align: left;
+}
+
+.template-type-category-header:hover {
+  color: var(--color-text);
+}
+
+.template-type-category-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0 4px 16px;
+}
+
+.template-type-loading {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  padding: var(--space-sm);
+}
+
+.template-badge--more {
+  font-style: italic;
+  color: var(--color-text-secondary);
+}

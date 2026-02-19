@@ -1751,10 +1751,11 @@ convey calm authority and specificity:
   system" (conduction) and "your heart's pumping ability" (function)
 - Cardiology patients often know their prior numbers — reference trends when
   prior results are available
-- **Note**: These are default reporting preferences. If the physician has
-  provided a template with Structure Instructions or Teaching Points that
-  specify a different format or ordering, follow the physician's template
-  instructions instead.
+- **OVERRIDE NOTICE**: The above are DEFAULT preferences only. If the user
+  prompt contains a "Structure Instructions" section, follow those instructions
+  for report ordering and structure — even if they contradict the defaults
+  above (e.g., if the template says "always lead with EF", lead with EF
+  regardless of whether it is normal or abnormal).
 """,
     "pulmonology": """\
 ## Specialty Voice — Pulmonology
@@ -3515,7 +3516,27 @@ class PromptEngine:
                 )
             sections.append(" ".join(guidance))
 
-        # 1d. Next steps to include (if provided)
+        # 1d. Template instructions — placed early so the LLM sees structural
+        #     requirements before the main content sections.
+        if template_instructions:
+            sections.append("\n## Structure Instructions (PHYSICIAN OVERRIDE)")
+            sections.append(
+                "IMPORTANT: The physician has configured specific structural "
+                "requirements via this template. These instructions MUST take "
+                "precedence over ALL default formatting, including Specialty Voice "
+                "preferences in the system prompt. If the physician says 'always "
+                "lead with EF', lead with EF even if the Specialty Voice section "
+                "says otherwise.\n\n"
+                "Physician's structural requirements:"
+            )
+            sections.append(template_instructions)
+        if closing_text:
+            sections.append("\n## Closing Text")
+            sections.append(
+                f"End the overall_summary with the following closing text:\n{closing_text}"
+            )
+
+        # 1e. Next steps to include (if provided)
         if next_steps and any(s != "No comment" for s in next_steps):
             sections.append("\n## Specific Next Steps to Include")
             sections.append(
@@ -3525,21 +3546,6 @@ class PromptEngine:
             for step in next_steps:
                 if step != "No comment":
                     sections.append(f"- {step}")
-
-        # 1e. Template instructions (if provided)
-        if template_instructions:
-            sections.append("\n## Structure Instructions")
-            sections.append(
-                "The physician has chosen this template for how they want their "
-                "report structured. These instructions override default specialty "
-                "reporting guidelines and voice preferences when they conflict."
-            )
-            sections.append(template_instructions)
-        if closing_text:
-            sections.append("\n## Closing Text")
-            sections.append(
-                f"End the overall_summary with the following closing text:\n{closing_text}"
-            )
 
         # 1f-preamble. Personalization priority (only if any personalization active)
         _has_personalization = any([

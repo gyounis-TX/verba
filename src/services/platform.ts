@@ -24,3 +24,9 @@ export const API_BASE_URL: string | undefined = IS_TAURI
  */
 export const APP_VERSION: string =
   import.meta.env.VITE_APP_VERSION ?? "0.0.0";
+
+/** Git short SHA at build time. */
+export const GIT_SHA: string = import.meta.env.VITE_GIT_SHA ?? "dev";
+
+/** ISO timestamp of the build. */
+export const BUILD_TIME: string = import.meta.env.VITE_BUILD_TIME ?? "";

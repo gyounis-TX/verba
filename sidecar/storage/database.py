@@ -1317,14 +1317,25 @@ class Database:
 
     # --- Templates ---
 
+    @staticmethod
+    def _normalize_template_row(row: dict[str, Any]) -> dict[str, Any]:
+        """Add test_types list by parsing the test_type column (JSON array or bare string)."""
+        from api.template_models import normalize_test_type_field
+        row["test_types"] = normalize_test_type_field(row.get("test_type"))
+        return row
+
     def create_template(
         self,
         name: str,
         test_type: str | None = None,
+        test_types: list[str] | None = None,
         tone: str | None = None,
         structure_instructions: str | None = None,
         closing_text: str | None = None,
     ) -> dict[str, Any]:
+        # If test_types list provided, serialize to JSON for the test_type column
+        if test_types:
+            test_type = json.dumps(test_types)
         conn = self._get_conn()
         try:
             sid = str(uuid.uuid4())
@@ -1346,7 +1357,7 @@ class Database:
             rows = conn.execute(
                 "SELECT * FROM templates ORDER BY created_at DESC"
             ).fetchall()
-            return [dict(row) for row in rows], total
+            return [self._normalize_template_row(dict(row)) for row in rows], total
         finally:
             conn.close()
 
@@ -1356,7 +1367,7 @@ class Database:
             row = conn.execute(
                 "SELECT * FROM templates WHERE id = ?", (template_id,)
             ).fetchone()
-            return dict(row) if row else None
+            return self._normalize_template_row(dict(row)) if row else None
         finally:
             conn.close()
 
@@ -1372,16 +1383,24 @@ class Database:
             allowed = {"name", "test_type", "tone", "structure_instructions", "closing_text", "is_default"}
             updates = {k: v for k, v in kwargs.items() if k in allowed}
             if not updates:
-                return dict(existing)
+                return self._normalize_template_row(dict(existing))
 
-            # If setting as default, clear any other default for the same test_type
+            # If setting as default, clear defaults for each type in the JSON array
             if updates.get("is_default"):
-                test_type = updates.get("test_type", existing["test_type"])
-                if test_type:
-                    conn.execute(
-                        "UPDATE templates SET is_default = 0 WHERE test_type = ? AND id != ?",
-                        (test_type, template_id),
-                    )
+                test_type_raw = updates.get("test_type", existing["test_type"])
+                if test_type_raw:
+                    from api.template_models import normalize_test_type_field
+                    types_list = normalize_test_type_field(test_type_raw) or []
+                    for t in types_list:
+                        conn.execute(
+                            """UPDATE templates SET is_default = 0
+                               WHERE id != ? AND is_default = 1 AND EXISTS (
+                                 SELECT 1 FROM json_each(
+                                   CASE WHEN test_type LIKE '[%' THEN test_type ELSE json_array(test_type) END
+                                 ) WHERE value = ?
+                               )""",
+                            (template_id, t),
+                        )
 
             set_clause = ", ".join(f"{k} = ?" for k in updates)
             values = list(updates.values())
@@ -1399,10 +1418,14 @@ class Database:
         conn = self._get_conn()
         try:
             row = conn.execute(
-                "SELECT * FROM templates WHERE test_type = ? AND is_default = 1 LIMIT 1",
+                """SELECT * FROM templates WHERE is_default = 1 AND EXISTS (
+                     SELECT 1 FROM json_each(
+                       CASE WHEN test_type LIKE '[%' THEN test_type ELSE json_array(test_type) END
+                     ) WHERE value = ?
+                   ) LIMIT 1""",
                 (test_type,),
             ).fetchone()
-            return dict(row) if row else None
+            return self._normalize_template_row(dict(row)) if row else None
         finally:
             conn.close()
 

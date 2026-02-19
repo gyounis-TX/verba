@@ -31,6 +31,31 @@
   cursor: not-allowed;
 }
 
+/* App Information */
+.admin-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.admin-info-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.admin-info-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  min-width: 80px;
+}
+
+.admin-info-value {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
 /* Active Provider Indicator */
 .admin-active-provider {
   font-size: var(--font-size-sm);

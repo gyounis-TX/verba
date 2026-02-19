@@ -942,15 +942,26 @@ class PgDatabase:
 
     # --- Templates ---
 
+    @staticmethod
+    def _normalize_template_row(row: dict[str, Any]) -> dict[str, Any]:
+        """Add test_types list by parsing the test_type column."""
+        from api.template_models import normalize_test_type_field
+        row["test_types"] = normalize_test_type_field(row.get("test_type"))
+        return row
+
     async def create_template(
         self,
         name: str,
         test_type: str | None = None,
+        test_types: list[str] | None = None,
         tone: str | None = None,
         structure_instructions: str | None = None,
         closing_text: str | None = None,
         user_id: str | None = None,
     ) -> dict[str, Any]:
+        # If test_types list provided, serialize to JSON for the test_type column
+        if test_types:
+            test_type = json.dumps(test_types)
         pool = await _get_pool()
         sync_id = str(uuid.uuid4())
         now = _now()
@@ -967,7 +978,7 @@ class PgDatabase:
                 "SELECT * FROM templates WHERE sync_id = $1 AND user_id = $2",
                 sync_id, user_id,
             )
-        return _normalize_row(dict(row))
+        return self._normalize_template_row(_normalize_row(dict(row)))
 
     async def list_templates(self, user_id: str | None = None) -> tuple[list[dict[str, Any]], int]:
         pool = await _get_pool()
@@ -980,7 +991,7 @@ class PgDatabase:
                 "SELECT * FROM templates WHERE user_id = $1 ORDER BY created_at DESC",
                 user_id,
             )
-        return [_normalize_row(dict(row)) for row in rows], total
+        return [self._normalize_template_row(_normalize_row(dict(row))) for row in rows], total
 
     async def get_template(self, template_id: int | str, user_id: str | None = None) -> dict[str, Any] | None:
         pool = await _get_pool()
@@ -989,7 +1000,7 @@ class PgDatabase:
                 "SELECT * FROM templates WHERE sync_id = $1 AND user_id = $2",
                 str(template_id), user_id,
             )
-        return _normalize_row(dict(row)) if row else None
+        return self._normalize_template_row(_normalize_row(dict(row))) if row else None
 
     async def update_template(self, template_id: int | str, user_id: str | None = None, **kwargs: Any) -> dict[str, Any] | None:
         pool = await _get_pool()
@@ -1004,16 +1015,24 @@ class PgDatabase:
             allowed = {"name", "test_type", "tone", "structure_instructions", "closing_text", "is_default"}
             updates = {k: v for k, v in kwargs.items() if k in allowed}
             if not updates:
-                return dict(existing)
+                return self._normalize_template_row(_normalize_row(dict(existing)))
 
-            # If setting as default, clear other defaults for the same test_type
+            # If setting as default, clear defaults for each type in the JSON array
             if updates.get("is_default"):
-                test_type = updates.get("test_type", existing["test_type"])
-                if test_type:
-                    await conn.execute(
-                        "UPDATE templates SET is_default = false WHERE test_type = $1 AND sync_id != $2 AND user_id = $3",
-                        test_type, str(template_id), user_id,
-                    )
+                test_type_raw = updates.get("test_type", existing["test_type"])
+                if test_type_raw:
+                    from api.template_models import normalize_test_type_field
+                    types_list = normalize_test_type_field(test_type_raw) or []
+                    for t in types_list:
+                        await conn.execute(
+                            """UPDATE templates SET is_default = false
+                               WHERE sync_id != $1 AND user_id = $2 AND is_default = true
+                               AND (
+                                 (test_type LIKE '[%' AND test_type::jsonb ? $3)
+                                 OR test_type = $3
+                               )""",
+                            str(template_id), user_id, t,
+                        )
 
             set_parts = []
             values: list[Any] = []
@@ -1039,10 +1058,14 @@ class PgDatabase:
         pool = await _get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT * FROM templates WHERE test_type = $1 AND is_default = true AND user_id = $2 LIMIT 1",
-                test_type, user_id,
+                """SELECT * FROM templates WHERE is_default = true AND user_id = $1
+                   AND (
+                     (test_type LIKE '[%' AND test_type::jsonb ? $2)
+                     OR test_type = $2
+                   ) LIMIT 1""",
+                user_id, test_type,
             )
-        return _normalize_row(dict(row)) if row else None
+        return self._normalize_template_row(_normalize_row(dict(row))) if row else None
 
     async def delete_template(self, template_id: int | str, user_id: str | None = None) -> bool:
         pool = await _get_pool()

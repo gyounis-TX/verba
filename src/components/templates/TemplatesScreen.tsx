@@ -4,12 +4,14 @@ import { queueUpsertAfterMutation, deleteFromSupabase } from "../../services/syn
 import { getMyShareRecipients, type ShareRecipient } from "../../services/sharingService";
 import { isAuthConfigured, getSession } from "../../services/supabase";
 import { useToast } from "../shared/Toast";
-import type { Template, SharedTemplate } from "../../types/sidecar";
+import { groupTypesByCategory } from "../../utils/testTypeCategories";
+import type { Template, SharedTemplate, TestTypeInfo } from "../../types/sidecar";
 import "./TemplatesScreen.css";
+import "../shared/TypeModal.css";
 
 interface FormState {
   name: string;
-  test_type: string;
+  test_types: string[];
   tone: string;
   structure_instructions: string;
   closing_text: string;
@@ -17,11 +19,19 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   name: "",
-  test_type: "",
+  test_types: [],
   tone: "",
   structure_instructions: "",
   closing_text: "",
 };
+
+/** Get display names for test type IDs from the available types list. */
+function typeDisplayNames(ids: string[], allTypes: TestTypeInfo[]): string[] {
+  return ids.map((id) => {
+    const match = allTypes.find((t) => t.test_type_id === id);
+    return match ? match.display_name : id;
+  });
+}
 
 export function TemplatesScreen() {
   const { showToast } = useToast();
@@ -34,6 +44,8 @@ export function TemplatesScreen() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
   const [recipients, setRecipients] = useState<ShareRecipient[]>([]);
+  const [availableTypes, setAvailableTypes] = useState<TestTypeInfo[]>([]);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function loadRecipients() {
@@ -46,6 +58,20 @@ export function TemplatesScreen() {
       } catch {}
     }
     loadRecipients();
+  }, []);
+
+  // Load available test types
+  useEffect(() => {
+    sidecarApi.listTestTypes().then((types) => {
+      setAvailableTypes(
+        types.map((t) => ({
+          test_type_id: t.id,
+          display_name: t.name,
+          keywords: [],
+          category: t.category,
+        }))
+      );
+    }).catch(() => {});
   }, []);
 
   const fetchTemplates = useCallback(async () => {
@@ -70,18 +96,20 @@ export function TemplatesScreen() {
   const openCreate = () => {
     setForm(EMPTY_FORM);
     setEditingId(null);
+    setCollapsedCategories(new Set());
     setShowForm(true);
   };
 
   const openEdit = (tpl: Template) => {
     setForm({
       name: tpl.name,
-      test_type: tpl.test_type ?? "",
+      test_types: tpl.test_types ?? (tpl.test_type ? [tpl.test_type] : []),
       tone: tpl.tone ?? "",
       structure_instructions: tpl.structure_instructions ?? "",
       closing_text: tpl.closing_text ?? "",
     });
     setEditingId(tpl.id);
+    setCollapsedCategories(new Set());
     setShowForm(true);
   };
 
@@ -97,7 +125,7 @@ export function TemplatesScreen() {
     try {
       const payload = {
         name: form.name.trim(),
-        test_type: form.test_type.trim() || undefined,
+        test_types: form.test_types.length > 0 ? form.test_types : undefined,
         tone: form.tone.trim() || undefined,
         structure_instructions:
           form.structure_instructions.trim() || undefined,
@@ -124,11 +152,14 @@ export function TemplatesScreen() {
 
   const handleToggleDefault = async (tpl: Template) => {
     const newDefault = !tpl.is_default;
+    const typeNames = tpl.test_types?.length
+      ? typeDisplayNames(tpl.test_types, availableTypes).join(", ")
+      : tpl.test_type ?? "";
     try {
       await sidecarApi.updateTemplate(tpl.id, { is_default: newDefault });
       queueUpsertAfterMutation("templates", tpl.id).catch(() => {});
       fetchTemplates();
-      showToast("success", newDefault ? `"${tpl.name}" set as default for ${tpl.test_type}.` : "Default removed.");
+      showToast("success", newDefault ? `"${tpl.name}" set as default for ${typeNames}.` : "Default removed.");
     } catch {
       showToast("error", "Failed to update default.");
     }
@@ -150,8 +181,46 @@ export function TemplatesScreen() {
     }
   };
 
-  const updateField = (field: keyof FormState, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  const toggleType = (typeId: string) => {
+    setForm((prev) => ({
+      ...prev,
+      test_types: prev.test_types.includes(typeId)
+        ? prev.test_types.filter((t) => t !== typeId)
+        : [...prev.test_types, typeId],
+    }));
+  };
+
+  const toggleCategory = (label: string) => {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  };
+
+  /** Render type badges for a template card. */
+  const renderTypeBadges = (tpl: Template) => {
+    const types = tpl.test_types ?? (tpl.test_type ? [tpl.test_type] : []);
+    if (types.length === 0) return null;
+    const names = typeDisplayNames(types, availableTypes);
+    const show = names.slice(0, 3);
+    const extra = names.length - show.length;
+    return (
+      <>
+        {show.map((name) => (
+          <span key={name} className="template-badge">{name}</span>
+        ))}
+        {extra > 0 && (
+          <span className="template-badge template-badge--more">+{extra} more</span>
+        )}
+      </>
+    );
+  };
+
+  const hasTypes = (tpl: Template) => {
+    const types = tpl.test_types ?? (tpl.test_type ? [tpl.test_type] : []);
+    return types.length > 0;
   };
 
   if (loading) {
@@ -188,9 +257,7 @@ export function TemplatesScreen() {
             <div className="template-card-info">
               <div className="template-card-name">{tpl.name}</div>
               <div className="template-card-meta">
-                {tpl.test_type && (
-                  <span className="template-badge">{tpl.test_type}</span>
-                )}
+                {renderTypeBadges(tpl)}
                 {tpl.tone && (
                   <span className="template-badge">{tpl.tone}</span>
                 )}
@@ -218,11 +285,11 @@ export function TemplatesScreen() {
                 </div>
               ) : (
                 <>
-                  {tpl.test_type && (
+                  {hasTypes(tpl) && (
                     <button
                       className={`template-default-btn${tpl.is_default ? " template-default-btn--active" : ""}`}
                       onClick={() => handleToggleDefault(tpl)}
-                      title={tpl.is_default ? "Remove as default" : `Set as default for ${tpl.test_type}`}
+                      title={tpl.is_default ? "Remove as default" : "Set as default for assigned types"}
                     >
                       {tpl.is_default ? "Default" : "Set Default"}
                     </button>
@@ -263,9 +330,14 @@ export function TemplatesScreen() {
                     <span className="template-badge template-badge--shared">
                       Shared by {tpl.sharer_email}
                     </span>
-                    {tpl.test_type && (
-                      <span className="template-badge">{tpl.test_type}</span>
-                    )}
+                    {(tpl.test_types ?? (tpl.test_type ? [tpl.test_type] : [])).map((t) => {
+                      const match = availableTypes.find((at) => at.test_type_id === t);
+                      return (
+                        <span key={t} className="template-badge">
+                          {match ? match.display_name : t}
+                        </span>
+                      );
+                    })}
                     {tpl.tone && (
                       <span className="template-badge">{tpl.tone}</span>
                     )}
@@ -299,7 +371,7 @@ export function TemplatesScreen() {
                 className="template-form-input"
                 type="text"
                 value={form.name}
-                onChange={(e) => updateField("name", e.target.value)}
+                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="e.g. Cardiology Summary"
                 maxLength={100}
               />
@@ -307,15 +379,47 @@ export function TemplatesScreen() {
 
             <div className="template-form-group">
               <label className="template-form-label">
-                Test Type (optional)
+                Test Types (optional)
+                {form.test_types.length > 0 && (
+                  <span className="template-type-count">
+                    {form.test_types.length} selected
+                  </span>
+                )}
               </label>
-              <input
-                className="template-form-input"
-                type="text"
-                value={form.test_type}
-                onChange={(e) => updateField("test_type", e.target.value)}
-                placeholder="e.g. cbc, lipid_panel"
-              />
+              {availableTypes.length > 0 ? (
+                <div className="template-type-picker">
+                  {groupTypesByCategory(availableTypes).map(([label, types]) => (
+                    <div key={label} className="template-type-category">
+                      <button
+                        type="button"
+                        className="template-type-category-header"
+                        onClick={() => toggleCategory(label)}
+                      >
+                        <span className={`settings-collapse-arrow${!collapsedCategories.has(label) ? " settings-collapse-arrow--open" : ""}`}>
+                          &#9656;
+                        </span>
+                        {label}
+                      </button>
+                      {!collapsedCategories.has(label) && (
+                        <div className="template-type-category-buttons">
+                          {types.map((t) => (
+                            <button
+                              key={t.test_type_id}
+                              type="button"
+                              className={`detection-type-btn${form.test_types.includes(t.test_type_id) ? " detection-type-btn--active" : ""}`}
+                              onClick={() => toggleType(t.test_type_id)}
+                            >
+                              {t.display_name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="template-type-loading">Loading test types...</p>
+              )}
             </div>
 
             <div className="template-form-group">
@@ -324,7 +428,7 @@ export function TemplatesScreen() {
                 className="template-form-input"
                 type="text"
                 value={form.tone}
-                onChange={(e) => updateField("tone", e.target.value)}
+                onChange={(e) => setForm((prev) => ({ ...prev, tone: e.target.value }))}
                 placeholder="e.g. Warm and reassuring"
               />
             </div>
@@ -337,7 +441,7 @@ export function TemplatesScreen() {
                 className="template-form-textarea"
                 value={form.structure_instructions}
                 onChange={(e) =>
-                  updateField("structure_instructions", e.target.value)
+                  setForm((prev) => ({ ...prev, structure_instructions: e.target.value }))
                 }
                 placeholder="e.g. Start with a brief overview, then discuss abnormal values..."
                 rows={4}
@@ -351,7 +455,7 @@ export function TemplatesScreen() {
               <textarea
                 className="template-form-textarea"
                 value={form.closing_text}
-                onChange={(e) => updateField("closing_text", e.target.value)}
+                onChange={(e) => setForm((prev) => ({ ...prev, closing_text: e.target.value }))}
                 placeholder="e.g. Please discuss these results with your provider at your next visit."
                 rows={3}
               />

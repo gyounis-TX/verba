@@ -2448,17 +2448,22 @@ async def list_templates(request: Request):
 async def create_template(request: Request, body: TemplateCreateRequest = Body(...)):
     """Create a new template."""
     user_id = _get_user_id(request)
-    # If setting as default, clear other defaults for same test_type
-    if body.is_default and body.test_type:
-        # For SQLite mode, use direct SQL. For PG mode, handled in update_template.
+    # If setting as default, clear other defaults for overlapping test types
+    if body.is_default and body.test_types:
         if not _USE_PG:
             from storage.database import get_db as _get_db
             conn = _get_db()._get_conn()
             try:
-                conn.execute(
-                    "UPDATE templates SET is_default = 0 WHERE test_type = ?",
-                    (body.test_type,),
-                )
+                for t in body.test_types:
+                    conn.execute(
+                        """UPDATE templates SET is_default = 0
+                           WHERE is_default = 1 AND EXISTS (
+                             SELECT 1 FROM json_each(
+                               CASE WHEN test_type LIKE '[%' THEN test_type ELSE json_array(test_type) END
+                             ) WHERE value = ?
+                           )""",
+                        (t,),
+                    )
                 conn.commit()
             finally:
                 conn.close()
@@ -2466,13 +2471,14 @@ async def create_template(request: Request, body: TemplateCreateRequest = Body(.
         "create_template",
         name=body.name,
         test_type=body.test_type,
+        test_types=body.test_types,
         tone=body.tone,
         structure_instructions=body.structure_instructions,
         closing_text=body.closing_text,
         user_id=user_id,
     )
     # Set is_default after creation if requested
-    if body.is_default and body.test_type:
+    if body.is_default and body.test_types:
         record = await _db_call("update_template", record["id"], is_default=1, user_id=user_id)
     return TemplateResponse(**record)
 

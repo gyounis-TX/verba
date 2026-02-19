@@ -351,7 +351,7 @@ export function ResultsScreen() {
       // Auto-select default template if none was explicitly chosen
       if (selectedTemplateId == null && effectiveTestType) {
         const defaultTpl = res.items.find(
-          (t) => t.is_default && t.test_type === effectiveTestType,
+          (t) => t.is_default && (t.test_types ?? (t.test_type ? [t.test_type] : [])).includes(effectiveTestType),
         );
         if (defaultTpl) setSelectedTemplateId(defaultTpl.id);
       }

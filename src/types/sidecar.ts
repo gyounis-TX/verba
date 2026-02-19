@@ -294,6 +294,7 @@ export interface Template {
   id: string | number;
   name: string;
   test_type: string | null;
+  test_types: string[] | null;
   tone: string | null;
   structure_instructions: string | null;
   closing_text: string | null;
@@ -307,6 +308,7 @@ export interface Template {
 export interface TemplateCreateRequest {
   name: string;
   test_type?: string;
+  test_types?: string[];
   tone?: string;
   structure_instructions?: string;
   closing_text?: string;
@@ -316,6 +318,7 @@ export interface TemplateCreateRequest {
 export interface TemplateUpdateRequest {
   name?: string;
   test_type?: string;
+  test_types?: string[];
   tone?: string;
   structure_instructions?: string;
   closing_text?: string;
@@ -452,6 +455,7 @@ export interface SharedTemplate {
   sync_id: string;
   name: string;
   test_type: string | null;
+  test_types: string[] | null;
   tone: string | null;
   structure_instructions: string | null;
   closing_text: string | null;
