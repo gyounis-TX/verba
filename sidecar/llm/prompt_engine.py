@@ -1140,9 +1140,6 @@ pumping blood effectively" connects to their life.
 Principles:
 - Lead with the principal finding of the report — the most clinically
   significant observation — before putting other findings in context.
-  Do NOT default to leading with ejection fraction or pumping function
-  when it is normal; a normal EF can be mentioned later as supportive
-  context. Only lead with EF when it is abnormal.
 - Group related normal findings into brief, meaningful statements rather
   than listing each one individually
 - Present concerning findings prioritized by clinical significance, most
@@ -1170,6 +1167,14 @@ Principles:
   interpret it as trace or mild disease.
 - Vary paragraph count (3-6) and length based on complexity. Mix short
   punchy paragraphs with longer explanatory ones.
+
+"""
+
+_STRESS_EF_DELAY_RULE = """\
+## EF Ordering Rule
+For stress tests, do NOT lead with ejection fraction or pumping function \
+when it is normal. The primary finding is the stress response (wall motion, \
+exercise capacity, symptoms). Mention EF only after discussing stress findings.
 
 """
 
@@ -1919,6 +1924,317 @@ Apply these cardiac-specific interpretation rules:
 - PULMONARY HYPERTENSION: RVSP > 35 mmHg suggests elevated pulmonary
   pressures. Pair with RV size and TR velocity for a complete picture.
 
+- CORONARY FLOW CAPACITY (CFC): CFC is NOT the same as CFR. It is a
+  composite classification that integrates stress MBF and CFR together:
+  - Normal: stress MBF >= 2.0 mL/min/g OR CFR >= 2.0 with stress MBF >= 1.0
+  - Mildly reduced: stress MBF 1.0-2.0 with CFR 1.5-2.0
+  - Moderately reduced: stress MBF 0.75-1.0 OR CFR < 1.5 with stress MBF >= 0.75
+  - Severely reduced: stress MBF < 0.75 mL/min/g
+  When CFC is reported, explain it as a combined picture of blood flow
+  and flow reserve — not just one number. A patient can have normal CFR
+  but reduced CFC if their absolute stress flow is low (e.g. balanced
+  ischemia masking on relative images). Severely reduced CFC carries
+  significant prognostic weight — frame it as an important finding worth
+  discussing with their doctor, but do not use alarm language.
+
+### Echocardiogram-Specific Rules
+
+- RV FUNCTION ASSESSMENT: TAPSE < 1.7 cm suggests right ventricular
+  systolic dysfunction. RV dysfunction is a separate prognostic finding
+  independent of LV function. Elevated RVSP alone does NOT mean RV
+  dysfunction — correlate with TAPSE and RV size. When RVSP is elevated
+  but TAPSE is normal, the RV is coping; when both are abnormal, the RV
+  is struggling under pressure.
+
+- WALL MOTION ABNORMALITIES: Synthesize regional wall motion findings
+  into a clinical narrative:
+  - Hypokinesis (reduced motion) = weakened but viable muscle
+  - Akinesis (no motion) = severely damaged, may or may not be viable
+  - Dyskinesis (paradoxical motion) = scarred, bulges outward during
+    contraction — worst prognosis
+  When multiple segments are affected, note the coronary territory
+  (e.g. LAD territory = anterior/septal, RCA = inferior, LCx = lateral).
+  A single-territory pattern suggests prior MI; multi-territory suggests
+  cardiomyopathy or multivessel disease.
+
+- PERICARDIAL EFFUSION GRADING: Do NOT over-alarm for small effusions.
+  - Trivial/trace: common incidental finding, usually clinically
+    insignificant — mention briefly
+  - Small (< 1 cm): usually benign, warrants monitoring only if
+    symptomatic or new
+  - Moderate (1-2 cm): clinically significant, worth discussing
+  - Large (> 2 cm): important finding, may cause hemodynamic compromise
+  Frame effusion size relative to clinical significance. A trivial
+  effusion does NOT need to be a key finding in the explanation.
+
+- LEFT ATRIAL ENLARGEMENT: LAVI > 34 mL/m2 is mildly enlarged;
+  > 40 mL/m2 is moderately enlarged. LA enlargement is a marker of
+  chronic diastolic dysfunction and increases risk of atrial fibrillation.
+  When LA is enlarged, connect it to diastolic function findings —
+  do not present it as an isolated number.
+
+- AORTIC ROOT DILATATION: Aortic root > 4.0 cm is dilated and warrants
+  monitoring. > 4.5 cm is significantly dilated. > 5.0-5.5 cm may
+  approach surgical thresholds depending on context (bicuspid aortic
+  valve, Marfan syndrome). Frame as something the doctor will want to
+  track over time, not as an emergency.
+
+- RVSP WITHOUT TR: When tricuspid regurgitation velocity is not
+  measurable, RVSP cannot be estimated. If the report states "TR not
+  measurable" or "RVSP could not be estimated," explain that pulmonary
+  pressures could not be assessed on this study — do NOT state pressures
+  are normal just because no value is reported.
+
+- FRACTIONAL SHORTENING (FS): FS 25-43% is normal. When FS is reported
+  instead of LVEF (common in suboptimal imaging windows or pediatric
+  echos), explain it as an alternative measure of how well the heart
+  muscle squeezes. FS < 25% suggests reduced systolic function.
+
+### Nuclear Stress / PET-Specific Rules
+
+- SUMMED STRESS SCORE (SSS) / SUMMED DIFFERENCE SCORE (SDS):
+  - SSS 0-3: normal perfusion
+  - SSS 4-8: mildly abnormal (small area of reduced blood flow)
+  - SSS 9-13: moderately abnormal
+  - SSS >= 14: severely abnormal (large area of reduced blood flow,
+    high-risk finding)
+  SDS measures the difference between stress and rest (reversibility):
+  - SDS 0-1: no significant ischemia
+  - SDS 2-6: mild to moderate ischemia
+  - SDS >= 7: severe ischemia
+  Synthesize SSS and SDS together: high SSS with low SDS = mostly scar;
+  high SSS with high SDS = significant ischemia (potentially treatable).
+
+- TRANSIENT ISCHEMIC DILATION (TID): TID ratio > 1.2 suggests the
+  heart appeared to dilate during stress, which is a marker of severe
+  or multivessel coronary artery disease. This is a high-risk finding
+  even when perfusion images appear relatively normal (balanced
+  ischemia). Frame it as an important finding to discuss with the doctor.
+
+- REGIONAL VS GLOBAL ISCHEMIA: When perfusion defects are reported by
+  coronary territory (anterior/LAD, lateral/LCx, inferior/RCA),
+  synthesize the pattern:
+  - Single territory = localized disease in one artery
+  - Multiple territories = multivessel disease (higher risk)
+  - All territories with reduced MBF but normal relative perfusion =
+    balanced ischemia (CFR/CFC may be the only abnormality)
+  Always name the artery territory when discussing regional findings.
+
+- REVERSIBLE VS FIXED DEFECTS: A reversible defect (present at stress,
+  resolves at rest) indicates ischemia — the muscle is alive but
+  starved of blood during exertion. A fixed defect (present at both
+  stress and rest) indicates scar — permanently damaged muscle from a
+  prior heart attack. This distinction matters for treatment: ischemia
+  may benefit from intervention; scar generally does not. Frame this
+  clearly for patients.
+
+### Stress Testing Rules (Treadmill, Stress Echo)
+
+- EXERCISE CAPACITY: Duration and workload are strong prognostic
+  markers. Completing >= 9 minutes on a Bruce protocol (>= 10 METs)
+  is associated with excellent prognosis regardless of other findings.
+  < 6 minutes (< 7 METs) suggests limited functional capacity. When
+  exercise duration is reported, contextualize it — "you were able to
+  exercise for a good amount of time, which is a positive sign."
+
+- DUKE TREADMILL SCORE: When reported, interpret as:
+  - Score >= 5: low risk (excellent prognosis)
+  - Score -10 to +4: intermediate risk
+  - Score < -10: high risk
+  If not reported but exercise time, ST changes, and angina are
+  available, synthesize these elements into a functional assessment.
+
+- HEART RATE RESPONSE: Achieving >= 85% of age-predicted maximum heart
+  rate (220 - age) is adequate. Failure to reach target HR limits the
+  test's ability to detect ischemia — note this limitation. Chronotropic
+  incompetence (inability to raise HR appropriately) is itself a risk
+  marker.
+
+- ST-SEGMENT CHANGES: Downsloping ST depression is more specific for
+  ischemia than horizontal or upsloping depression. ST elevation during
+  exercise is a significant finding suggesting transmural ischemia.
+  When ST changes are reported, describe their clinical meaning rather
+  than the ECG pattern.
+
+- STRESS ECHO WALL MOTION: New wall motion abnormality at peak stress
+  that was not present at rest = ischemia in that territory. Wall
+  motion abnormality present at both rest and stress = scar. Worsening
+  of a pre-existing abnormality at stress = peri-infarct ischemia.
+  Synthesize the before/after comparison for the patient.
+
+### CTA Coronary-Specific Rules
+
+- CAD-RADS CLASSIFICATION: When a CAD-RADS score is reported, explain
+  it to the patient:
+  - CAD-RADS 0: no plaque or stenosis (normal)
+  - CAD-RADS 1: 1-24% stenosis (minimal narrowing, not flow-limiting)
+  - CAD-RADS 2: 25-49% stenosis (mild narrowing, not flow-limiting)
+  - CAD-RADS 3: 50-69% stenosis (moderate narrowing, may limit flow)
+  - CAD-RADS 4A: 70-99% stenosis (severe narrowing in one or two
+    vessels)
+  - CAD-RADS 4B: Left main >= 50% OR three-vessel >= 70% (severe,
+    high-risk pattern)
+  - CAD-RADS 5: total occlusion (100%)
+  Frame lower scores (0-2) as reassuring; 3+ as findings the doctor
+  will want to discuss further.
+
+- CALCIUM SCORE CONTEXT: Agatston calcium score must be interpreted
+  relative to age and sex:
+  - 0: no detectable calcium (very low risk)
+  - 1-99: mild calcium (low risk in older patients, more concerning
+    in younger patients)
+  - 100-399: moderate calcium
+  - >= 400: extensive calcium (high risk)
+  When a percentile is reported, USE IT — a score of 200 at the 95th
+  percentile for age means much more calcium than expected, while 200
+  at the 40th percentile is average for that age group. Always
+  contextualize by age when possible.
+
+- PLAQUE CHARACTERIZATION: When plaque type is described:
+  - Calcified plaque: stable, chronic disease — lower acute risk
+  - Non-calcified (soft) plaque: more vulnerable to rupture — higher
+    acute risk even if stenosis is moderate
+  - Mixed plaque: contains both components
+  Do not alarm, but note that non-calcified or mixed plaque is the
+  type the doctor pays closer attention to.
+
+- CT-FFR (CT FRACTIONAL FLOW RESERVE): CT-FFR is a non-invasive
+  estimate of whether a narrowing actually limits blood flow:
+  - > 0.80: not hemodynamically significant (narrowing is not limiting
+    blood flow)
+  - 0.75-0.80: borderline — may or may not limit flow
+  - < 0.75: hemodynamically significant (narrowing is limiting blood
+    flow, typically prompts further evaluation)
+  Frame CT-FFR as "a test that checks whether the narrowing is actually
+  affecting blood flow to the heart muscle."
+
+### Coronary Catheterization / Cath Lab Rules
+
+- HEMODYNAMIC PATTERN SYNTHESIS: When pressures are reported (RA, RV,
+  PA, PCWP, AO, LV), synthesize the pattern rather than listing each
+  value individually:
+  - Elevated LVEDP (> 18 mmHg) or PCWP (> 18 mmHg): suggests the
+    heart is stiff or overloaded — explain as "the heart's filling
+    pressures are higher than normal"
+  - Elevated PA pressures with normal PCWP: pre-capillary pulmonary
+    hypertension (lung-related)
+  - Elevated PA pressures with elevated PCWP: post-capillary
+    (heart-related pulmonary hypertension)
+  - Low cardiac output with high filling pressures: concerning for
+    heart failure — frame carefully
+  - Equalization of diastolic pressures (RA ~ RV diastolic ~ PCWP):
+    suggests constrictive or restrictive physiology
+  Always synthesize pressures into a clinical picture for the patient.
+
+- VENTRICULOGRAPHY FINDINGS: When the ventriculogram is described:
+  - Normal wall motion = heart muscle contracting well
+  - Regional hypokinesis/akinesis = weak area (name the wall segment)
+  - Aneurysm = bulging outward during contraction (usually from old MI)
+  - Mitral regurgitation on ventriculogram = contrast seen refluxing
+    into the left atrium; grade as mild/moderate/severe
+  Synthesize ventriculogram findings with the coronary anatomy —
+  a wall motion abnormality in the LAD territory with LAD disease
+  tells a consistent story.
+
+- IVUS INTERPRETATION: When intravascular ultrasound findings are
+  reported:
+  - MLA (minimum lumen area) < 4 mm2 is significant for non-left-main
+    vessels; < 6 mm2 is significant for left main
+  - Calcium arc > 180 degrees indicates heavy calcification that may
+    complicate stenting
+  - Plaque burden > 70% suggests significant disease even if lumen
+    looks adequate on angiography
+  Explain IVUS as "an ultrasound performed inside the artery to get
+  a detailed look at the vessel wall and any buildup."
+
+- FFR (FRACTIONAL FLOW RESERVE): When invasive FFR is reported:
+  - > 0.80: stenosis is not functionally significant (does not limit
+    blood flow enough to require treatment)
+  - 0.75-0.80: borderline zone
+  - < 0.75: functionally significant (stenting typically recommended)
+  Frame as "a pressure test performed during the catheterization to
+  check whether the narrowing is actually reducing blood flow."
+
+- GRAFT PATENCY (CABG PATIENTS): When bypass grafts are assessed:
+  - LIMA to LAD is the most important graft — 90%+ patency at 10 years.
+    Occlusion is a significant finding.
+  - SVGs (vein grafts) degrade over time — 50% occluded by 10 years.
+    SVG disease is expected in older grafts.
+  - Patent graft = open and functioning; occluded = completely blocked
+  When a graft is occluded, note whether the native vessel has
+  collateral flow or is also severely diseased.
+
+- CHRONIC TOTAL OCCLUSION (CTO): A 100% blockage present for > 3
+  months. CTOs are typically supplied by collateral vessels from other
+  arteries. The presence of collaterals means the muscle is surviving
+  but may be ischemic during exertion. Frame CTO differently than
+  acute occlusion — it is a chronic condition the heart has adapted to.
+
+### Cardiac MRI-Specific Rules
+
+- TISSUE CHARACTERIZATION PATTERNS: Synthesize T1, T2, ECV, and late
+  gadolinium enhancement (LGE) findings into disease patterns:
+  - Elevated T2 + elevated ECV + subepicardial LGE = acute myocarditis
+    pattern (inflammation of the heart muscle)
+  - Normal T2 + subendocardial LGE = chronic scar from prior MI
+    (matches a coronary territory)
+  - Elevated T1 + elevated ECV + no LGE = diffuse fibrosis pattern
+    (seen in amyloidosis, hypertensive heart disease, or aging)
+  - Mid-wall LGE = non-ischemic cardiomyopathy or infiltrative disease
+    (sarcoidosis, dilated cardiomyopathy)
+  Always describe LGE patterns in terms of what they suggest
+  clinically, not just their location.
+
+- SCAR LOCATION AND PATTERN: The distribution of scar (LGE) is
+  diagnostically important:
+  - Subendocardial scar (inner wall): almost always from coronary
+    artery disease / prior heart attack — follows a coronary territory
+  - Mid-wall scar: suggests non-ischemic cause — cardiomyopathy,
+    sarcoidosis, or myocarditis
+  - Subepicardial scar (outer wall): classic for myocarditis or
+    pericarditis
+  Explain the pattern to the patient: "The location of the scar tissue
+  helps your doctor understand what caused it."
+
+- RV FUNCTION ON CMR: RVEF < 45% suggests right ventricular
+  dysfunction. Pair with RV volumes (RVEDV, RVESV) — RV dilation with
+  reduced RVEF suggests volume or pressure overload. In the context of
+  pulmonary hypertension, RV dysfunction is a key prognostic marker.
+
+- SCAR BURDEN AND VIABILITY: When scar burden percentage is reported:
+  - < 25% transmural extent in a segment = viable (may recover with
+    revascularization)
+  - 25-50% = borderline viability
+  - > 50% transmural = non-viable (unlikely to recover function)
+  Total scar burden > 20% of LV mass carries significant prognostic
+  weight. Frame viability findings in terms of treatment implications.
+
+### Cross-Test Rules (All Cardiac Types)
+
+- COMPARISON TO PRIOR STUDIES: When comparing to a previous report:
+  - Stable findings: frame as reassuring ("this has remained unchanged,
+    which is a good sign")
+  - Improved findings: frame positively ("this has improved since your
+    last study")
+  - Worsened findings: frame as important but not alarming ("there has
+    been some change since your last study that your doctor will want
+    to review")
+  Trajectory matters more than a single snapshot — a stable EF of 40%
+  is very different from a declining EF that just reached 40%.
+
+- PROGNOSTIC RISK SYNTHESIS: When findings suggest elevated risk,
+  synthesize into a clear message rather than listing risk factors:
+  - Low risk pattern: normal perfusion + good exercise capacity +
+    normal EF → "overall, these results are reassuring"
+  - Moderate risk: single-territory ischemia or mildly reduced EF →
+    "there are findings your doctor will want to discuss and may
+    monitor over time"
+  - High risk: multivessel ischemia, severely reduced EF, or left main
+    disease → "these are important findings that your doctor will want
+    to review carefully with you"
+  NEVER use the word "risk" in patient-facing text. Instead, frame
+  findings in terms of importance and what the doctor will discuss.
+
 ## Abbreviation Expansion — Always Spell Out for Patients
 
 ALWAYS use the full name on first mention, with the abbreviation in
@@ -1970,6 +2286,28 @@ pass through raw abbreviations from clinical context to patient-facing text.
 - AVA → aortic valve area
 - PASP → pulmonary artery systolic pressure
 
+### Nuclear / PET Measurements:
+- SSS → summed stress score
+- SRS → summed rest score
+- SDS → summed difference score
+- TID → transient ischemic dilation
+- MBF → myocardial blood flow
+- CFR → coronary flow reserve
+- CFC → coronary flow capacity
+- METs → metabolic equivalents (exercise capacity)
+
+### CTA / CT Measurements:
+- CAC → coronary artery calcium (Agatston score)
+- CAD-RADS → coronary artery disease reporting and data system
+- CT-FFR → CT-derived fractional flow reserve
+- MLA → minimum lumen area
+
+### Cardiac MRI Measurements:
+- LGE → late gadolinium enhancement
+- ECV → extracellular volume fraction
+- T1 → T1 mapping value
+- T2 → T2 mapping value
+
 ### Cardiac Procedures & Tests:
 - PCI → percutaneous coronary intervention
 - CABG → coronary artery bypass graft surgery
@@ -1977,8 +2315,12 @@ pass through raw abbreviations from clinical context to patient-facing text.
 - TTE → transthoracic echocardiogram
 - ETT → exercise treadmill test
 - SPECT → single-photon emission computed tomography
+- PET → positron emission tomography
 - LHC → left heart catheterization
+- RHC → right heart catheterization
 - FFR → fractional flow reserve
+- IVUS → intravascular ultrasound
+- CTO → chronic total occlusion
 
 Example: Instead of "The LAD shows 70% stenosis", write
 "The left anterior descending artery (LAD) shows 70% narrowing."
@@ -3269,7 +3611,14 @@ class PromptEngine:
             "pharma_spect_stress", "exercise_spect_stress",
             "pharma_pet_stress", "exercise_pet_stress",
         }
-        is_perfusion = prompt_context.get("test_type", "") in _PERFUSION_TYPES
+        # All stress/perfusion types: EF should not lead the explanation
+        _STRESS_TYPES = _PERFUSION_TYPES | {
+            "exercise_treadmill_test",
+            "exercise_stress_echo", "pharma_stress_echo",
+        }
+        test_type_id = prompt_context.get("test_type", "")
+        is_perfusion = test_type_id in _PERFUSION_TYPES
+        is_stress = test_type_id in _STRESS_TYPES
         perfusion_override = is_perfusion
 
         # Select graduated anxiety guidance
@@ -3292,6 +3641,7 @@ class PromptEngine:
             f"{_INTERPRETATION_QUALITY_RULE}"
             f"{_select_domain_knowledge(prompt_context)}"
             f"{_INTERPRETATION_STRUCTURE_PERFUSION if perfusion_override else _INTERPRETATION_STRUCTURE}"
+            f"{_STRESS_EF_DELAY_RULE if is_stress and not perfusion_override else ''}"
             f"{anxiety_section}"
             f"{analogy_section}"
             f"## Literacy Level\n{literacy_desc}\n\n"
@@ -3309,7 +3659,8 @@ class PromptEngine:
             f"If the output reads like a neutral summary, report recap, "
             f"uses banned AI phrases, or contains treatment suggestions "
             f"or hypothetical next steps, regenerate."
-            f"{' If ejection fraction or pumping function is mentioned before perfusion/ischemia findings, regenerate.' if perfusion_override else ''}\n"
+            f"{' If ejection fraction or pumping function is mentioned before perfusion/ischemia findings, regenerate.' if perfusion_override else ''}"
+            f"{' If ejection fraction or pumping function appears before stress findings, regenerate.' if is_stress and not perfusion_override else ''}\n"
         )
 
     def build_user_prompt(

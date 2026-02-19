@@ -1,7 +1,7 @@
 {
   "name": "explify",
   "private": true,
-  "version": "1.03",
+  "version": "1.04",
   "type": "module",
   "scripts": {
     "dev": "vite",
