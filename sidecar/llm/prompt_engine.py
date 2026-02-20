@@ -2450,9 +2450,35 @@ Apply these cardiac-specific interpretation rules:
 
 - DIASTOLIC FUNCTION GRADING: When E/A ratio, E/e', and TR velocity are
   provided, synthesize them into a diastolic function assessment:
-  - Grade I (impaired relaxation): E/A < 0.8, low e', normal LA
-  - Grade II (pseudonormal): E/A 0.8-2.0, elevated E/e' > 14, enlarged LA
-  - Grade III (restrictive): E/A > 2.0, E/e' > 14, dilated LA
+  - Grade I (impaired relaxation): E/A < 0.8, low e', normal LA size.
+    Tell patients: "Your heart relaxes a bit slower than normal. This is
+    the mildest form and very common with age."
+  - Grade II (pseudonormal): E/A 0.8-2.0 (looks normal but ISN'T),
+    elevated E/e' > 14, enlarged LA (LAVI > 34 mL/m²). The key to
+    recognizing pseudonormalization: E/A ratio APPEARS normal but elevated
+    filling pressures (E/e') and enlarged LA betray abnormal relaxation.
+    Tell patients: "Your filling pattern looks normal on the surface, but
+    deeper measurements show your heart is working harder to fill."
+  - Grade III (restrictive): E/A > 2.0, E/e' > 14, dilated LA. Elevated
+    filling pressures. Most severe. May be reversible or irreversible
+    (test with Valsalva — if E/A ratio reverses to < 1.0 with Valsalva,
+    it is reversible and potentially treatable).
+  - INDETERMINATE: When indices disagree (e.g., E/A suggests Grade I but
+    E/e' > 14), grade is indeterminate. Prioritize E/e' and LAVI over E/A
+    because E/A is flow-dependent and unreliable in many conditions (AFib,
+    tachycardia, mitral disease). When reporting indeterminate diastology,
+    say: "The filling measurements give mixed results — some suggest mild
+    abnormality while others suggest elevated pressures."
+  - CONSTRICTIVE vs RESTRICTIVE differentiation (when suspected):
+    - Constrictive pericarditis: Septal bounce (respiratory variation in
+      septal position), exaggerated E velocity respiratory variation (> 25%),
+      annulus paradoxus (e' is normal or elevated despite elevated filling
+      pressures), thickened pericardium, IVC plethora.
+    - Restrictive cardiomyopathy: No septal bounce, minimal respiratory
+      variation in E, reduced e', increased wall thickness (amyloid, storage
+      diseases). E/e' is markedly elevated.
+    - KEY: In constrictive pericarditis, the PERICARDIUM is the problem;
+      in restrictive cardiomyopathy, the MYOCARDIUM is the problem.
   Explain what the grade means clinically, not just the individual numbers.
 
 - LV WALL THICKNESS: IVSd or LVPWd > 1.1 cm suggests left ventricular
@@ -2465,6 +2491,40 @@ Apply these cardiac-specific interpretation rules:
 
 - PULMONARY HYPERTENSION: RVSP > 35 mmHg suggests elevated pulmonary
   pressures. Pair with RV size and TR velocity for a complete picture.
+  - Echo-estimated RVSP = 4(TR velocity)² + RAP
+  - RAP estimated from IVC diameter/collapsibility: < 2.1 cm + > 50%
+    collapse = RAP 3 mmHg; > 2.1 cm + < 50% collapse = RAP 15 mmHg
+  - Mild PH: RVSP 36-50 mmHg
+  - Moderate PH: RVSP 51-70 mmHg
+  - Severe PH: RVSP > 70 mmHg
+  - CAUTION: Echo underestimates or overestimates RVSP in up to 50% of
+    cases. Right heart catheterization (RHC) is the gold standard.
+
+- RIGHT HEART CATHETERIZATION (RHC) HEMODYNAMICS:
+  When RHC data is present, classify pulmonary hypertension precisely:
+  - NORMAL HEMODYNAMICS: mPAP < 20 mmHg, PCWP < 15 mmHg, PVR < 2 WU
+  - PRE-CAPILLARY PH (WHO Group 1, 3, 4, 5): mPAP > 20 mmHg, PCWP <= 15,
+    PVR > 2 WU. The problem is in the pulmonary arteries themselves.
+  - POST-CAPILLARY PH (WHO Group 2): mPAP > 20 mmHg, PCWP > 15 mmHg.
+    The problem is left-sided heart disease causing back-pressure.
+    - Isolated post-capillary (IpcPH): PVR <= 2 WU — purely passive congestion
+    - Combined pre- and post-capillary (CpcPH): PVR > 2 WU — congestion PLUS
+      intrinsic pulmonary vascular disease. Worse prognosis.
+  - TRANSPULMONARY GRADIENT (TPG): mPAP - PCWP. Normal < 12 mmHg.
+    TPG > 12 with elevated PCWP = combined disease (not just passive).
+  - DIASTOLIC PRESSURE GRADIENT (DPG): dPAP - PCWP. Normal < 7 mmHg.
+    DPG > 7 = pulmonary vascular remodeling beyond passive congestion.
+  - PULMONARY VASCULAR RESISTANCE (PVR): (mPAP - PCWP) / CO.
+    Normal < 2 WU. Mild 2-3 WU. Moderate 3-5 WU. Severe > 5 WU.
+  - VASODILATOR CHALLENGE: Positive response = drop in mPAP >= 10 mmHg
+    to absolute mPAP <= 40 mmHg with stable or increased CO. Positive
+    responders may benefit from calcium channel blockers (only ~10% of
+    Group 1 PAH patients respond). Tell patients: "We tested whether your
+    blood vessel pressures respond to a blood vessel relaxing medicine."
+  - CARDIAC OUTPUT (CO) and CARDIAC INDEX (CI): CO = HR × SV. CI = CO/BSA.
+    Normal CI 2.5-4.0 L/min/m². CI < 2.2 = low output state.
+  - FICK vs THERMODILUTION: Two methods for measuring CO. May disagree,
+    especially in low-output states or severe TR.
 
 - CORONARY FLOW CAPACITY (CFC): CFC is NOT the same as CFR. It is a
   composite classification that integrates stress MBF and CFR together:
@@ -2572,37 +2632,95 @@ Apply these cardiac-specific interpretation rules:
 
 ### Stress Testing Rules (Treadmill, Stress Echo)
 
-- EXERCISE CAPACITY: Duration and workload are strong prognostic
+- EXERCISE CAPACITY (METs): Duration and workload are strong prognostic
   markers. Completing >= 9 minutes on a Bruce protocol (>= 10 METs)
   is associated with excellent prognosis regardless of other findings.
-  < 6 minutes (< 7 METs) suggests limited functional capacity. When
-  exercise duration is reported, contextualize it — "you were able to
-  exercise for a good amount of time, which is a positive sign."
+  < 6 minutes (< 7 METs) suggests limited functional capacity.
+  - PATIENT-FRIENDLY METs TRANSLATION:
+    - 1-3 METs (poor): Basic self-care activities only. "Your exercise
+      ability is very limited — this suggests significant functional
+      impairment."
+    - 4-6 METs (below average): Light housework, slow walking (2-3 mph),
+      climbing one flight of stairs slowly.
+    - 7-9 METs (average): Brisk walking (3-4 mph), cycling at moderate
+      pace, light yard work, climbing stairs without stopping.
+    - 10-12 METs (above average): Jogging, swimming laps, singles tennis,
+      heavy yard work. "You achieved excellent exercise capacity."
+    - > 12 METs (excellent): Running, vigorous sports. "Your fitness level
+      is in the top tier — this is a very positive finding."
+  - PROGNOSTIC POWER: Exercise capacity (METs) is the STRONGEST predictor
+    of all-cause mortality from a stress test — more predictive than
+    perfusion findings or ST changes. Always highlight exercise capacity
+    prominently in the explanation.
 
-- DUKE TREADMILL SCORE: When reported, interpret as:
-  - Score >= 5: low risk (excellent prognosis)
-  - Score -10 to +4: intermediate risk
-  - Score < -10: high risk
-  If not reported but exercise time, ST changes, and angina are
-  available, synthesize these elements into a functional assessment.
+- DUKE TREADMILL SCORE (DTS): A validated composite risk score.
+  Formula: DTS = Exercise time (minutes, Bruce protocol) - (5 × max ST
+  deviation in mm) - (4 × angina index)
+  where angina index: 0 = no angina, 1 = non-limiting angina,
+  2 = exercise-limiting angina.
+  - Score >= 5: LOW RISK (annual mortality < 1%). Excellent prognosis.
+  - Score -10 to +4: INTERMEDIATE RISK (annual mortality 2-3%).
+  - Score < -10: HIGH RISK (annual mortality >= 5%).
+  - Example: 10 minutes exercise, 2mm ST depression, non-limiting angina:
+    DTS = 10 - (5 × 2) - (4 × 1) = 10 - 10 - 4 = -4 (intermediate risk)
+  - Gender note: DTS was developed primarily in men. In women, the score
+    has lower sensitivity — consider supplemental imaging for intermediate-
+    risk women.
+  If DTS is not explicitly reported but components are available,
+  synthesize exercise time, ST changes, and angina into a functional
+  assessment.
 
 - HEART RATE RESPONSE: Achieving >= 85% of age-predicted maximum heart
   rate (220 - age) is adequate. Failure to reach target HR limits the
   test's ability to detect ischemia — note this limitation. Chronotropic
   incompetence (inability to raise HR appropriately) is itself a risk
-  marker.
+  marker — see NUCLEAR block "Stress Test Prognostic Markers" for detail.
 
 - ST-SEGMENT CHANGES: Downsloping ST depression is more specific for
   ischemia than horizontal or upsloping depression. ST elevation during
   exercise is a significant finding suggesting transmural ischemia.
   When ST changes are reported, describe their clinical meaning rather
   than the ECG pattern.
+  - TIMING: ST changes in recovery (after exercise stops) are MORE specific
+    for ischemia than changes during exercise alone.
+  - MAGNITUDE: > 2mm ST depression = higher risk than 1-2mm.
+  - BASELINE ABNORMALITIES: LVH, digoxin, baseline ST abnormalities, LBBB
+    all make ST interpretation unreliable — note this limitation.
 
 - STRESS ECHO WALL MOTION: New wall motion abnormality at peak stress
   that was not present at rest = ischemia in that territory. Wall
   motion abnormality present at both rest and stress = scar. Worsening
   of a pre-existing abnormality at stress = peri-infarct ischemia.
   Synthesize the before/after comparison for the patient.
+
+### Borderline / Equivocal Findings Communication
+
+When values fall at thresholds between normal and abnormal, do NOT force
+a binary classification. Instead, acknowledge the borderline nature and
+provide context:
+
+- EF 40-45%: "Your heart's pumping function is at the lower end of normal
+  to mildly reduced range. Small changes in measurement technique can
+  shift this number. What matters most is the trend over time."
+- RVSP 35-45 mmHg: "The estimated pressure in your lung arteries is at
+  the upper limit of normal or mildly elevated. This can be affected by
+  heart rate, breathing, and other factors. Your doctor may want to
+  monitor this over time."
+- Calcium Score at 25-75th percentile: "Your calcium score is in the
+  average range for people your age and sex. This means plaque is present
+  but not more than expected."
+- Stenosis ~50%: "The narrowing is at the borderline between mild and
+  moderate. A functional test (like a pressure wire) may be needed to
+  determine if it's affecting blood flow."
+- EF decline (e.g., 55% → 48%): "Your pumping function has decreased
+  from the prior study. While some variation is expected between tests,
+  a drop of this magnitude warrants attention and follow-up."
+- GLS -18% to -20%: "Your global strain is at the lower end of normal.
+  In the setting of [condition], this may represent early changes."
+
+General principle: Frame borderline results as "worth monitoring" rather
+than definitively normal or abnormal. Connect to clinical context when
+available.
 
 ### CTA Coronary-Specific Rules
 
@@ -2712,6 +2830,62 @@ Apply these cardiac-specific interpretation rules:
   but may be ischemic during exertion. Frame CTO differently than
   acute occlusion — it is a chronic condition the heart has adapted to.
 
+- CORONARY STENOSIS SEVERITY (% diameter reduction on angiography):
+  - < 50%: Non-obstructive — plaque is present but not flow-limiting.
+    Tell patients: "There is some buildup in the artery, but it is not
+    blocking blood flow. This is managed with medications and lifestyle."
+  - 50-69%: Borderline — may or may not limit flow. Functional testing
+    (FFR/iFR) is indicated to determine significance. Tell patients:
+    "There is moderate narrowing; we may need an additional pressure test
+    to determine if it's affecting blood flow."
+  - 70-99%: Significant — typically flow-limiting and warrants intervention
+    (PCI or medical therapy depending on anatomy, symptoms, and test results).
+  - 100%: Total occlusion (acute or chronic — see CTO above).
+
+- LEFT MAIN DISEASE: The left main coronary artery supplies 75-100% of
+  the LV. Disease thresholds are LOWER than other vessels:
+  - LM >= 50% stenosis is "significant" (vs >= 70% for other vessels)
+  - LM >= 50% + LVEF reduction = highest risk — survival benefit with
+    revascularization (CABG preferred over PCI for complex LM disease)
+  - SYNTAX score guides revascularization strategy for LM/multivessel:
+    Low (0-22): PCI or CABG. Intermediate (23-32): CABG preferred.
+    High (> 32): CABG strongly preferred.
+  Tell patients: "The left main artery is the most important artery in
+  the heart because it supplies the largest area of heart muscle."
+
+- COLLATERAL FLOW GRADING (Rentrop Classification):
+  - Grade 0: No visible collateral filling
+  - Grade 1: Filling of side branches only
+  - Grade 2: Partial filling of the epicardial vessel
+  - Grade 3: Complete filling of the epicardial vessel by collaterals
+  Well-developed collaterals (Grade 2-3) protect myocardium from ischemia
+  and are favorable for CTO revascularization outcomes.
+
+- IN-STENT RESTENOSIS PATTERNS:
+  - Focal (< 10mm): At stent edges or body. Usually responds to drug-coated
+    balloon or repeat DES placement.
+  - Diffuse (> 10mm): Throughout the stent. Suggests aggressive neointimal
+    proliferation. May require different stent type or CABG.
+  - Proliferative: Extends beyond stent edges. Most aggressive pattern.
+  - Time course: Bare-metal stent restenosis peaks at 6-12 months.
+    Drug-eluting stent restenosis is less common but can occur late
+    (> 1 year). Very late stent thrombosis (abrupt occlusion) is a
+    different entity — acute emergency, not gradual restenosis.
+
+- MICROVASCULAR DISEASE (CORONARY MICROVASCULAR DYSFUNCTION — CMD):
+  - Diagnosis requires: Symptoms (chest pain, dyspnea) + positive
+    stress test or reduced CFR + normal coronary angiography (no
+    obstructive epicardial CAD).
+  - More common in women, diabetics, and patients with hypertension.
+  - PET-derived CFR < 2.0 with normal coronaries = CMD diagnosis.
+  - Invasive testing: Coronary flow reserve by Doppler wire, acetylcholine
+    provocation testing for vasospasm.
+  - Treatment differs from obstructive CAD: beta-blockers, ACE-I/ARBs,
+    statins, ranolazine, lifestyle modification. No stenting.
+  - Tell patients: "Your large arteries look open, but the tiny blood
+    vessels in the heart muscle are not working properly. This is a real
+    condition that causes real symptoms and requires treatment."
+
 ### Cardiac MRI-Specific Rules
 
 - TISSUE CHARACTERIZATION PATTERNS: Synthesize T1, T2, ECV, and late
@@ -2757,15 +2931,28 @@ Apply these cardiac-specific interpretation rules:
   - HFrEF (EF < 40%): systolic dysfunction — the heart muscle is weakened
     and pumps less blood. Frame as "your heart's pumping strength is
     reduced" and note that medications can often improve function.
+    Guideline-directed medical therapy (GDMT): ACEi/ARB/ARNI, beta-blocker,
+    MRA, SGLT2i — the "four pillars" of HFrEF treatment.
   - HFmrEF (EF 41-49%): mildly reduced — NOT "near normal." This is a
     recognized intermediate phenotype with real prognostic implications.
     Do NOT dismiss EF in this range as "borderline normal."
+    Recent evidence supports SGLT2i and ARNI benefit in HFmrEF.
+    Monitor for trajectory: improving HFmrEF (previously HFrEF, responding
+    to therapy) has better prognosis than de novo HFmrEF or worsening
+    HFmrEF (previously normal, declining).
   - HFpEF (EF >= 50% with diastolic dysfunction): the heart pumps
     normally but is stiff and doesn't fill well. Do NOT tell these
     patients "your heart is normal." Instead: "your heart pumps well
     but has trouble relaxing and filling, which can cause symptoms like
     shortness of breath." Integrate E/e', LAVI, and filling pressures
     (LVEDP/PCWP if available) to support the diagnosis.
+  - ULTRA-PRESERVED EF (>= 70%): In certain conditions, an EF > 70% is
+    NOT reassuring and may be ABNORMAL:
+    - HCM: Hypercontractile, small cavity → artificially high EF
+    - Cardiac amyloidosis: Thick walls, restrictive physiology
+    - Severe MR: EF is falsely elevated because part of the stroke volume
+      goes backward into the LA (effective forward EF is lower)
+    When EF is >= 70%, check for these conditions before calling it "normal."
 
 - ATRIAL FIBRILLATION CONTEXT: When AFib is noted in the report or
   clinical context, adjust interpretation accordingly:
@@ -3152,9 +3339,42 @@ Apply these cardiac-specific interpretation rules:
   - Mild: peak gradient < 36 mmHg
   - Moderate: peak gradient 36-64 mmHg
   - Severe: peak gradient > 64 mmHg
+  Intervention considered when peak gradient > 64 mmHg with symptoms or
+  RV dysfunction (balloon valvuloplasty is first-line for pulmonic stenosis).
   Pulmonic regurgitation is common and physiological (trace to mild).
   Significant PR suggests pulmonary hypertension or post-surgical (repaired
   Tetralogy of Fallot).
+
+- AORTIC REGURGITATION (AR) SEVERITY:
+  - Mild: Jet width < 25% of LVOT, vena contracta < 3mm, pressure half-time
+    > 500 ms, no LV dilation, regurgitant volume < 30 mL, EROA < 0.10 cm²
+  - Moderate: Jet width 25-65% of LVOT, vena contracta 3-6mm, pressure
+    half-time 200-500 ms, mild LV dilation, RVol 30-59 mL, EROA 0.10-0.29 cm²
+  - Severe: Jet width > 65% of LVOT, vena contracta > 6mm, pressure half-time
+    < 200 ms (rapid equalization = severe), holodiastolic flow reversal in
+    descending aorta, significant LV dilation, RVol >= 60 mL, EROA >= 0.30 cm²
+  Context: Holodiastolic flow reversal in the descending aorta is a specific
+  sign of severe AR. When seen, explain: "Blood is flowing backward through
+  the valve during the entire filling phase, which indicates significant
+  leakage." Chronic severe AR causes LV volume overload → LV dilation →
+  eventually LV dysfunction. Surgical threshold: symptomatic severe AR, or
+  asymptomatic with LVEF < 55% or LVESDi > 25 mm/m² or LVESD > 50 mm.
+
+- PROSTHETIC VALVE REFERENCE RANGES (by type/size):
+  - Mechanical aortic: Mean gradient typically 10-20 mmHg (varies by size).
+    Small sizes (19-21mm) may have mean gradient up to 25 mmHg normally.
+  - Bioprosthetic aortic: Mean gradient typically 10-15 mmHg for sizes >= 23mm.
+    Sizes 19-21mm may have mean gradient up to 20 mmHg normally.
+  - Mitral prostheses (mechanical or bio): Mean gradient typically 3-6 mmHg.
+    > 8 mmHg suggests obstruction or patient-prosthesis mismatch.
+  - PATIENT-PROSTHESIS MISMATCH (PPM): Effective orifice area indexed to BSA
+    < 0.85 cm²/m² (moderate) or < 0.65 cm²/m² (severe) for aortic position.
+    PPM creates inherently higher gradients — NOT valve dysfunction.
+  - KEY: When prosthesis type/size is known, compare to expected normals.
+    When unknown, note that interpretation depends on specific prosthesis.
+  - STRUCTURAL VALVE DETERIORATION: Progressive increase in gradient over
+    years (bioprosthetic) or new/worsening regurgitation. Compare to
+    baseline post-implant echo.
 
 ### Cardiac Amyloidosis
 
@@ -3300,6 +3520,28 @@ Apply these cardiac-specific interpretation rules:
 
 ### Pacemaker / ICD / CRT Device Interrogation
 
+- PACING MODES (NBG Code — 3-5 letter code):
+  Position 1: Chamber paced (A=atrium, V=ventricle, D=dual)
+  Position 2: Chamber sensed (A, V, D, O=none)
+  Position 3: Response to sensing (I=inhibit, T=trigger, D=dual, O=none)
+  Position 4: Rate response (R=rate-responsive, O=none)
+  Common modes:
+  - VVI: Paces ventricle, senses ventricle, inhibits when native beat.
+    Single-chamber pacing. Used for chronic AFib with slow ventricular rate.
+  - AAI: Paces atrium, senses atrium, inhibits when native beat.
+    Single-chamber atrial pacing. Used for sinus node dysfunction with
+    intact AV conduction.
+  - DDD: Paces both chambers, senses both, dual response. The standard
+    dual-chamber mode. Maintains AV synchrony. Most physiologic.
+  - DDDR: DDD + rate response. Sensor (accelerometer or minute ventilation)
+    adjusts pacing rate with activity. Standard for active patients.
+  - VVI-R: VVI with rate response. For AFib patients who need rate
+    acceleration with activity.
+  - DOO/VOO: Asynchronous mode (no sensing). Used during surgery or
+    magnet application. Fixed-rate pacing regardless of native rhythm.
+  Tell patients: "Your device is programmed in [MODE] mode, which means
+  it [simple explanation of what the mode does]."
+
 - PACING PERCENTAGES: Atrial pacing % and ventricular pacing %. High
   unnecessary RV pacing (> 40%) can worsen heart failure in some patients.
   CRT devices aim for biventricular pacing > 98% for optimal benefit.
@@ -3325,6 +3567,25 @@ Apply these cardiac-specific interpretation rules:
 - THRESHOLD TESTING: Capture threshold (minimum energy to pace the heart).
   Rising thresholds over time may indicate lead maturation, dislodgement,
   or fibrosis. Sudden increase warrants evaluation.
+
+- LEADLESS PACEMAKERS (Micra): Single-chamber (VVI) device implanted
+  directly in the RV via femoral vein. No leads or subcutaneous pocket.
+  Battery longevity ~12 years. Impedance and threshold monitoring similar
+  to conventional leads. No chest X-ray lead evaluation. Appropriate for
+  patients with limited venous access or high infection risk.
+
+- SUBCUTANEOUS ICD (S-ICD): Implanted subcutaneously (no transvenous
+  leads). Provides defibrillation but NOT pacing (except brief post-shock
+  pacing). Cannot provide anti-tachycardia pacing (ATP). Appropriate for
+  patients at risk for VT/VF who do NOT need pacing. Sensing from
+  subcutaneous electrodes — different filtering and sensing algorithms
+  than transvenous ICD. T-wave oversensing is a known issue.
+
+- CONDUCTION SYSTEM PACING (CSP): Newer alternative to traditional RV
+  pacing. His bundle pacing (HBP) or left bundle branch area pacing (LBBAP)
+  activate the native conduction system for more physiologic activation.
+  Narrower QRS than RV pacing. May be preferred in patients needing high
+  ventricular pacing percentage to avoid pacing-induced cardiomyopathy.
 
 ### Cross-Test Rules (All Cardiac Types)
 
@@ -4936,6 +5197,51 @@ Apply these nuclear cardiology interpretation rules:
   When reporting CFC, explain that it represents the heart's overall ability
   to increase blood delivery when working hard.
 
+### PET-Specific Absolute MBF Interpretation
+
+When absolute myocardial blood flow values are reported (mL/min/g):
+- STRESS MBF SEVERITY GRADING:
+  - Normal: >= 2.0 mL/min/g
+  - Mildly reduced: 1.5-2.0 mL/min/g
+  - Moderately reduced: 0.75-1.5 mL/min/g
+  - Severely reduced: < 0.75 mL/min/g
+- REST MBF: Normal 0.6-1.2 mL/min/g. Elevated resting MBF (>1.2) may be
+  due to high rate-pressure product, anemia, or compensatory response.
+  Abnormally low resting MBF (<0.5) suggests critical stenosis or severe
+  microvascular disease.
+
+- REGIONAL vs GLOBAL FLOW REDUCTION:
+  - REGIONAL: Reduced MBF/CFR in one coronary territory with normal flow
+    in others → focal epicardial stenosis in that territory's artery.
+  - GLOBAL: Reduced MBF/CFR across ALL territories → two possibilities:
+    1. BALANCED ISCHEMIA: Severe multi-vessel or left main CAD where all
+       territories are equally affected. Relative perfusion imaging (SPECT)
+       may appear "normal" because there is no reference normal territory.
+       This is a dangerous false negative — only absolute flow PET detects it.
+    2. MICROVASCULAR DISEASE: Abnormal vasodilation at capillary level without
+       significant epicardial stenosis. More common in women, diabetics, and
+       patients with HTN. Diagnosis requires: symptoms + abnormal CFR + normal
+       coronary angiography.
+  - Tell patients with balanced ischemia: "Even though the pictures may look
+    similar everywhere, the actual blood flow numbers show all areas are
+    getting less blood than they should during stress. This can happen when
+    multiple arteries are narrowed."
+
+- PET TRACER CONSIDERATIONS:
+  - RUBIDIUM-82 (Rb-82): 75-second half-life, generator-produced, most
+    commonly used. High throughput. Lower spatial resolution than N-13.
+    Adequate for most clinical questions. Flow quantification reliable
+    but may underestimate MBF at very high flows.
+  - N-13 AMMONIA: 10-minute half-life, cyclotron-produced (limited
+    availability). Superior spatial resolution and image quality. More
+    accurate flow quantification at high flow rates. Longer imaging
+    window allows exercise stress (not just pharmacologic).
+  - F-18 FLURPIRIDAZ: Newest agent (FDA approved 2024). 110-minute
+    half-life, excellent spatial resolution, allows exercise stress.
+    Better extraction fraction at high flow.
+  - Tracer choice does NOT change clinical interpretation of results —
+    the severity categories above apply regardless of tracer.
+
 ### Gated Function (SPECT or PET)
 
 - LVEF FROM GATED IMAGES: Provides ejection fraction from the nuclear images.
@@ -4962,21 +5268,99 @@ Apply these nuclear cardiology interpretation rules:
   - Focus on perfusion findings, wall motion, and EF
   Side effects (flushing, chest tightness, shortness of breath) are from
   the drug, not from heart disease.
+  - ADENOSINE: Continuous IV infusion 140 µg/kg/min for 4-6 minutes.
+    Non-selective adenosine receptor agonist. More side effects than
+    regadenoson (bronchospasm, AV block, hypotension). Contraindicated
+    in asthma/severe COPD, 2nd/3rd degree AV block, SBP < 90 mmHg.
+    Must hold caffeine 12-24 hours before test.
+  - REGADENOSON: Single IV bolus (0.4 mg). Selective A2A receptor agonist.
+    Fewer side effects, more predictable. Can be used cautiously in mild
+    COPD (not severe asthma). Also requires caffeine abstinence.
+  - DIPYRIDAMOLE: Older agent, indirect mechanism (blocks adenosine reuptake).
+    Less commonly used. Reversed with aminophylline.
 
-- DOBUTAMINE: Stimulates the heart directly. Heart rate response IS relevant
-  for dobutamine stress. Evaluates contractile reserve.
+- DOBUTAMINE: Stimulates the heart directly (beta-1 agonist). Heart rate
+  response IS relevant — target 85% age-predicted maximum HR. Used when
+  vasodilators are contraindicated (asthma, severe COPD, caffeine use).
+  - Low dose (5-10 µg/kg/min): Inotropic effect. Used for viability
+    assessment — hibernating myocardium may "wake up" at low dose.
+  - High dose (20-40 µg/kg/min) + atropine if needed: Chronotropic effect.
+    Used for ischemia detection.
+  - BIPHASIC RESPONSE: Improvement at low dose but worsening at high dose
+    indicates viable but ischemic myocardium — a candidate for
+    revascularization. This is a KEY finding.
+  - Beta-blocker interference: Patients on beta-blockers may not reach
+    target HR. Some protocols require beta-blocker washout (24-48 hours).
+    If patient exercised on beta-blocker and did NOT reach target HR,
+    note this as a limitation: "The test was submaximal, which may reduce
+    sensitivity for detecting ischemia."
+
+### Stress Test Prognostic Markers
+
+- CHRONOTROPIC INCOMPETENCE (CI): Inability to achieve >= 85% of age-predicted
+  maximum heart rate during exercise OR chronotropic index < 0.80.
+  CI is an INDEPENDENT predictor of cardiac mortality even when perfusion
+  is normal. Do not dismiss a "negative" stress test if the patient showed CI.
+  Tell patients: "Although we did not find evidence of blockages, your heart
+  rate did not increase as much as expected during exercise, which is a
+  finding we take seriously and may warrant further evaluation."
+
+- EXERCISE-INDUCED HYPOTENSION: Systolic BP drop > 10 mmHg from baseline
+  during exercise, or failure of SBP to rise above resting level. Suggests
+  severe multivessel disease, left main stenosis, or severe LV dysfunction.
+  This is a HIGH-RISK finding that warrants urgent follow-up.
+
+- EXERCISE-INDUCED ARRHYTHMIAS:
+  - Frequent PVCs during exercise: Common and usually benign
+  - PVCs during RECOVERY (post-exercise): More concerning, associated with
+    increased mortality risk
+  - Sustained VT during stress: Stop test, HIGH-RISK finding
+  - New-onset atrial fibrillation during exercise: Warrants clinical attention
+  - Exercise-induced 2nd/3rd degree AV block: Suggests disease in the
+    His-Purkinje system
+
+- POST-EXERCISE ST CHANGES: ST depression that APPEARS or WORSENS during
+  recovery (after the patient stops exercising) is MORE specific for true
+  ischemia than ST changes during exercise alone. The timing matters.
+
+- HEART RATE RECOVERY (HRR): Failure of heart rate to decrease by >= 12 bpm
+  in the first minute after stopping exercise (upright position) OR >= 18 bpm
+  (supine position) is abnormal. Impaired HRR is an independent predictor
+  of all-cause mortality. Simple to assess and highly prognostic.
 
 ### Calcium Score (CT Calcium Scoring)
 
 - AGATSTON SCORE:
-  - 0: Very low risk (no detectable calcium)
+  - 0: Very low risk (no detectable calcium). Strong negative predictor —
+    risk of cardiac events is very low (but NOT zero; soft non-calcified
+    plaque can exist with score 0, especially in younger patients).
+    Tell patients: "A zero calcium score is very reassuring. Your risk
+    of having a significant blockage right now is very low."
   - 1-100: Low risk (mild plaque burden)
   - 101-400: Moderate risk (moderate plaque burden)
   - > 400: High risk (extensive plaque burden)
   - > 1000: Very high risk
-  Percentile by age/sex matters — a score of 200 is more concerning in a
-  45-year-old than a 75-year-old. Calcium score shows plaque BURDEN but
-  not whether arteries are actually blocked.
+
+- AGE/SEX PERCENTILE INTERPRETATION:
+  Percentile by age/sex is often MORE informative than raw score:
+  - > 75th percentile for age/sex: Plaque burden higher than most peers.
+    Warrants aggressive risk factor modification regardless of raw score.
+    A 45-year-old with score 150 at 95th percentile is more concerning
+    than a 75-year-old with score 300 at 50th percentile.
+  - 25-75th percentile: Average for age. Standard risk management.
+  - < 25th percentile: Less plaque than expected. Favorable.
+  Tell patients: "Your score is [X], which puts you at the [Y]th percentile
+  for your age and sex — meaning [Y]% of people your age have less calcium."
+
+- SERIAL CALCIUM SCORING: Approximately 10-15% annual increase is typical
+  progression. Progression > 15-20% per year or absolute increase > 100
+  suggests accelerated atherosclerosis and may warrant intensified therapy.
+  Comparing scores requires same CT scanner and protocol.
+
+- CALCIUM SCORE DOES NOT EQUAL STENOSIS: Calcium indicates plaque BURDEN
+  but not whether arteries are actually blocked. A high score with no
+  symptoms may not need further testing. A score of 0 in a symptomatic
+  patient does not exclude soft plaque — consider CTA or stress testing.
 
 ### Territory Mapping
 
@@ -5043,6 +5427,217 @@ Always explain in plain language: "The area of your heart supplied by the
 - RATE-PRESSURE PRODUCT: Resting MBF is influenced by cardiac workload
   (heart rate x systolic BP). Elevated resting MBF from high RPP may
   artificially lower CFR. Some centers normalize resting MBF to a standard RPP.
+
+"""
+
+_CLINICAL_DOMAIN_KNOWLEDGE_CARDIAC_MRI = """\
+## Clinical Domain Knowledge — Cardiac MRI (CMR)
+
+Apply these CMR-specific interpretation rules when explaining cardiac MRI findings.
+
+### Tissue Characterization — The Unique Strength of CMR
+
+CMR goes beyond anatomy and function — it characterizes TISSUE. Explain this
+to patients: "Unlike an echo or CT, cardiac MRI can see what the heart muscle
+is made of — whether there is scarring, swelling, or infiltration."
+
+### Late Gadolinium Enhancement (LGE) Patterns
+
+LGE identifies areas of fibrosis/scar by showing where gadolinium contrast
+accumulates (damaged tissue washes out contrast more slowly than healthy tissue).
+
+- ISCHEMIC PATTERN (subendocardial or transmural):
+  - Starts from the inner layer (subendocardium) and extends outward
+  - Follows a coronary artery territory distribution
+  - Subendocardial only (< 50% wall thickness): viable myocardium — may
+    recover function with revascularization
+  - Transmural (> 50% wall thickness): nonviable — unlikely to recover
+    even with revascularization
+  - KEY RULE: "The more scar through the wall, the less likely recovery"
+
+- NON-ISCHEMIC PATTERNS:
+  - MID-WALL: Fibrosis in the middle of the wall, sparing endo- and epicardium.
+    Seen in: dilated cardiomyopathy (DCM), hypertrophic cardiomyopathy (HCM)
+    at RV insertion points, sarcoidosis, Chagas disease, myotonic dystrophy.
+    Mid-wall LGE in DCM is a strong predictor of arrhythmic events and SCD.
+  - SUBEPICARDIAL: Fibrosis in the outer layer. Classic for: myocarditis
+    (especially inferolateral wall), sarcoidosis, Anderson-Fabry disease.
+  - PATCHY / MULTIFOCAL: Scattered areas not following coronary territories.
+    Seen in: sarcoidosis, myocarditis (multifocal), radiation-induced.
+  - RV INSERTION POINT: Enhancement at the junction of RV and septum.
+    Seen in: pulmonary hypertension (pressure overload), HCM. Usually NOT
+    clinically significant in isolation if only at insertion points.
+  - DIFFUSE SUBENDOCARDIAL (circumferential): Characteristic of cardiac
+    amyloidosis. Unlike ischemic pattern, this involves BOTH coronary
+    territories circumferentially. Often with difficulty nulling myocardium
+    on inversion recovery sequences.
+
+### T1 Mapping
+
+Native (pre-contrast) T1 values reflect tissue composition:
+- ELEVATED NATIVE T1: Edema (acute injury), fibrosis, amyloid infiltration,
+  iron overload (only mildly), Anderson-Fabry (LOWERED, not elevated — see below)
+- NORMAL NATIVE T1: Varies by field strength (1.5T: ~950-1050 ms; 3T: ~1100-1200 ms).
+  Always compare to local institutional normals.
+- LOWERED NATIVE T1: Anderson-Fabry disease (sphingolipid accumulation),
+  iron overload (hemochromatosis, transfusion-dependent). Low T1 is relatively
+  specific and helps narrow the differential.
+- ELEVATED POST-CONTRAST T1 / LOW POST-CONTRAST T1: Reflects gadolinium
+  distribution. Used to calculate ECV (see below).
+
+### T2 Mapping
+
+T2 values reflect tissue water content (edema):
+- ELEVATED T2 (> ~50-55 ms at 1.5T): Active inflammation/edema.
+  Seen in: acute myocarditis, acute MI (area at risk), transplant rejection,
+  sarcoid flare, stress cardiomyopathy (Takotsubo).
+- NORMAL T2 with LGE: Chronic/healed scar (no active edema). Helps
+  distinguish acute from chronic injury.
+- KEY CLINICAL USE: T2 elevation = "active" disease. If T2 is elevated
+  and LGE is present, the process is acute or active. If T2 is normal
+  and LGE is present, the process is chronic/burned out.
+
+### Extracellular Volume (ECV)
+
+ECV quantifies the proportion of myocardium that is extracellular space
+(normal ~25-30%). Calculated from pre/post-contrast T1 values and hematocrit.
+- ELEVATED ECV (> 30%): Diffuse fibrosis, amyloid infiltration, edema.
+  Amyloidosis typically shows ECV > 40-50% (very high).
+- ECV ADVANTAGE: Detects DIFFUSE disease that LGE misses (LGE relies on
+  contrast between normal and abnormal — if the entire heart is affected,
+  there is no "normal" reference and LGE may appear absent).
+- Explain to patients: "ECV measures how much of your heart muscle is
+  healthy tissue versus scarring or other material. A higher number means
+  more of the normal muscle has been replaced."
+
+### Disease-Specific CMR Patterns
+
+- MYOCARDITIS:
+  - Acute: Elevated T2 (edema) + subepicardial/mid-wall LGE (inferolateral
+    wall classically) + elevated ECV + normal or mildly reduced EF.
+  - Fulminant: Diffuse T2 elevation, reduced EF, may have pericardial effusion.
+  - Healed: LGE persists (scar) but T2 normalizes (no active edema).
+  - Updated Lake Louise Criteria (2018): At least one T2-based criterion
+    (T2 mapping or T2-weighted imaging) PLUS one T1-based criterion (T1
+    mapping, ECV, or LGE) = consistent with myocarditis.
+  - Tell patients: "The MRI shows a pattern of inflammation in your heart
+    muscle. This is different from a heart attack — it's caused by a virus
+    or immune reaction, not a blocked artery."
+
+- CARDIAC AMYLOIDOSIS:
+  - KEY FINDINGS: Difficulty nulling myocardium on standard inversion recovery
+    (myocardium and blood pool null at similar TI), diffuse subendocardial or
+    transmural LGE not following coronary territories, very elevated native T1,
+    very elevated ECV (often > 40-50%), LV wall thickening (mimics LVH),
+    biatrial enlargement, small pericardial effusion.
+  - LGE pattern: Global subendocardial or transmural. "Zebra stripe" pattern
+    in advanced disease.
+  - APICAL SPARING pattern on strain imaging (GLS) — base and mid segments
+    are impaired while apex is preserved. Characteristic but not exclusive.
+  - ATTR vs AL distinction: CMR cannot definitively distinguish subtypes
+    (need nuclear pyrophosphate scan for ATTR, serum/urine studies for AL).
+    But ATTR tends to be more symmetric LVH while AL may be more asymmetric.
+  - Tell patients: "Amyloid is an abnormal protein that deposits in the
+    heart muscle, making it thick and stiff. The MRI pattern strongly
+    suggests this diagnosis."
+
+- SARCOIDOSIS:
+  - LGE: Mid-wall or subepicardial, often in lateral wall or septum.
+    May be patchy or multifocal. Does NOT follow coronary territories.
+  - T2 elevation: Suggests active granulomatous inflammation (may respond
+    to immunosuppression).
+  - Wall motion abnormalities out of proportion to coronary territory.
+  - Septal thinning in chronic cases.
+  - Tell patients: "Sarcoidosis can affect the heart by causing patches
+    of inflammation and scarring. The MRI helps us see where and how
+    much the heart is affected."
+
+- ARVC (Arrhythmogenic Right Ventricular Cardiomyopathy):
+  - RV free wall fatty infiltration (T1-bright on non-contrast imaging)
+  - Regional RV wall motion abnormalities (akinesis, dyskinesis, aneurysm)
+  - RV dilation and dysfunction
+  - RV LGE (fibrofatty replacement)
+  - Revised Task Force Criteria: CMR provides major criteria (regional RV
+    akinesia/dyskinesia with RVEDV/BSA >= 110 mL/m² male or >= 100 mL/m²
+    female, or RVEF <= 40%)
+  - Biventricular involvement increasingly recognized (LV involvement in
+    up to 50% of cases)
+
+- HYPERTROPHIC CARDIOMYOPATHY (HCM):
+  - LGE at RV insertion points (very common, low prognostic significance
+    in isolation)
+  - Extensive LGE (> 15% of LV mass): associated with increased SCD risk
+    and may influence ICD decision
+  - Maximal wall thickness measurement (CMR more accurate than echo for
+    apical HCM)
+  - SAM of mitral valve and LVOT obstruction assessment
+  - Fibrosis extent on LGE/ECV predicts arrhythmic risk
+
+- IRON OVERLOAD (CARDIAC):
+  - T2* mapping: Normal > 20 ms. Mild 15-20 ms. Moderate 10-15 ms.
+    Severe < 10 ms (high risk for heart failure and arrhythmia).
+  - T2* < 10 ms requires urgent chelation therapy intensification.
+  - Native T1 is also reduced in iron overload.
+  - Seen in: transfusion-dependent thalassemia, hemochromatosis,
+    sickle cell disease with chronic transfusions.
+
+- TAKOTSUBO (STRESS CARDIOMYOPATHY):
+  - Acute phase: Apical ballooning with basal hyperkinesis (classic pattern),
+    elevated T2 (edema in affected segments), NO LGE (distinguishes from MI).
+  - Absence of LGE is a KEY differentiator from acute MI.
+  - Elevated ECV may be present in affected segments.
+  - Follow-up: Complete recovery of wall motion typically within 1-4 weeks.
+  - Tell patients: "This is a temporary condition where the heart muscle
+    was stunned, usually by severe emotional or physical stress. Unlike
+    a heart attack, there is no permanent scar."
+
+- CHAGAS CARDIOMYOPATHY:
+  - LGE: Inferolateral wall (especially basal segments), often transmural.
+    Apical aneurysm is characteristic.
+  - May mimic ischemic scar but doesn't follow typical coronary territory
+    pattern when combined with apical aneurysm.
+
+### Viability Assessment
+
+CMR is the gold standard for myocardial viability:
+- TRANSMURALITY OF SCAR determines recovery potential:
+  - 0-25% transmural LGE: Very likely to recover with revascularization
+  - 25-50%: Intermediate probability of recovery
+  - 50-75%: Unlikely to recover
+  - > 75%: Very unlikely to recover
+- Combine LGE transmurality with wall thickness:
+  - Thin, scarred segment (end-diastolic thickness < 5.5 mm) + transmural
+    LGE = nonviable regardless of extent
+  - Normal thickness + subendocardial LGE = viable (good recovery expected)
+- Tell patients: "The MRI can show us which parts of your heart muscle
+  are still alive but not getting enough blood (hibernating) versus parts
+  that have turned to scar. This helps us decide if opening the blocked
+  artery would help your heart recover."
+
+### CMR Quantification
+
+- LVEF by CMR: Gold standard for EF measurement (no geometric assumptions
+  like echo). Normal >= 57% male, >= 61% female (may differ slightly from
+  echo EF due to methodology). Serial comparison should use same modality.
+- RVEF by CMR: Normal >= 45%. CMR is the reference standard for RV volumes
+  and function (echo has limited acoustic windows for RV).
+- INDEXED VOLUMES: LVEDVi, LVESVi, RVEDVi normalized to BSA. Important
+  for serial comparison and disease classification.
+- MYOCARDIAL MASS: LV mass index for LVH assessment. CMR-derived mass
+  is more reproducible than echo-derived.
+
+### CMR Abbreviations
+
+- LGE → late gadolinium enhancement (scar/fibrosis mapping)
+- ECV → extracellular volume fraction
+- T1 → longitudinal relaxation time (tissue composition)
+- T2 → transverse relaxation time (edema/inflammation)
+- T2* → effective transverse relaxation (iron quantification)
+- STIR → short tau inversion recovery (edema imaging)
+- SSFP → steady-state free precession (cine imaging)
+- PSIR → phase-sensitive inversion recovery (LGE imaging)
+- MOLLI → Modified Look-Locker Inversion (T1 mapping sequence)
+- SAM → systolic anterior motion (mitral valve)
 
 """
 
@@ -5856,13 +6451,157 @@ _CROSS_BLOCK_HOLTER_CARDIAC = """
   SVT runs are usually benign in a structurally normal heart. In patients
   with cardiomyopathy or prior MI, even brief VT runs may be significant.
 
+- PVC BURDEN INTERPRETATION:
+  - < 1%: Very low, benign in virtually all patients.
+  - 1-10%: Low to moderate. Generally benign with normal cardiac function.
+  - 10-20%: Elevated. May cause PVC-induced cardiomyopathy if sustained
+    over months-years. Recommend echo to assess LV function.
+  - > 20%: High burden. Significant risk of PVC-induced cardiomyopathy.
+    Ablation or suppressive therapy may be warranted.
+  Tell patients with high burden but normal EF: "The frequency of extra
+  beats is high enough that we should monitor your heart function over
+  time to make sure it stays normal." With reduced EF: "The frequent
+  extra beats may be contributing to your heart weakness — treating
+  them could help your heart recover."
+
+- PVC COUPLING INTERVAL:
+  - Fixed coupling interval: Suggests a single ectopic focus (usually benign).
+  - Variable coupling interval: Suggests parasystole or multiple foci
+    (warrants more attention).
+
+- PAC (PREMATURE ATRIAL COMPLEX) BURDEN:
+  - Frequent PACs (> 500/day or > 1% burden) are associated with increased
+    risk of developing atrial fibrillation. This is particularly true with
+    structural heart disease or LA enlargement.
+  - Tell patients: "Frequent extra beats from the upper chambers may
+    indicate a tendency toward atrial fibrillation in the future."
+
+- BIDIRECTIONAL VT: Alternating QRS axis beat-to-beat. Pathognomonic for
+  digitalis toxicity. Also seen in CPVT (catecholaminergic polymorphic VT).
+  This is ALWAYS significant and requires urgent clinical attention.
+
 - ATRIAL FIBRILLATION detected on monitoring warrants CHA2DS2-VASc
   scoring for stroke risk assessment. Even brief paroxysms (minutes)
   carry stroke risk if the score is >= 2 in men or >= 3 in women.
+  - AF BURDEN: Total time in AF matters. Higher burden (>10-20% of
+    recording time) carries greater stroke and heart failure risk.
+  - SUBCLINICAL AF: Device-detected AF episodes lasting > 6 minutes
+    (AHRE — atrial high-rate episodes) may warrant anticoagulation
+    consideration, especially with high CHA2DS2-VASc scores.
 
 - PVC MORPHOLOGY: Uniform (monomorphic) PVCs from a single focus are
   generally more benign than multiform (polymorphic) PVCs. RVOT PVCs
   (LBBB morphology with inferior axis) are the most common benign type.
+  - LBBB morphology (paced from RV or RVOT origin): Usually benign
+  - RBBB morphology (LV origin): More likely to be associated with
+    structural heart disease — warrants further evaluation
+  - Very short coupling interval (R-on-T): Risk of triggering VT/VF
+"""
+
+_CROSS_BLOCK_CMR_CATH = """
+### CMR + Catheterization Correlation
+
+When both cardiac MRI and catheterization data are available:
+- LGE TERRITORY vs CORONARY ANATOMY: Correlate scar location on CMR with
+  the coronary artery disease found on cath. Subendocardial LGE in the LAD
+  territory with LAD stenosis tells a consistent ischemic story.
+- VIABILITY + REVASCULARIZATION: If CMR shows viable myocardium (< 50%
+  transmural LGE) in a territory supplied by a severely stenosed artery,
+  revascularization may improve function. If transmural scar, intervention
+  is unlikely to help that territory.
+- HEMODYNAMICS + CMR VOLUMES: RHC pressures complement CMR volumetric data.
+  Elevated PCWP with CMR showing elevated ECV suggests infiltrative or
+  restrictive cardiomyopathy.
+"""
+
+_CROSS_BLOCK_CTA_STRESS = """
+### CTA + Stress Test Concordance
+
+When both anatomic (CTA) and functional (stress) data are available:
+- CONCORDANT: CTA shows stenosis + stress test shows ischemia in same
+  territory = high confidence that the stenosis is hemodynamically
+  significant and may benefit from intervention.
+- DISCORDANT (CTA positive, stress negative): CTA shows stenosis but
+  stress test is normal. The stenosis may not be flow-limiting. Medical
+  therapy is typically appropriate. Explain: "The CT scan shows some
+  narrowing, but the stress test shows your heart is getting adequate
+  blood flow — this means the narrowing is not currently causing a
+  problem during exertion."
+- DISCORDANT (CTA negative, stress positive): Normal CTA but positive
+  stress test. Consider: false positive stress test (especially in women,
+  LVH, baseline ST abnormalities), microvascular disease, or coronary
+  vasospasm. Explain: "The CT scan does not show significant blockages,
+  but the stress test had some findings. This may indicate a problem
+  with the tiny blood vessels rather than the large arteries."
+"""
+
+_CROSS_BLOCK_PFT_CARDIAC = """
+### PFT + Cardiac Imaging Integration
+
+When both pulmonary function and cardiac imaging data are available:
+- OBSTRUCTIVE PFT + RV DILATION on echo: Consider pulmonary hypertension
+  from chronic lung disease (WHO Group 3 PH). RVSP estimation, TAPSE, and
+  RV size help assess right heart impact of lung disease.
+- RESTRICTIVE PFT + ELEVATED FILLING PRESSURES: May suggest HFpEF
+  contributing to restrictive pattern (pulmonary congestion stiffens lungs)
+  or coexisting pulmonary fibrosis with heart failure.
+- REDUCED DLCO + NORMAL SPIROMETRY + ELEVATED RVSP: Classic triad for
+  pulmonary vascular disease. DLCO reduction reflects loss of
+  pulmonary capillary bed.
+"""
+
+_CROSS_BLOCK_LAB_IMAGING = """
+### Lab + Imaging Correlation
+
+When both laboratory and imaging data are available:
+- ELEVATED TROPONIN + ABNORMAL STRESS TEST: Consistent with acute coronary
+  syndrome. The stress test identifies ischemic territory; troponin confirms
+  myocardial injury. Urgent cardiology evaluation warranted.
+- ELEVATED BNP/NT-proBNP + REDUCED EF: Confirms heart failure diagnosis.
+  BNP correlates with filling pressures. Very high BNP (> 1000 pg/mL)
+  with reduced EF = decompensated heart failure.
+- ELEVATED BNP + PRESERVED EF: Supports HFpEF diagnosis, especially with
+  diastolic dysfunction on echo. Also consider PE, AFib, renal dysfunction.
+- ELEVATED TROPONIN + NORMAL CORONARIES: Type 2 MI (demand ischemia),
+  myocarditis, PE, takotsubo, aortic dissection, or renal impairment.
+  CMR may help differentiate (LGE pattern).
+- ELEVATED TSH + NEW ATRIAL FIBRILLATION or PERICARDIAL EFFUSION:
+  Hypothyroidism can cause both. Connect the lab finding to the imaging.
+"""
+
+_CROSS_BLOCK_BRAIN_MRI = """
+### Brain MRI — Neuroradiology Supplemental Context
+
+- AGE-RELATED WHITE MATTER CHANGES: T2/FLAIR hyperintensities in
+  periventricular and deep white matter are EXTREMELY common with aging.
+  Fazekas scale: Grade 0 (none), Grade 1 (punctate), Grade 2 (early
+  confluent), Grade 3 (confluent). Grade 1 is normal for age > 60.
+  Tell patients: "Small bright spots in the brain's white matter are
+  very common and usually related to aging and blood pressure."
+- NORMAL VARIANTS: Enlarged perivascular spaces (Virchow-Robin spaces),
+  mega cisterna magna, cavum septum pellucidum, pineal cyst < 1 cm,
+  arachnoid cyst — typically incidental and benign.
+- ACUTE STROKE: DWI (diffusion-weighted imaging) bright = acute ischemia
+  (within hours to days). ADC dark confirms true restricted diffusion.
+  Distribution maps to vascular territory (MCA, ACA, PCA, basilar).
+"""
+
+_CROSS_BLOCK_SPINE_MRI = """
+### Spine MRI — Degenerative Disease Context
+
+- AGE-RELATED DEGENERATIVE CHANGES: Disc desiccation, disc bulges, facet
+  arthropathy, and mild canal narrowing are EXTREMELY prevalent:
+  - Age 30: ~30-40% have disc abnormalities on MRI (asymptomatic)
+  - Age 50: ~60-70% have disc abnormalities
+  - Age 70: ~80-90% have disc abnormalities
+  A disc bulge on MRI does NOT necessarily explain symptoms. Clinical
+  correlation is essential. Tell patients: "Many of these findings are
+  normal wear-and-tear changes that most people your age have."
+- CLINICALLY SIGNIFICANT FINDINGS: Nerve root compression with matching
+  dermatome symptoms, severe central canal stenosis (< 10mm AP diameter),
+  cord signal change (myelopathy), cauda equina compression.
+- MODIC CHANGES: Type 1 (edema/inflammation — more likely symptomatic),
+  Type 2 (fatty — chronic, less symptomatic), Type 3 (sclerotic — end-stage).
 """
 
 
@@ -5889,6 +6628,9 @@ def _select_domain_knowledge(prompt_context: dict) -> str:
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_ENDOSCOPY
     elif test_type in ("pathology", "skin_biopsy"):
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_PATHOLOGY
+    elif test_type == "cardiac_mri":
+        # Cardiac MRI needs dedicated CMR tissue characterization knowledge
+        domain = _CLINICAL_DOMAIN_KNOWLEDGE_CARDIAC_MRI
     elif test_type in ("holter_monitor", "event_monitor"):
         # Holter/event monitors need EKG knowledge + cardiac arrhythmia context
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_EKG + _CROSS_BLOCK_HOLTER_CARDIAC
@@ -5907,8 +6649,16 @@ def _select_domain_knowledge(prompt_context: dict) -> str:
     # Category-based routing
     elif category == "lab":
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_LABS
-    elif category in ("imaging_ct", "imaging_mri", "imaging_xray"):
+    elif category in ("imaging_ct", "imaging_xray"):
         domain = _CLINICAL_DOMAIN_KNOWLEDGE_IMAGING
+    elif category == "imaging_mri":
+        # MRI reports get supplemental context for brain/spine — the two most
+        # common non-cardiac MRI types. Since all MRI subtypes share one
+        # test_type ("mri"), we include both supplements (they're short and
+        # only activate when findings match the context).
+        domain = (_CLINICAL_DOMAIN_KNOWLEDGE_IMAGING
+                  + _CROSS_BLOCK_BRAIN_MRI
+                  + _CROSS_BLOCK_SPINE_MRI)
     elif category == "imaging_ultrasound":
         # Route vascular ultrasound types to VASCULAR block for detailed
         # interpretation criteria (carotid, renal artery, AAA, mesenteric)

@@ -95,7 +95,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     _init_sentry()
-    app = FastAPI(title="Explify Sidecar", version="1.06", lifespan=lifespan)
+    app = FastAPI(title="Explify Sidecar", version="1.07", lifespan=lifespan)
     # Middleware order (inner → outer): Auth → Billing → Audit → CORS
     # CORS must be outermost so ALL responses (including 500s) get headers.
     app.add_middleware(AuthMiddleware)
